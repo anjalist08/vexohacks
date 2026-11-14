@@ -9,6 +9,7 @@ from tracker.events import (
     write_log,
 )
 from tracker.pdr import PathTracker, wrap_deg
+from tracker.wrist import WristTracker, make_tracker
 
 _REPLAY_EXPORTS = (
     "PoseRow",
@@ -24,6 +25,8 @@ __all__ = [
     "COLUMNS",
     "Event",
     "PathTracker",
+    "WristTracker",
+    "make_tracker",
     "PoseRow",
     "ReplayReport",
     "SampleLogger",

@@ -551,3 +551,19 @@ body {
 [data-theme="light"] .chip-danger {
   color: #b91c1c;
 }
+
+/* Tracking card (live status from the tracker) */
+.trk-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+.trk-grid dt { color: var(--text-muted); }
+.trk-grid dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }
+.trk-badge.ok { color: var(--success); border-color: var(--success); }
+.trk-badge.warn { color: var(--warning); border-color: var(--warning); }
+.trk-badge.err { color: var(--danger); border-color: var(--danger); }
+.trk-log { display: inline-block; margin-top: 10px; font-size: 13px; color: var(--accent); }
+.trk-log[hidden] { display: none; }

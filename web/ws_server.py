@@ -526,6 +526,25 @@ class _SafeStaticHandler(SimpleHTTPRequestHandler):
         pass
 
 
+def start_status_pump(ws, tracker, stop_event: threading.Event, extra=None, every: float = 0.05) -> threading.Thread:
+    """Broadcast tracker_status() (calibrating, live heading, step counts) 20 times a second, so the facing cone moves smoothly."""
+    from tracker.wrist import tracker_status
+
+    def loop():
+        while not stop_event.wait(every):
+            try:
+                msg = tracker_status(tracker)
+                if extra is not None:
+                    msg.update(extra())
+                ws.broadcast(msg)
+            except Exception as exc:     # never let the status feed kill the server
+                print("    [status] %s" % exc)
+
+    thread = threading.Thread(target=loop, name="tracker-status", daemon=True)
+    thread.start()
+    return thread
+
+
 def _start_static_http(host: str, port: int, root_dir: str) -> ThreadingHTTPServer:
     handler = functools.partial(_SafeStaticHandler, directory=root_dir)
     httpd = ThreadingHTTPServer((host, port), handler)
@@ -605,7 +624,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     from store.route_store import RouteStore
     from tracker.events import read_log
-    from tracker.pdr import PathTracker
+    from tracker.wrist import make_tracker
 
     parser = argparse.ArgumentParser(description="Live Spatial Memory Map WebSocket & HTTP preview server.")
     group = parser.add_mutually_exclusive_group(required=True)
@@ -627,7 +646,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     print(banner)
 
     now_ref = [time.time()]
-    tracker = PathTracker()
+    tracker = make_tracker(synthetic=args.sim)
     store = RouteStore()
     app = SpatialMemoryApp(
         tracker,
@@ -642,13 +661,14 @@ def main(argv: Optional[List[str]] = None) -> int:
     if not args.no_http:
         try:
             httpd = _start_static_http(args.host, args.http_port, repo_root)
-            print("Map page:  http://localhost:%d/web/" % args.http_port)
+            print("Map page:  http://localhost:%d/web/trail.html?ws_port=%d  (team map: /web/?ws_port=%d)" % (args.http_port, args.ws_port, args.ws_port))
         except OSError as exc:
             print("HTTP port %d busy (%s); run python3 -m http.server --bind 127.0.0.1 separately." % (args.http_port, exc))
     print("WebSocket: ws://%s:%d" % (ws.host, ws.port))
     print('Press Ctrl+C to stop, or type commands in the browser map page.')
 
     stop_event = threading.Event()
+    start_status_pump(ws, tracker, stop_event)
     if args.sim:
         worker = threading.Thread(
             target=_run_sim_demo,
