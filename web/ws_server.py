@@ -370,8 +370,12 @@ class MapWebSocketServer:
 
             route = self.app.store.current
             if route is not None:
-                for pt in route.points:
-                    msgs.append({"type": "point", **pt.to_dict()})
+                breaks = set(getattr(route, "breaks", []))
+                for i, pt in enumerate(route.points):
+                    msg = {"type": "point", **pt.to_dict()}
+                    if i in breaks:
+                        msg["jump"] = True       # a re-anchor reset, not a walked step
+                    msgs.append(msg)
                 for lm in route.landmarks:
                     msgs.append({"type": "landmark", **self.app._landmark_payload(lm)})
 

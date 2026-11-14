@@ -2,7 +2,13 @@
 
 The laptop JSON file is the source of truth. Return guidance walks the saved points
 backwards: it never uses a map, and the model never supplies a coordinate.
+
+A re-anchor (arriving somewhere, or "I'm at the elevator") resets the position. The point
+it adds is a jump, listed in Route.breaks: it was never walked, so it is not drawn or used
+as a path, and it is linked to the earlier point at the same place, so guidance can route
+through that place in either direction.
 """
+import heapq
 import json
 import math
 import os
@@ -36,16 +42,19 @@ class Route:
     landmarks: List[Landmark] = field(default_factory=list)
     notes: List[dict] = field(default_factory=list)       # {"point_index", "text"} not tied to a landmark
     active: bool = True
+    breaks: List[int] = field(default_factory=list)       # indices of points reached by a re-anchor jump
 
     def to_dict(self):
         return {"id": self.id, "title": self.title, "active": self.active,
                 "points": [p.to_dict() for p in self.points],
-                "landmarks": [l.to_dict() for l in self.landmarks], "notes": self.notes}
+                "landmarks": [l.to_dict() for l in self.landmarks], "notes": self.notes,
+                "breaks": self.breaks}
 
     @staticmethod
     def from_dict(d):
         return Route(d["id"], d["title"], [PoseSample(**p) for p in d["points"]],
-                     [Landmark(**l) for l in d["landmarks"]], d.get("notes", []), d.get("active", False))
+                     [Landmark(**l) for l in d["landmarks"]], d.get("notes", []), d.get("active", False),
+                     d.get("breaks", []))
 
 
 class RouteStore:
@@ -73,8 +82,11 @@ class RouteStore:
             self.current.active = False
         self.save()
 
-    def add_point(self, sample: PoseSample):
+    def add_point(self, sample: PoseSample, jump: bool = False):
+        """Record a point. jump=True: a re-anchor put the walker here; nobody walked the line to it."""
         if self.current and self.current.active:
+            if jump:
+                self.current.breaks.append(len(self.current.points))
             self.current.points.append(sample)
 
     # --- landmarks and notes ---------------------------------------------------
@@ -138,21 +150,64 @@ class RouteStore:
         pts = self.current.points
         if not pts:
             return []
-        if from_pose is None or math.hypot(from_pose.x_m - pts[-1].x_m, from_pose.y_m - pts[-1].y_m) <= 1e-4:
+        at_last = from_pose is None or math.hypot(from_pose.x_m - pts[-1].x_m, from_pose.y_m - pts[-1].y_m) <= 1e-4
+        if at_last and not self.current.breaks:
             return list(reversed(pts[target_index:]))
-        # Walker moved during a previous return trip without appending reverse points:
-        # start from the closest recorded point on the route.
-        from_idx = min(
-            range(len(pts)),
-            key=lambda idx: math.hypot(from_pose.x_m - pts[idx].x_m, from_pose.y_m - pts[idx].y_m),
-        )
-        if from_idx >= target_index:
-            sub = list(reversed(pts[target_index : from_idx + 1]))
+        if at_last:
+            from_idx = len(pts) - 1
         else:
-            sub = list(pts[from_idx : target_index + 1])
-        if sub and math.hypot(from_pose.x_m - sub[0].x_m, from_pose.y_m - sub[0].y_m) > 0.25:
+            # Walker moved during a previous return trip without appending reverse points:
+            # start from the closest recorded point on the route.
+            from_idx = min(
+                range(len(pts)),
+                key=lambda idx: math.hypot(from_pose.x_m - pts[idx].x_m, from_pose.y_m - pts[idx].y_m),
+            )
+        if self.current.breaks:
+            order = self._graph_path(from_idx, target_index)
+        elif from_idx >= target_index:
+            order = list(range(from_idx, target_index - 1, -1))
+        else:
+            order = list(range(from_idx, target_index + 1))
+        sub = []
+        for i in order:      # same-place links add a duplicate point: keep one
+            if not sub or math.hypot(pts[i].x_m - sub[-1].x_m, pts[i].y_m - sub[-1].y_m) > 1e-6:
+                sub.append(pts[i])
+        if not at_last and sub and math.hypot(from_pose.x_m - sub[0].x_m, from_pose.y_m - sub[0].y_m) > 0.25:
             sub = [from_pose] + sub
         return sub
+
+    def _graph_path(self, start: int, goal: int) -> List[int]:
+        """Shortest index path through the route graph: walked steps are edges, and each jump
+        point is linked (length 0) to the earlier point at the same place. A jump is never an edge."""
+        pts = self.current.points
+        breaks = set(self.current.breaks)
+        adj = {i: [] for i in range(len(pts))}
+        for i in range(1, len(pts)):
+            if i not in breaks:
+                d = math.hypot(pts[i].x_m - pts[i - 1].x_m, pts[i].y_m - pts[i - 1].y_m)
+                adj[i - 1].append((i, d))
+                adj[i].append((i - 1, d))
+        for j in breaks:
+            same = [k for k in range(j) if k not in breaks
+                    and math.hypot(pts[k].x_m - pts[j].x_m, pts[k].y_m - pts[j].y_m) <= 0.05]
+            for k in same:
+                adj[j].append((k, 0.0))
+                adj[k].append((j, 0.0))
+        best, prev, queue = {start: 0.0}, {}, [(0.0, start)]
+        while queue:
+            d, i = heapq.heappop(queue)
+            if i == goal:
+                path = [goal]
+                while path[-1] != start:
+                    path.append(prev[path[-1]])
+                return list(reversed(path))
+            if d > best.get(i, math.inf):
+                continue
+            for j, w in adj[i]:
+                if d + w < best.get(j, math.inf):
+                    best[j], prev[j] = d + w, i
+                    heapq.heappush(queue, (d + w, j))
+        return [start]       # no walked path: guidance will say it is already there
 
     def distance_back(self, target_index: int) -> float:
         pts = self.path_back(target_index)
