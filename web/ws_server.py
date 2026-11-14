@@ -360,6 +360,9 @@ class MapWebSocketServer:
         msgs: List[dict] = []
         with self._app_lock:
             msgs.append({"type": "mode", "mode": self.mode})
+            bridge = getattr(self, "bridge", None)
+            # Chrome may connect the band only when this app is bridging; otherwise Python holds it.
+            msgs.append({"type": "band_number", "band": bridge.number if bridge is not None else None})
             msgs.append({"type": "link", "status": self.link_status})
 
             led_state = getattr(self.app, "led_state", self._led_state) or "idle"
@@ -478,6 +481,24 @@ class MapWebSocketServer:
             if mtype == "ping":
                 client.send_json({"type": "pong"})
                 return
+            if mtype == "band_event":            # band data relayed by Chrome (web/band-bridge.js)
+                bridge = getattr(self, "bridge", None)
+                if bridge is not None:
+                    bridge.receive(parsed)
+                return
+            if mtype == "band_status":
+                handler = getattr(self, "on_bridge_status", None)
+                if handler is not None:
+                    handler(parsed)
+                return
+            if mtype == "talk":                  # the page's Talk / Stop button: same as a double-tap
+                loop = getattr(self, "voice_loop", None)
+                if loop is not None and getattr(loop, "band", None) is not None:
+                    loop.on_double_tap()
+                else:
+                    client.send_json({"type": "voice", "state": "error",
+                                      "text": "Voice needs the live band: run python3 main.py --band."})
+                return
             cmd_text = str(parsed.get("text") or parsed.get("command") or "").strip()
         elif isinstance(parsed, str):
             cmd_text = parsed.strip()
@@ -493,7 +514,13 @@ class MapWebSocketServer:
                 self.app.delete_all()
                 self.broadcast({"type": "say", "text": "All routes and landmarks deleted."})
                 return
-            self.app.keyword_command(cmd_text)
+            loop = getattr(self, "voice_loop", None)
+            if loop is None:
+                self.app.keyword_command(cmd_text)
+                return
+        # With the live voice loop, typed text is understood by Gemini like speech (keyword
+        # fallback inside). Run it off this connection's thread: a model call takes ~1-2 s.
+        threading.Thread(target=loop.run_turn, kwargs={"say_text": cmd_text}, daemon=True).start()
 
 
 # --- Standalone local HTTP + WebSocket preview runner ----------------------------

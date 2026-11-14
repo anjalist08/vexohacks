@@ -14,8 +14,11 @@ Critical band invariants (`vexo-open-kit/AGENTS.md`):
    or `led.reapply` runs.
 """
 import os
+import shutil
+import subprocess
 import sys
 import threading
+import time
 from typing import Callable, Optional, Tuple
 
 import config
@@ -30,6 +33,12 @@ KIT_EXAMPLES_PYTHON = os.path.join(
     "examples",
     "python",
 )
+
+
+def _printable(text: str, limit: int = 200) -> str:
+    """Speech text, safe to print: no terminal control characters, at most `limit` chars."""
+    clean = "".join(c if c.isprintable() else " " for c in str(text))
+    return clean[:limit] + ("..." if len(clean) > limit else "")
 
 
 def _safe_mic_off(band) -> None:
@@ -95,6 +104,8 @@ class VoiceLoop:
         self._turn_lock = threading.Lock()
         self._busy = False
         self._worker: Optional[threading.Thread] = None
+        self._listening = False               # the band's mic is on in toggle mode
+        self._end_listen = threading.Event()  # second double-tap: stop listening now
 
     @classmethod
     def create(
@@ -132,10 +143,61 @@ class VoiceLoop:
         Never listens inside the band event handler thread; only flags `_tap_event`.
         Returns True if a turn was queued, False if ignored because a turn is active.
         """
+        if self._listening:                 # second double-tap: mic off, then answer
+            self._end_listen.set()
+            return True
         if self._busy:
             return False
         self._tap_event.set()
         return True
+
+    def _chime(self, name: str) -> None:
+        """A short macOS system sound, so listening can be followed without looking at a screen."""
+        if not getattr(config, "VOICE_CHIMES", True) or not shutil.which("afplay"):
+            return
+        path = "/System/Library/Sounds/%s.aiff" % name
+        if os.path.exists(path):
+            try:
+                subprocess.Popen(["afplay", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except OSError:
+                pass
+
+    def _listen_toggle(self, speech, on_text) -> str:
+        """Mic on until a second double-tap, a pause after speech, or the time limit.
+
+        The same steps as the kit's speech.listen (create, start, feed audio, mic on, wait,
+        mic off, stop), with an early stop. Runs on the worker thread, never in a band handler.
+        """
+        max_s = float(getattr(config, "LISTEN_MAX_SECONDS", 15.0))
+        pause_s = float(getattr(config, "LISTEN_PAUSE_STOP_SECONDS", 2.0))
+        last_text = [None]
+
+        def _text(text, final):
+            if (text or "").strip():
+                last_text[0] = time.time()
+            on_text(text, final)
+
+        ears = speech.create(keyterm="landmark").start(_text)
+        feed = ears.feed
+        band = self.band
+        band.on("audio", feed)
+        self._end_listen.clear()
+        self._listening = True
+        try:
+            band.configure(audio=True)          # the light goes solid blue: the microphone is on
+            self._chime("Tink")
+            self._status("listening", seconds=max_s, toggle=True)
+            start = time.time()
+            while time.time() - start < max_s and not self._end_listen.is_set():
+                band.wait(0.1)
+                if last_text[0] is not None and time.time() - last_text[0] >= pause_s:
+                    break                       # they stopped talking
+            band.configure(audio=False)
+        finally:
+            self._listening = False
+            band.off("audio", feed)
+        self._chime("Pop")
+        return ears.stop()
 
     def start_background(self) -> threading.Thread:
         """Start a daemon worker thread that runs one turn per queued double-tap."""
@@ -181,6 +243,15 @@ class VoiceLoop:
             except Exception as exc:
                 self._log("Voice turn error (%s)." % _safe_error_summary(exc))
 
+    def _status(self, state: str, **fields) -> None:
+        """Tell the map page where the turn is: listening, heard, thinking, done, nothing, error."""
+        emit = getattr(self.app, "_emit", None)
+        if callable(emit):
+            try:
+                emit(dict({"type": "voice", "state": state}, **fields))
+            except Exception:
+                pass
+
     def _log(self, message: str) -> None:
         if self._log_fn is not None:
             self._log_fn(message)
@@ -205,16 +276,26 @@ class VoiceLoop:
         keys.prepare()
         if say_text is not None:
             words = str(say_text).strip()
+            if words:
+                self._status("heard", text=_printable(words), typed=True)
         else:
             ok, heard, partial_fallback = self._listen_once()
             if partial_fallback:
-                return self.app.keyword_command(partial_fallback)
+                self._status("heard", text=_printable(partial_fallback))
+                result = self.app.keyword_command(partial_fallback)
+                self._status("done", say=result.say if result else "")
+                return result
             if not ok:
+                self._status("error", text="I couldn't hear that. Check the band and try again.")
                 self._restore_led()
                 return None
             words = (heard or "").strip()
+            self._log('Heard: "%s"' % _printable(words) if words else "Heard nothing (speak while the light is blue).")
+            if words:
+                self._status("heard", text=_printable(words))
 
         if not words:
+            self._status("nothing", text="I didn't hear anything. Tap Talk, then speak right away.")
             self._restore_led()
             return None
 
@@ -223,6 +304,7 @@ class VoiceLoop:
             self.app.store.current and getattr(self.app.store.current, "active", False)
         )
         chooser = self._choose_fn or choose_tool
+        self._status("thinking", text=_printable(words))
 
         try:
             tool_name, tool_args = chooser(
@@ -235,9 +317,14 @@ class VoiceLoop:
                 "Gemini unavailable (%s); falling back to keyword command."
                 % _safe_error_summary(exc)
             )
-            return self.app.keyword_command(words)
+            result = self.app.keyword_command(words)
+            self._status("done", say=result.say if result else "", tool="keyword")
+            return result
 
-        return self.app.call_tool(tool_name, tool_args)
+        self._log("Gemini chose %s %s" % (tool_name, _printable(str(tool_args))))
+        result = self.app.call_tool(tool_name, tool_args)
+        self._status("done", say=result.say if result else "", tool=tool_name, ok=bool(result and result.ok))
+        return result
 
     def _listen_once(self) -> Tuple[bool, str, str]:
         """Record one window on `self.band` and guarantee `audio=False` before returning.
@@ -279,7 +366,13 @@ class VoiceLoop:
 
         try:
             speech = _load_kit_speech()
-            transcript = speech.listen(self.band, seconds, on_text=_on_text)
+            if getattr(config, "LISTEN_MODE", "toggle") == "toggle" and hasattr(speech, "create"):
+                transcript = self._listen_toggle(speech, _on_text)
+            else:
+                self._status("listening", seconds=seconds)
+                # keyterm: Deepgram nova-3 prompt for a word the wrist mic often mishears (the
+                # kit sends one keyterm; it cannot repeat the parameter).
+                transcript = speech.listen(self.band, seconds, on_text=_on_text, keyterm="landmark")
             return True, transcript or "", ""
         except (Exception, SystemExit) as exc:
             _safe_mic_off(self.band)

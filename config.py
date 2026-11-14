@@ -42,7 +42,11 @@ DECISION_MIN_CONFIDENCE = 0.75                # below this, ask the user instead
 ELEVENLABS_VOICE_ID = "SAz9YHcvj6GT2YYXdXww"   # River: calm, neutral, informative
 MINIMAX_TTS_MODEL = "speech-2.8-turbo"         # backup voice when ElevenLabs fails (MiniMax T2A)
 MINIMAX_VOICE_ID = "English_Insightful_Speaker"
-LISTEN_SECONDS = 4.0          # how long one tap-to-talk turn records
+LISTEN_SECONDS = 5.0          # fixed-window mode: how long one turn records
+LISTEN_MODE = "toggle"        # "toggle": double-tap = mic on, double-tap again (or pause) = mic off
+LISTEN_MAX_SECONDS = 15.0     # toggle mode: the mic always switches off after this
+LISTEN_PAUSE_STOP_SECONDS = 2.0   # toggle mode: stop this long after the last word heard
+VOICE_CHIMES = True           # short laptop sounds when the mic turns on (Tink) and off (Pop)
 
 # --- Files ------------------------------------------------------------------
 DATA_DIR = "data"
