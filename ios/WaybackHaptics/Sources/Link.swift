@@ -13,12 +13,33 @@ final class Link: ObservableObject {
     private var url: URL?
     private var lastDirectionAt = Date.distantPast
 
+    /// Accepts "172.20.10.13:8790", "ws://172.20.10.13:8790", or a pasted map link like
+    /// "http://172.20.10.13:8091/web/trail.html?ws_port=8790" (uses its ws_port).
+    static func websocketURL(from address: String) -> URL? {
+        var text = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.isEmpty { return nil }
+        if !text.contains("://") { text = "ws://" + text }
+        guard let parsed = URLComponents(string: text), let host = parsed.host, !host.isEmpty else { return nil }
+        var port = parsed.port ?? 8790
+        if let wsPort = parsed.queryItems?.first(where: { $0.name == "ws_port" })?.value, let p = Int(wsPort) {
+            port = p
+        } else if parsed.scheme == "http" || parsed.scheme == "https" {
+            port = 8790      // a map link without ws_port: main.py's default haptics port here
+        }
+        var out = URLComponents()
+        out.scheme = "ws"
+        out.host = host
+        out.port = port
+        return out.url
+    }
+
     func connect(_ address: String) {
-        let text = address.trimmingCharacters(in: .whitespaces)
-        guard let u = URL(string: text.hasPrefix("ws") ? text : "ws://" + text) else {
-            status = "bad address"
+        guard let u = Link.websocketURL(from: address) else {
+            status = "Can't read that address. Type what main.py prints, e.g. 172.20.10.13:8790"
             return
         }
+        task?.cancel(with: .goingAway, reason: nil)
+        task = nil
         url = u
         wanted = true
         open()
@@ -33,11 +54,18 @@ final class Link: ObservableObject {
 
     private func open() {
         guard wanted, let url else { return }
-        status = "connecting to \(url.host ?? "")…"
+        status = "connecting to \(url.absoluteString)…"
         let t = URLSession.shared.webSocketTask(with: url)
         task = t
         t.resume()
         receive(t)
+        // If nothing arrives in 5 s, say what usually causes it.
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            if self.task === t, self.status.hasPrefix("connecting") {
+                self.status = "No answer from \(url.absoluteString). Check: main.py runs with --host hotspot, the Mac is on this phone's hotspot, and Settings > Privacy & Security > Local Network > Wayback is on."
+            }
+        }
     }
 
     private func receive(_ t: URLSessionWebSocketTask) {
@@ -46,11 +74,11 @@ final class Link: ObservableObject {
                 guard let self, self.task === t else { return }
                 switch result {
                 case .success(let message):
-                    self.status = "connected"
+                    if !self.status.hasPrefix("connected") { self.status = "connected to \(self.url?.absoluteString ?? "")" }
                     if case .string(let s) = message { self.handle(s) }
                     self.receive(t)
                 case .failure(let error):
-                    self.status = "lost: \(error.localizedDescription). Retrying…"
+                    self.status = "Could not connect to \(self.url?.absoluteString ?? ""): \(error.localizedDescription). Retrying…"
                     self.task = nil
                     try? await Task.sleep(nanoseconds: 2_000_000_000)
                     self.open()
