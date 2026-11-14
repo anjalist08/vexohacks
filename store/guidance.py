@@ -19,6 +19,17 @@ def _wrap(a: float) -> float:
     return 180.0 if a == -180.0 else a
 
 
+def _along_and_off(px: float, py: float, seg) -> Tuple[float, float]:
+    """Distance along `seg` of the closest point to (px, py), and the distance from it."""
+    dx, dy = seg.end_x - seg.start_x, seg.end_y - seg.start_y
+    length = math.hypot(dx, dy)
+    if length < 1e-9:
+        return 0.0, math.hypot(px - seg.start_x, py - seg.start_y)
+    t = max(0.0, min(length, ((px - seg.start_x) * dx + (py - seg.start_y) * dy) / length))
+    cx, cy = seg.start_x + dx * t / length, seg.start_y + dy * t / length
+    return t, math.hypot(px - cx, py - cy)
+
+
 @dataclass
 class GuidanceSegment:
     """One straight leg of a planned return route."""
@@ -95,6 +106,18 @@ class GuidanceSession:
             "waypoints": [[round(x, 3), round(y, 3)] for x, y in self.waypoints],
         }
 
+    def _on_next_leg(self, px: float, py: float) -> bool:
+        """True when the walker turned a little early and is already walking the next leg:
+        closer to the next segment than to this one, and at least half a step along it.
+        Without this, a turn one step before the corner left guidance stuck on this leg."""
+        i = self.current_index
+        if i + 1 >= len(self.segments):
+            return False
+        cur, nxt = self.segments[i], self.segments[i + 1]
+        along_next, off_next = _along_and_off(px, py, nxt)
+        _, off_cur = _along_and_off(px, py, cur)
+        return along_next >= 0.5 * self.step_length_m and off_next < off_cur
+
     def update(self, sample: PoseSample) -> GuidanceUpdate:
         """Advance guidance state from a newly emitted PoseSample."""
         if not self.active or not self.instructions:
@@ -134,6 +157,9 @@ class GuidanceSession:
             dist_to_end <= radius
             or proj >= seg_len - 0.5 * self.step_length_m
             or (is_final_leg and dist_to_dest <= radius)
+            # people stop a step short of where they set out from: arrive within 1.5 steps
+            or (is_final_leg and proj >= seg_len - 1.5 * self.step_length_m)
+            or self._on_next_leg(px, py)
         )
 
         if reached_waypoint:

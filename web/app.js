@@ -553,7 +553,7 @@
       state.routePoints.forEach(function (pt, idx) {
         var px = toScreenX(pt.x_m);
         var py = toScreenY(pt.y_m);
-        if (idx === 0) {
+        if (idx === 0 || pt.jump) {          // a re-anchor reset was never walked: no line to it
           ctx.moveTo(px, py);
         } else {
           ctx.lineTo(px, py);
@@ -754,7 +754,8 @@
           x_m: Number(msg.x_m || 0),
           y_m: Number(msg.y_m || 0),
           heading_deg: Number(msg.heading_deg || 0),
-          steps: Number(msg.steps || 0)
+          steps: Number(msg.steps || 0),
+          jump: msg.jump === true
         };
         state.currentPose = pt;
         state.hasPose = true;
