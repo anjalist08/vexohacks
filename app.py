@@ -328,7 +328,7 @@ def parse_keywords(text: str, store: RouteStore):
     m = re.match(r"^note[: ]+(.*)$", t)
     if m:
         return "save_note", {"text": m.group(1)}
-    m = re.match(r"^(?:remember|save|mark)(?: this)?(?: place)?(?: as| is)?\s+(.*)$", t) or \
+    m = re.match(r"^(?:remember|save|mark)(?: this)?(?: place| spot| location| point)?(?: as| is)?\s+(.*)$", t) or \
         re.match(r"^this is\s+(.*)$", t)
     if m:
         label, _, note = m.group(1).partition(" near ")

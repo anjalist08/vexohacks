@@ -114,8 +114,17 @@ def build_system_instruction(landmark_summary: str, route_active: bool = False) 
         "use its exact id from the saved landmarks list (for example `lm1`).\n"
         "- If the wearer asks to go back to the start or beginning (and no saved landmark specifically "
         "matches better), call `navigate_to` with `target` set to `\"start\"`.\n"
-        "- If two saved landmarks match ambiguously, or if what the wearer said is unclear, "
-        "call `ask_user` with a short clarifying question."
+        "- The text comes from speech recognition on a small wrist microphone, so words are often "
+        "misheard. Read it as the closest sensible command for this app before giving up. For example: "
+        "'same dislocation' or 'save this vacation' means 'save this location'; 'stat route' or "
+        "'start root' means 'start route'; 'take me back' with no place means the start; "
+        "'remember this' or 'mark this' means save a landmark.\n"
+        "- To save a place: call `remember_landmark`. If no name was said, use the label `\"spot N\"` "
+        "where N is one more than the number of saved landmarks, rather than asking.\n"
+        "- If no route is active and the wearer wants to save a place or walk, call `start_route` first "
+        "only when they clearly asked to start; otherwise still pick the closest tool.\n"
+        "- Only if two saved landmarks match equally, or the text has no plausible command at all, "
+        "call `ask_user` with a short question that offers the two or three likeliest commands."
     ) % (summary, active_label)
 
 
