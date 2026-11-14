@@ -13,6 +13,18 @@ The original plan was written for an iPhone and Apple Watch. The band changes fo
 - **Division of labour:** Gemini picks the tool and matches place names. Code computes every coordinate and route. The model never invents a position.
 - **Cut from the original plan:** iPhone app, Apple Watch haptics, AirPods, barometer floors, object-loss detection, Vexo MCP.
 - **Time:** it is 11:15 AM Pacific and submissions close at 6:00 PM. Target a complete submission by 5:30 PM.
+- **Pitch line:** *"Vexo remembers what you said. We make it remember **where** you said it."* (Vexo, the host, pitches its band as an always-listening bracelet that remembers everything you say.)
+
+## Sponsor tracks we enter
+
+Overall awards and sponsor-track awards are separate, so one pipeline can compete in three tracks. Enter all three on Devpost.
+
+| Track | Prize | What qualifies us | Requirement to meet |
+| --- | --- | --- | --- |
+| Deepgram: Best Voice Use Case **on Pipecat** | Up to $100k Deepgram credits + Switches | Band mic → Deepgram STT inside a Pipecat pipeline | **The voice loop must run in Pipecat.** The kit's `voice_commands.py` alone does not count (see Voice and agent) |
+| Google DeepMind: Best Use of Gemini 4 | GCP credits | Gemini 4 picks tools and matches place names | Use a Gemini 4 model id (confirm in the sponsor channel) |
+| ElevenLabs: Best ElevenLabs Project | 3 months Scale per member | Spoken turn-by-turn guidance | ElevenLabs TTS, not browser TTS, in the Gold demo |
+| Stripe: Best Economic Agent | Stripe credits | Not a fit | Skip |
 
 ## Band reality check
 
@@ -21,7 +33,7 @@ Five of the original plan's sensing and output assumptions do not hold on the ba
 | Need | Original plan | What the band offers | Decision |
 | --- | --- | --- | --- |
 | Heading | Phone compass plus gyro | Accelerometer and gyroscope only, no magnetometer | Integrate gyro yaw. Snap turns to multiples of 90 degrees. Re-anchor at landmarks. |
-| Distance | `CMPedometer` distance | Steps, cadence and `still`/`walk`/`run` state, once per second. `steps` is a lifetime total. | Fixed step length from one measured walk. Subtract the first step count seen. |
+| Distance | `CMPedometer` distance | Steps, cadence and `still`/`walk`/`run` state, once per second by default and up to 10 per second with `configure(activity="fastest")` (firmware 1.1). `steps` is a lifetime total. | Use `activity="fastest"`. Fixed step length from one measured walk. Subtract the first step count seen. |
 | Haptic cue | Apple Watch | None | LED color and pattern, plus spoken cue |
 | Spoken output | AirPods | No speaker | ElevenLabs audio on the laptop speaker |
 | Voice input | Phone microphone | Opus microphone. LED is locked solid blue while it is on. | Deepgram speech to text. Listen, switch mic off, then respond. |
@@ -81,9 +93,9 @@ The route is a list of (x, y) points in meters from the start, built from step c
 **Algorithm**
 
 1. On "start route," set the position to (0, 0) and heading to 0. Stand still for about two seconds and average the gyro to measure its bias.
-2. Configure `activity=True` and the motion stream. Each `activity` event gives a lifetime `steps` total, so new steps = current minus last seen.
+2. Configure `activity="fastest"` (10 readings a second instead of 1) and the motion stream. Each `activity` event gives a lifetime `steps` total, so new steps = current minus last seen.
 3. Distance = new steps times a fixed step length. Measure the step length once by walking a known distance and dividing by the steps counted.
-4. Compute yaw rate as the gyro vector projected onto gravity, where gravity is a low-pass of the accelerometer. Subtract the bias and integrate only while the activity state is `walk`.
+4. Compute yaw rate as the gyro vector projected onto gravity, where gravity is a low-pass of the accelerometer. Subtract the bias and **integrate yaw all the time**, not only while the state is `walk`. People slow down or stop at corners, so the state often reads `still` exactly while they turn, and a walk-only integration would lose the turn. Use `still` periods only to re-estimate the gyro bias (and only when the gyro magnitude is also near zero).
 5. Advance the position with the plan's formula: `x += distance * sin(heading)`, `y += distance * cos(heading)`.
 6. **Turn snapping:** after a turn settles, round the net heading change to the nearest 90 degrees. This keeps hallways straight and stops small gyro errors from accumulating. Add a switch to turn it off outdoors or in curved spaces.
 7. A landmark stores the index of the current route point plus its label, floor label and transcript.
@@ -128,7 +140,8 @@ A double-tap on the band starts one listening turn, Gemini picks a tool, code ru
 - If a landmark id does not exist, code rejects the call and the agent asks the user.
 - If speech-to-text or the model fails, a text box on the map page runs the same tools with keyword matching.
 - Keep the model name and voice id in one config file. Keep keys in `.env`.
-- Use the kit's example `voice_commands.py` as the template: it already goes band microphone to Deepgram to a tool-calling model. Replace its OpenAI call with Gemini.
+- Use the kit's example `voice_commands.py` as the template: it already goes band microphone to Deepgram to a tool-calling model. Replace its OpenAI call with Gemini. Note that the kit's `ai.py` reads `OPENAI_API_KEY`: do not run it with anyone's personal OpenAI key.
+- **Pipecat (needed for the Deepgram track).** Treat `voice_commands.py` as the safe baseline that gets the loop working first. The voice owner then ports the same loop into a Pipecat pipeline on a branch: Deepgram STT service → Gemini LLM service with the same tools → ElevenLabs TTS service → local audio out. Start with the laptop mic as the Pipecat input. Then feed band audio: decode the band's Opus packets with the kit's decoder helper (`docs/speech.md`) to 16 kHz PCM and push them into the pipeline. Merge when one spoken turn works end to end. If the port is not working by about 15:30, ship the baseline and drop the Deepgram track knowingly.
 - The band's audio goes to Deepgram only while the mic is on and a key is set. Use tap-to-talk, not always-on listening.
 
 ## Feedback vocabulary
@@ -140,13 +153,15 @@ Your four "vibration" states become four LED patterns plus a spoken line, becaus
 | Start location set | Green, blink | "Route started." |
 | Travelling (recording) | Amber, breathe | None, to avoid chatter |
 | Landmark saved | Purple, solid for about 1.5 s | "Saved: entrance." |
-| Navigating back | Amber, breathe | Turn and step count, e.g. "Turn left, walk 18 steps." |
-| Turn now | White, blink | "Turn left." |
+| Navigating back | White, breathe (different from recording, so the wrist shows which mode you are in) | Turn and step count, e.g. "Turn left, walk 18 steps." |
+| Turn now | White, blink (period shortens as the turn gets closer) | "Turn left." |
 | Arrived | Green solid, then rainbow | "You have reached the entrance." |
 | Position uncertain | Red, blink | "I'm not sure where we are. Say where you are to re-anchor." |
 | Listening | Solid blue, set by the band | None |
 
 **Accessibility honesty.** The LED helps a wearer who can see their wrist and anyone nearby. For a blind or low-vision user, audio is the channel that carries the guidance, and the demo should say so. The band cannot provide tactile output, so do not claim haptic or braille support.
+
+**Output modes (setting, stretch).** *Both* (default), *light-only* (deaf or hard-of-hearing users, or a quiet "stealth" mode late at night with lower brightness) and *voice-only* (blind or low-vision users). Gemini can switch modes with a `set_mode(mode)` tool.
 
 **Limits.** The LED resets when the link drops, and brightness is capped on low battery. Re-apply the current state after every reconnect.
 
@@ -266,6 +281,7 @@ Submit a complete version by 5:30 PM Pacific. Submissions close at 6:00 PM and j
 - [ ] A README that states the limits: wrist heading, drift, no haptics, carry assumption.
 - [ ] A demo video and a repeatable judge script.
 - [ ] A public GitHub repo with commits made after the allowed build start, a README covering the problem, how it works, setup and limitations, and the Devpost entry with every required field.
+- [ ] Devpost entry lists all three sponsor tracks (Deepgram/Pipecat, Gemini 4, ElevenLabs), and the README says where each is used.
 
 **Submission owner** is named early and checks every link on the final page before 5:30 PM.
 
