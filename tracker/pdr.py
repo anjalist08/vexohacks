@@ -70,6 +70,12 @@ class PathTracker:
         with self._lock:
             self.running = False
 
+    def resume(self):
+        """Keep tracking from the current position (e.g. to guide someone back after stop)."""
+        with self._lock:
+            self.running = True
+            self._last_motion_t = None
+
     def on_sample(self, fn: Callable[[PoseSample], None]):
         """Call fn(PoseSample) for every new route point."""
         self._listeners.append(fn)

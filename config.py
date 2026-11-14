@@ -28,6 +28,11 @@ STILL_GYRO_DPS = 3.0          # gyro magnitude below this (with state "still") c
 # --- Return guidance ----------------------------------------------------------
 SEGMENT_MERGE_DEG = 30.0      # consecutive moves within this many degrees form one segment
 MIN_SEGMENT_M = 0.5           # segments shorter than this are dropped from the spoken route
+TURN_WARN_STEPS = 5           # say "in N steps, turn left" this many steps before a corner
+TURN_NOW_STEPS = 1.5          # say "turn left now" this close to a corner
+ARRIVE_STEPS = 2.0            # within this many steps of the destination counts as arrived
+OFF_ROUTE_M = 4.0             # PLACEHOLDER: farther than this from the path counts as off route
+WRONG_WAY_M = 3.0             # going back this far along the path counts as the wrong way
 
 # --- Output -----------------------------------------------------------------
 OUTPUT_MODE = "both"          # "both", "light-only" or "voice-only" (stretch goal)

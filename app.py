@@ -10,6 +10,7 @@ from typing import Callable, Optional
 
 import config
 from interfaces import OUTPUT_MODES, TOOLS, ToolResult
+from store.navigator import Navigator
 from store.route_store import RouteStore
 from tracker.pdr import PathTracker
 
@@ -27,7 +28,21 @@ class SpatialMemoryApp:
         self.mode = config.OUTPUT_MODE
         self.guidance = []                # Instructions of the current return trip
         self.on_result = []               # functions called with every ToolResult (e.g. the dashboard)
-        tracker.on_sample(store.add_point)
+        self.navigator = None             # store.navigator.Navigator while guiding someone back
+        tracker.on_sample(self._on_sample)
+
+    def _on_sample(self, sample):
+        """Every new position: record it, or, while guiding, follow it along the path."""
+        nav = self.navigator
+        if nav is None:
+            self.store.add_point(sample)
+            return
+        for result in nav.update(sample):
+            self.output(result)
+        if nav.arrived and self.navigator is nav:
+            self.navigator = None
+            x, y = nav.target
+            self.tracker.reanchor(x, y, self.tracker.heading, sample.t)   # cancel drift at the destination
 
     # --- dispatch ----------------------------------------------------------------
     def call_tool(self, name: str, args: Optional[dict] = None) -> ToolResult:
@@ -48,18 +63,21 @@ class SpatialMemoryApp:
         if self.mode != "light-only" and result.say:
             self.speak(result.say)
         if self.mode != "voice-only" and result.led and self.led is not None:
-            self.led.show(result.led)
+            self.led.show(result.led, period=result.data.get("led_period"))
         for fn in self.on_result:
             fn(result)
         return result
 
     # --- tools ---------------------------------------------------------------------
     def start_route(self, title: str = None) -> ToolResult:
+        self.navigator = None
+        self.guidance = []
         first = self.tracker.start(self.clock())
         route = self.store.start_route(title, first)
         return ToolResult(True, "Route started. Stand still for a moment.", "route_started", {"route": route.id})
 
     def stop_route(self) -> ToolResult:
+        self.navigator = None
         self.tracker.stop()
         self.store.stop_route()
         return ToolResult(True, "Route saved.", "idle")
@@ -111,7 +129,13 @@ class SpatialMemoryApp:
                 return ToolResult(False, "The %s is on an earlier route, so I can't guide you there." % lm.label,
                                   "uncertain")
             index, name = lm.point_index, lm.label
-        self.guidance = self.store.plan_return(index, name, self.tracker.pose.heading_deg, self.tracker.step_length_m)
+        self.guidance = self.store.plan_return(index, name, self.tracker.heading, self.tracker.step_length_m)
+        segments = self.store.return_segments(index)
+        if not segments:
+            return ToolResult(True, "You're already at the %s." % name, "arrived")
+        self.navigator = Navigator(segments, self.guidance, name, self.tracker.step_length_m)
+        if not self.tracker.running:
+            self.tracker.resume()
         steps = [i.text for i in self.guidance]
         say = steps[0] if len(steps) == 1 else " Then ".join([steps[0]] + [s[0].lower() + s[1:] for s in steps[1:]])
         return ToolResult(True, say, "navigating", {"instructions": [i.to_dict() for i in self.guidance]})

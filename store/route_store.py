@@ -141,31 +141,45 @@ class RouteStore:
         pts = self.path_back(target_index)
         return sum(math.hypot(b.x_m - a.x_m, b.y_m - a.y_m) for a, b in zip(pts, pts[1:]))
 
-    def plan_return(self, target_index: int, target_name: str, facing_deg: float,
-                    step_length_m: float = None) -> List[Instruction]:
-        """Turn-by-turn steps along the recorded path, back to target_index."""
-        step_len = step_length_m or config.STEP_LENGTH_M
-        pts = self.path_back(target_index)
+    def return_segments(self, target_index: int) -> List[dict]:
+        """The recorded path back to target_index, merged into straight segments.
 
-        segments = []    # [heading, dx, dy]
+        Each segment: {"heading": deg, "dist": m, "start": (x, y), "end": (x, y)}, in walking
+        order. Consecutive segments join end to start, so the corners form a polyline.
+        """
+        pts = self.path_back(target_index)
+        raw = []    # [heading, dx, dy, start_x, start_y]
         for a, b in zip(pts, pts[1:]):
             dx, dy = b.x_m - a.x_m, b.y_m - a.y_m
             if math.hypot(dx, dy) < 1e-6:
                 continue
             h = math.degrees(math.atan2(dx, dy))
-            if segments and abs(_wrap(h - segments[-1][0])) <= config.SEGMENT_MERGE_DEG:
-                seg = segments[-1]
+            if raw and abs(_wrap(h - raw[-1][0])) <= config.SEGMENT_MERGE_DEG:
+                seg = raw[-1]
                 seg[1] += dx
                 seg[2] += dy
                 seg[0] = math.degrees(math.atan2(seg[1], seg[2]))
             else:
-                segments.append([h, dx, dy])
-        segments = [s for s in segments if math.hypot(s[1], s[2]) >= config.MIN_SEGMENT_M]
+                raw.append([h, dx, dy, a.x_m, a.y_m])
+        out = []
+        for h, dx, dy, sx, sy in raw:
+            if math.hypot(dx, dy) < config.MIN_SEGMENT_M:
+                continue
+            start = out[-1]["end"] if out else (sx, sy)       # keep the polyline connected
+            end = (sx + dx, sy + dy)
+            dist = math.hypot(end[0] - start[0], end[1] - start[1])
+            out.append({"heading": math.degrees(math.atan2(end[0] - start[0], end[1] - start[1])),
+                        "dist": dist, "start": start, "end": end})
+        return out
 
+    def plan_return(self, target_index: int, target_name: str, facing_deg: float,
+                    step_length_m: float = None) -> List[Instruction]:
+        """Turn-by-turn steps along the recorded path, back to target_index."""
+        step_len = step_length_m or config.STEP_LENGTH_M
         out: List[Instruction] = []
         facing = facing_deg
-        for h, dx, dy in segments:
-            dist = math.hypot(dx, dy)
+        for seg in self.return_segments(target_index):
+            h, dist = seg["heading"], seg["dist"]
             steps = max(1, int(round(dist / step_len)))
             delta = _wrap(h - facing)
             if abs(delta) < 45:
