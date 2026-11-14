@@ -41,6 +41,13 @@ class SpatialMemoryApp:
         self._last_pose: Optional[PoseSample] = None
         self._event_listeners: List[Callable[[dict], None]] = []
         tracker.on_sample(self.on_pose)
+        if hasattr(tracker, "on_uncertainty"):
+            tracker.on_uncertainty(self._on_tracker_uncertainty)
+
+    def _on_tracker_uncertainty(self, uncertain: bool) -> None:
+        if uncertain and self.store.current is not None and self.store.current.active:
+            self._say_text("I'm not sure where we are. Say where you are to re-anchor.")
+            self._show_led("uncertain")
 
     @property
     def current_pose(self) -> PoseSample:
