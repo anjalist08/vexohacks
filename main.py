@@ -146,6 +146,29 @@ def run_replay(path, ws_port=8765, http_port=8000, no_web=False):
     return 0
 
 
+class _QueuedSpeaker:
+    """Speaks in a background thread, one line after another. Speaking (ElevenLabs request
+    plus playback) takes seconds; called directly it held up the band's data and the map."""
+
+    def __init__(self, inner):
+        import queue
+        self._inner = inner
+        self._q = queue.Queue()
+        threading.Thread(target=self._run, name="speaker", daemon=True).start()
+
+    def __call__(self, text):
+        self._q.put(text)
+        return text
+
+    def _run(self):
+        while True:
+            text = self._q.get()
+            try:
+                self._inner(text)
+            except Exception as exc:
+                print("    [speech failed] %s" % exc)
+
+
 def run_band(ws_port=8765, http_port=8000, no_web=False, usb=False):
     from tracker import band_source
     from voice.elevenlabs_tts import ElevenLabsSpeaker
@@ -158,7 +181,7 @@ def run_band(ws_port=8765, http_port=8000, no_web=False, usb=False):
     tracker = make_tracker()
     logger = SampleLogger(log_dir)
     led = LedController()
-    speaker = ElevenLabsSpeaker()
+    speaker = _QueuedSpeaker(ElevenLabsSpeaker())   # speaking never blocks the band or the map
     app = SpatialMemoryApp(tracker, RouteStore(routes_file), speak=speaker, led=led)
     voice_loop = VoiceLoop(app, listen_seconds=config.LISTEN_SECONDS)
     ws, httpd = _start_web_servers(
