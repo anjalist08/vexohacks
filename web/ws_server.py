@@ -497,7 +497,7 @@ class MapWebSocketServer:
                     loop.on_double_tap()
                 else:
                     client.send_json({"type": "voice", "state": "error",
-                                      "text": "Voice needs the live band: run python3 main.py --band."})
+                                      "text": "Voice needs the live band: run python3 main.py --band (or --bridge)."})
                 return
             cmd_text = str(parsed.get("text") or parsed.get("command") or "").strip()
         elif isinstance(parsed, str):

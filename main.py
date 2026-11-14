@@ -285,7 +285,9 @@ def run_bridge(ws_port=8765, http_port=8000):
     led.band = band
     voice_loop.band = band
     voice_loop.start_background()
-    print("Open http://localhost:%d/web/ in Chrome, double-tap the band, then click \"Connect band\"." % http_port)
+    print("Open in Chrome:  http://localhost:%d/web/trail.html?ws_port=%d   (or the team map http://localhost:%d/web/)"
+          % (http_port, ws_port, http_port))
+    print("Double-tap the band, then click \"Connect band (Chrome)\" and pick it in the list.")
     print("Logging every sample to %s" % logger.path)
     try:
         repl(app)

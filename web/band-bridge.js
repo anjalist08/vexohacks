@@ -5,6 +5,7 @@
 // Rules from vexo-open-kit/AGENTS.md: only the team's band (the number comes from Python's
 // config.BAND), connect only from a click, and show problems on the page.
 import { Band } from '../vexo-open-kit/js/src/index.js';
+import { relayBand, runBandCommand } from './band-relay.js';
 
 const $ = (id) => document.getElementById(id);
 const btn = $('bridge-btn');
@@ -29,12 +30,6 @@ function show(text, level) {
   btn.dataset.level = level || '';
 }
 
-function b64(bytes) {
-  let s = '';
-  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-  return btoa(s);
-}
-
 function openSocket() {
   ws = new WebSocket(wsUrl());
   ws.addEventListener('message', (ev) => {
@@ -45,43 +40,10 @@ function openSocket() {
       btn.disabled = !bandNumber || !!band;
       if (!band) show(bandNumber ? 'Connect band ' + bandNumber : 'Band is connected by the app', bandNumber ? '' : 'ok');
     } else if (msg.type === 'band_cmd' && band) {
-      runCommand(msg).catch(() => { /* e.g. LED locked while the mic is on: Python retries */ });
+      runBandCommand(band, msg).catch(() => { /* e.g. LED locked while the mic is on: Python retries */ });
     }
   });
   ws.addEventListener('close', () => setTimeout(openSocket, 1500));
-}
-
-async function runCommand(msg) {
-  const a = msg.args || {};
-  if (msg.op === 'configure') {
-    await band.configure(a);
-  } else if (msg.op === 'setLed') {
-    await band.setLed(a.color || '#ffffff', { brightness: a.brightness ?? 1, pattern: a.pattern || 'solid',
-                                               period: a.period || 1000 });
-  } else if (msg.op === 'ledOff') {
-    await band.ledOff();
-  }
-}
-
-function relay(b) {
-  const s = (ms) => (typeof ms === 'number' ? ms / 1000 : Date.now() / 1000);   // Python uses seconds
-  b.on('motion', (m) => send({ type: 'band_event', kind: 'motion', time: s(m.time),
-    ax: m.ax, ay: m.ay, az: m.az, gx: m.gx, gy: m.gy, gz: m.gz }));
-  b.on('activity', (e) => send({ type: 'band_event', kind: 'activity', time: s(e.time),
-    steps: e.steps, cadence: e.cadence, state: e.state, motion: e.motion }));
-  b.on('event', (e) => send({ type: 'band_event', kind: 'event', time: s(e.time), event: e.kind, arg: e.arg ?? null }));
-  b.on('battery', (e) => send({ type: 'band_event', kind: 'battery', percent: e.percent,
-    millivolts: e.millivolts, state: e.state }));
-  b.on('temperature', (e) => send({ type: 'band_event', kind: 'temperature', time: s(e.time), celsius: e.celsius }));
-  b.on('audio', (e) => send({ type: 'band_event', kind: 'audio', seq: e.seq, opus: b64(e.opus) }));
-  b.on('reconnecting', () => { show('Reconnecting...', 'warn'); send({ type: 'band_status', status: 'reconnecting' }); });
-  b.on('reconnected', () => { show(b.name, 'ok'); send({ type: 'band_status', status: 'reconnected', name: b.name }); });
-  b.on('disconnect', (e) => {
-    band = null;
-    show('Disconnected - double-tap the band, then connect', 'err');
-    btn.disabled = false;
-    send({ type: 'band_status', status: 'disconnected', reason: e.reason || '' });
-  });
 }
 
 btn.addEventListener('click', async () => {
@@ -92,7 +54,15 @@ btn.addEventListener('click', async () => {
     const b = await Band.connect(bandNumber, { autoReconnect: true });   // only the team's band
     if (b.number !== bandNumber) { await b.disconnect(); throw new Error('That is not band ' + bandNumber + '.'); }
     band = b;
-    relay(b);
+    relayBand(b, send, (state) => {
+      if (state === 'reconnecting') show('Reconnecting...', 'warn');
+      else if (state === 'reconnected') show(b.name, 'ok');
+      else if (state === 'disconnected') {
+        band = null;
+        show('Disconnected - double-tap the band, then connect', 'err');
+        btn.disabled = false;
+      }
+    });
     show(b.name + ' (Chrome)', 'ok');
     send({ type: 'band_status', status: 'connected', name: b.name, firmware: b.info && b.info.firmware });
   } catch (e) {

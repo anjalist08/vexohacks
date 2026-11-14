@@ -182,5 +182,14 @@ class ToggleListenTests(unittest.TestCase):
         self.assertTrue(res.ok)
 
 
+
+class KeywordFallbackPhrasingTests(unittest.TestCase):
+    def test_save_this_spot_as(self):
+        from app import parse_keywords
+        store = RouteStore()
+        for text in ("save this spot as the desk", "save this location as the desk", "remember this as the desk"):
+            self.assertEqual(parse_keywords(text, store), ("remember_landmark", {"label": "desk"}), text)
+
+
 if __name__ == "__main__":
     unittest.main()
