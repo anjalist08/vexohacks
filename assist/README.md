@@ -28,6 +28,22 @@ announce. Light-only mode sends no vibration.
 **Android Chrome only.** iPhone browsers do not let a web page vibrate; there the page
 still shows and announces every cue, and the spoken audio carries the guidance.
 
+### iPhone and Apple Watch: notifications through ntfy
+
+No app of our own is needed. A notification buzzes the iPhone, or taps the Apple Watch
+when the phone is locked. Install the free **ntfy** app on the iPhone, then:
+
+    python3 -m assist.phone_server --demo --ntfy new     # prints a random topic to subscribe to
+
+| Sent | Not sent |
+| --- | --- |
+| "Are you at a saved place?", "You have arrived.", "Not sure where you are." | turns, landmark names, routes, positions, anything the user said |
+
+Every notification feels the same and can arrive a second or more late, so turns stay
+with the spoken audio. Messages go through the ntfy server (ntfy.sh by default, or your
+own with `--ntfy-server`); anyone who knows the topic can read it, so keep it private.
+Custom vibration patterns on iPhone or Apple Watch would need a native app.
+
 ## Localization
 
 - **Arrival prompts.** On the way back, near each saved landmark the app asks "Are you at
@@ -61,6 +77,8 @@ contain landmark names, so use it on a network you trust.
     helper = attach(app, send=hub.broadcast)
     hub.on_message = helper.on_phone_message
     server, url = start(hub)
+    # iPhone / Apple Watch: from assist.notify import NtfySender, fan_out
+    #   helper.send = fan_out(hub.broadcast, NtfySender(topic))
     # on the band's double-tap, when a prompt is open: helper.confirm()
 
 Tests: `tests/test_assist.py`.

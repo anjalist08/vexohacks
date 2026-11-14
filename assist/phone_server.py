@@ -158,27 +158,42 @@ def main(argv=None):
     p.add_argument("--host", default="0.0.0.0", help="0.0.0.0 so the phone can reach it")
     p.add_argument("--cert", help="certificate file, for https (needed for the compass)")
     p.add_argument("--key", help="its private key file")
+    p.add_argument("--ntfy", metavar="TOPIC",
+                   help="also notify an iPhone / Apple Watch through the ntfy app; 'new' makes a topic")
+    p.add_argument("--ntfy-server", default=None, help="your own ntfy server (default https://ntfy.sh)")
     a = p.parse_args(argv)
+
+    from assist import notify
+    ntfy = None
+    if a.ntfy:
+        topic = notify.new_topic() if a.ntfy == "new" else a.ntfy
+        ntfy = notify.NtfySender(topic, a.ntfy_server or notify.DEFAULT_SERVER)
+        print("ntfy: in the ntfy app on the iPhone, subscribe to this topic (keep it private):\n\n"
+              "    %s\n\nOnly generic words are sent (see assist/notify.py).\n" % topic)
 
     hub = PhoneHub()
     server, url = start(hub, a.host, a.port, a.cert, a.key)
-    print("On the phone (same Wi-Fi), open:\n\n    %s\n\nthen tap Start. Ctrl-C to stop." % url)
-    hub.connected.wait()
+    print("On an Android phone (same Wi-Fi), open:\n\n    %s\n\nthen tap Start. Ctrl-C to stop." % url)
+    if ntfy is None:
+        hub.connected.wait()
+    else:
+        input("\nPress Enter to begin (no need to open the page on an iPhone). ")
     time.sleep(1.5)
+    send_all = notify.fan_out(hub.broadcast, ntfy)
     try:
         if a.learn:
             from assist.haptics import HAPTIC_PATTERNS, haptic_message
             for cue in HAPTIC_PATTERNS:
                 name = cue.replace("_", " ")
                 print("    [BUZZ] %s" % name)
-                hub.broadcast(haptic_message(cue, name))
+                send_all(haptic_message(cue, name))
                 time.sleep(3.0)
         else:
             from assist import demo
 
             def send(msg):
                 demo.print_haptic(msg)
-                hub.broadcast(msg)
+                send_all(msg)
             demo.run(send=send, pause=3.0)
     except KeyboardInterrupt:
         pass

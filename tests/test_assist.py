@@ -193,5 +193,60 @@ class PhoneLinkTests(unittest.TestCase):
             server.server_close()
 
 
+class NtfyTests(unittest.TestCase):
+    def sender(self, posts, now):
+        from assist.notify import NtfySender
+        return NtfySender("vexo-test-topic-123456", post=lambda u, b, h: posts.append((u, b, h)) or 200,
+                          clock=lambda: now[0], background=False)
+
+    def test_only_key_moments_and_never_names(self):
+        from assist.haptics import haptic_message
+        posts, now = [], [0.0]
+        send = self.sender(posts, now)
+        self.assertFalse(send(haptic_message("turn_left", "Turn left, walk 18 steps.")))
+        self.assertTrue(send(haptic_message("confirm_prompt", "Are you at the elevator?")))
+        url, body, headers = posts[0]
+        self.assertEqual(url, "https://ntfy.sh/vexo-test-topic-123456")
+        self.assertNotIn(b"elevator", body)
+        self.assertEqual(headers["Priority"], "high")
+
+    def test_repeats_are_held_back(self):
+        from assist.haptics import haptic_message
+        posts, now = [], [0.0]
+        send = self.sender(posts, now)
+        send(haptic_message("arrived"))
+        send(haptic_message("arrived"))
+        now[0] = 5.0
+        send(haptic_message("arrived"))
+        self.assertEqual(len(posts), 2)
+
+    def test_failure_does_not_stop_guidance(self):
+        from assist.haptics import haptic_message
+        from assist.notify import NtfySender
+
+        def broken(*a):
+            raise OSError("offline")
+        send = NtfySender("vexo-test-topic-123456", post=broken, background=False)
+        self.assertTrue(send(haptic_message("uncertain")))
+        self.assertEqual(send.sent, 0)
+
+    def test_short_topics_are_refused(self):
+        from assist.notify import NtfySender, new_topic
+        with self.assertRaises(ValueError):
+            NtfySender("vexo")
+        self.assertGreater(len(new_topic()), 20)
+
+    def test_demo_sends_only_generic_notifications(self):
+        from assist import demo
+        from assist.notify import NtfySender, fan_out
+        posts, ticks = [], iter(range(0, 10000, 10))     # each cue 10 s apart, as on a real walk
+        ntfy = NtfySender("vexo-test-topic-123456", post=lambda u, b, h: posts.append(b) or 200,
+                          clock=lambda: float(next(ticks)), background=False)
+        demo.run(send=fan_out(lambda m: None, ntfy), speak=lambda t: None)
+        self.assertEqual([b.decode() for b in posts],
+                         ["Are you at a saved place? Double-tap for yes.",
+                          "Are you at a saved place? Double-tap for yes.", "You have arrived."])
+
+
 if __name__ == "__main__":
     unittest.main()
