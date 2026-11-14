@@ -1,0 +1,862 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wayback Trail Commercial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000000;
+    --fg: #f5f5f7;
+    --muted: #86868b;
+    --glass: rgba(28, 28, 30, 0.72);
+    --line: rgba(255, 255, 255, 0.14);
+    --blue: #0a84ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font-family: "Montserrat", system-ui, sans-serif; }
+  body { display: grid; grid-template-rows: 1fr auto; min-height: 100vh; overflow: hidden; }
+  .stage { display: grid; place-items: center; min-height: 0; padding: 16px; }
+  canvas { width: min(100%, calc((100vh - 110px) * 16 / 9)); aspect-ratio: 16 / 9; height: auto; display: block; border-radius: 14px; background: #000; box-shadow: 0 30px 80px rgba(0,0,0,.6); }
+  .bar { display: flex; gap: 12px; align-items: center; padding: 12px 16px 18px; max-width: 1100px; width: 100%; margin: 0 auto; }
+  button { font: 600 14px "Montserrat", sans-serif; color: var(--fg); background: var(--glass); border: 1px solid var(--line); border-radius: 999px; padding: 9px 16px; cursor: pointer; backdrop-filter: blur(20px); }
+  button.primary { background: var(--blue); border-color: var(--blue); }
+  button[aria-pressed="true"] { border-color: var(--fg); }
+  input[type=range] { flex: 1; accent-color: var(--blue); min-width: 0; }
+  .time { font: 500 13px "Montserrat", sans-serif; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 84px; text-align: right; }
+  body.render { display: block; }
+  body.render .bar, body.render .stage { padding: 0; }
+  body.render .bar { display: none; }
+  body.render canvas { width: 1920px; height: 1080px; border-radius: 0; box-shadow: none; }
+  @media (max-width: 600px) { .bar { flex-wrap: wrap; } }
+</style>
+</head>
+<body>
+<div class="stage"><canvas id="c" width="1920" height="1080" role="img" aria-label="Wayback Trail commercial, 60 seconds, with burned-in captions"></canvas></div>
+<div class="bar">
+  <button id="play" class="primary" type="button">Play</button>
+  <input id="scrub" type="range" min="0" max="60" step="0.01" value="0" aria-label="Position in the commercial">
+  <span class="time" id="time">0:00 / 1:00</span>
+  <button id="cc" type="button" aria-pressed="true" title="Captions">CC</button>
+</div>
+<audio id="track" src="audio/narration.mp3" preload="auto"></audio>
+<script>
+"use strict";
+/* ============================================================================
+   Wayback Trail x Vexo — 60 second commercial.
+   Everything is drawn from one function of time, render(t), so the same page
+   plays live in a browser and renders frame-by-frame to video (render.mjs).
+   ========================================================================== */
+const W = 1920, H = 1080, DURATION = 60;
+const cv = document.getElementById("c");
+const ctx = cv.getContext("2d");
+const F = '"Montserrat", sans-serif';
+
+// Apple system colours (dark appearance)
+const C = {
+  blue: "#0A84FF", green: "#30D158", orange: "#FF9F0A", purple: "#BF5AF2",
+  pink: "#FF375F", teal: "#64D2FF", indigo: "#5E5CE6", yellow: "#FFD60A",
+  red: "#FF453A", mint: "#63E6E2", white: "#F5F5F7", gray: "#86868B",
+  g1: "#1C1C1E", g2: "#2C2C2E", g3: "#3A3A3C",
+};
+const GLOW = [C.orange, C.pink, C.purple, C.indigo, C.blue, C.teal];
+
+// ---- Recorded test walk (data/logs/walk3-wrist-loop.csv replayed through tracker/wrist.py)
+// [x_m, y_m, steps, t_s]. A replay, never presented as live sensing.
+const WALK = [[0.0,0.0,0,0.0],[-3.5,0.0,5,25.99],[-4.9,0.0,7,27.01],[-4.9,-0.7,8,30.05],[-4.9,-2.8,11,31.07],[-4.9,-4.2,13,32.08],[-4.9,-4.9,14,33.1],[-4.9,-6.3,16,34.11],[-4.9,-7.7,18,35.13],[-6.3,-7.7,20,37.16],[-7.7,-7.7,22,38.17],[-9.1,-7.7,24,39.19],[-9.8,-7.7,25,40.2],[-11.9,-7.7,28,41.22],[-12.6,-7.7,29,43.25],[-14.0,-7.7,31,44.26],[-15.4,-7.7,33,45.28],[-16.8,-7.7,35,46.29],[-18.2,-7.7,37,47.31],[-20.3,-7.7,40,48.32],[-21.7,-7.7,42,50.35],[-21.7,-5.6,45,51.37],[-21.7,-4.2,47,52.38],[-21.7,-2.8,49,53.4],[-21.7,-2.1,50,54.42],[-21.7,0.0,53,56.45],[-20.3,0.0,55,57.46],[-19.6,0.0,56,58.48],[-17.5,0.0,59,59.49],[-16.1,0.0,61,60.51],[-14.7,0.0,63,61.52],[-13.3,0.0,65,63.55],[-11.9,0.0,67,64.57],[-10.5,0.0,69,65.58],[-9.1,0.0,71,66.6],[-7.7,0.0,73,67.61],[-6.3,0.0,75,69.64],[-4.9,0.0,77,70.66],[-4.2,0.0,78,71.67],[-2.8,0.0,80,72.69],[-0.7,0.0,83,73.7],[0.7,0.0,85,74.72],[1.4,0.0,86,76.75],[3.5,0.0,89,77.76],[4.9,0.0,91,78.78],[5.6,0.0,92,87.91]];
+const STEP_LENGTH_M = 0.70;          // config.STEP_LENGTH_M (placeholder until measured)
+const LANDMARKS = [{ i: 0, label: "Entrance", color: C.purple }, { i: 20, label: "Elevator", color: C.purple }];
+// Haptic patterns from store/haptics.py (ms on, off, on, ...)
+const PATTERNS = { turn_left: [500, 150, 150], on_track: [600], arrived: [700, 200, 700, 200, 700], tick: [50] };
+
+// cumulative distance along the walk
+const CUM = [0];
+for (let i = 1; i < WALK.length; i++) CUM.push(CUM[i - 1] + Math.hypot(WALK[i][0] - WALK[i - 1][0], WALK[i][1] - WALK[i - 1][1]));
+const TOTAL_M = CUM[CUM.length - 1];
+
+// Return guidance to the Elevator: walk the saved path backwards (as store/guidance.py does),
+// merge legs that share a heading, turn = sign of the heading change (clockwise = right).
+function planReturn(fromIdx, toIdx) {
+  const pts = []; for (let i = fromIdx; i >= toIdx; i--) pts.push(WALK[i]);
+  const legs = [];
+  for (let i = 1; i < pts.length; i++) {
+    const dx = pts[i][0] - pts[i - 1][0], dy = pts[i][1] - pts[i - 1][1], d = Math.hypot(dx, dy);
+    if (d < 1e-6) continue;
+    const hd = Math.atan2(dx, dy) * 180 / Math.PI;
+    const last = legs[legs.length - 1];
+    if (last && Math.abs(wrapDeg(hd - last.hd)) < 30) last.m += d; else legs.push({ hd, m: d });
+  }
+  const out = [];
+  legs.forEach((l, k) => {
+    if (k > 0) { const turn = wrapDeg(l.hd - legs[k - 1].hd); out.push(turn > 0 ? "Turn right" : "Turn left"); }
+    out.push("Walk " + Math.round(l.m / STEP_LENGTH_M) + " steps");
+  });
+  return out;
+}
+function wrapDeg(a) { a = ((a + 180) % 360 + 360) % 360 - 180; return a; }
+const RETURN_STEPS = planReturn(WALK.length - 1, 20);
+
+// ---- Narration (ElevenLabs, voice River from config.py). Times in seconds.
+// Captions are burned in: the ad must work with the sound off.
+let VO = [
+  { id: "vo1", t: 0.9, d: 2.6, text: "Every place you go leaves a trail." },
+  { id: "vo2", t: 6.1, d: 5.6, text: "Say “remember this as the entrance.” Wayback Trail pins it to the path you actually walked." },
+  { id: "vo3", cx: 560, maxw: 860, t: 13.6, d: 6.8, text: "Every step counted. Every turn mapped. And when it’s time to go back, it guides you — step by step." },
+  { id: "vo4a", t: 22.5, d: 2.3, text: "Can’t see? It talks you through every turn." },
+  { id: "vo4b", t: 25.0, d: 2.2, text: "Can’t hear? It glows, and it buzzes." },
+  { id: "vo4c", t: 27.4, d: 2.0, text: "Can’t speak? Just tap and type." },
+  { id: "vo5", t: 31.5, d: 1.2, text: "In the crowd." },
+  { id: "vo6", t: 36.6, d: 1.8, text: "In places you’ve never been." },
+  { id: "vo7", t: 42.6, d: 1.8, text: "And places no one else is." },
+  { id: "vo8", t: 48.6, d: 5.0, text: "Across the country. Around the world. The way back is always with you." },
+  { id: "vo9", t: 56.0, d: 2.0, text: "This is the Wayback Trail." },
+];
+
+// ---------------------------------------------------------------- helpers
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const eio = k => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;      // ease in-out cubic
+const eout = k => 1 - Math.pow(1 - k, 4);                                      // ease out quart
+const espring = k => { if (k <= 0) return 0; if (k >= 1) return 1; return 1 - Math.exp(-6 * k) * Math.cos(9 * k); };
+function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let x = Math.imul(seed ^ seed >>> 15, 1 | seed); x = x + Math.imul(x ^ x >>> 7, 61 | x) ^ x; return ((x ^ x >>> 14) >>> 0) / 4294967296; }; }
+function fade(t, a, b, inD = .5, outD = .5) { return Math.min(seg(t, a, a + inD), 1 - seg(t, b - outD, b)); }
+
+function font(w, px) { return w + " " + px + "px " + F; }
+function text(c, s, x, y, o = {}) {
+  c.save();
+  c.font = font(o.w || 600, o.size || 48);
+  c.textAlign = o.align || "left"; c.textBaseline = o.base || "alphabetic";
+  if (o.ls != null && "letterSpacing" in c) c.letterSpacing = o.ls + "px";
+  c.globalAlpha *= o.a == null ? 1 : o.a;
+  if (o.grad) {
+    const m = c.measureText(s), wd = m.width;
+    const x0 = o.align === "center" ? x - wd / 2 : o.align === "right" ? x - wd : x;
+    const g = c.createLinearGradient(x0, 0, x0 + wd, 0);
+    o.grad.forEach((col, i) => g.addColorStop(i / (o.grad.length - 1), col));
+    c.fillStyle = g;
+  } else c.fillStyle = o.color || C.white;
+  if (o.shadow) { c.shadowColor = o.shadow; c.shadowBlur = o.blur || 30; }
+  c.fillText(s, x, y);
+  c.restore();
+}
+// Apple-style headline reveal: each word rises out of a mask with a slight blur.
+function reveal(c, s, x, y, t, t0, o = {}) {
+  const words = s.split(" ");
+  c.save(); c.font = font(o.w || 700, o.size || 96);
+  if (o.ls != null && "letterSpacing" in c) c.letterSpacing = o.ls + "px";
+  const space = c.measureText(" ").width;
+  const widths = words.map(w => c.measureText(w).width);
+  const total = widths.reduce((a, b) => a + b, 0) + space * (words.length - 1);
+  let cx = o.align === "center" ? x - total / 2 : x;
+  c.restore();
+  words.forEach((wd, i) => {
+    const k = eout(seg(t, t0 + i * (o.stagger || .08), t0 + i * (o.stagger || .08) + .7));
+    c.save();
+    c.beginPath(); c.rect(cx - 10, y - (o.size || 96) * 1.05, widths[i] + 20, (o.size || 96) * 1.35); c.clip();
+    c.filter = k < 1 ? "blur(" + ((1 - k) * 10).toFixed(1) + "px)" : "none";
+    text(c, wd, cx, y + (1 - k) * (o.size || 96) * .9, Object.assign({}, o, { align: "left", a: (o.a == null ? 1 : o.a) * k }));
+    c.restore();
+    cx += widths[i] + space;
+  });
+}
+function rrect(c, x, y, w, h, r) { c.beginPath(); c.roundRect ? c.roundRect(x, y, w, h, r) : c.rect(x, y, w, h); }
+function glass(c, x, y, w, h, r, o = {}) {
+  c.save();
+  c.shadowColor = "rgba(0,0,0,.45)"; c.shadowBlur = 50; c.shadowOffsetY = 20;
+  rrect(c, x, y, w, h, r); c.fillStyle = o.fill || "rgba(28,28,30,.78)"; c.fill();
+  c.shadowColor = "transparent";
+  c.lineWidth = 1.5; c.strokeStyle = o.stroke || "rgba(255,255,255,.14)"; c.stroke();
+  const g = c.createLinearGradient(x, y, x, y + h * .5); g.addColorStop(0, "rgba(255,255,255,.08)"); g.addColorStop(1, "rgba(255,255,255,0)");
+  rrect(c, x, y, w, h, r); c.fillStyle = g; c.fill();
+  c.restore();
+}
+function glowBlob(c, x, y, r, col, a = 1) {
+  const g = c.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, hexA(col, .55 * a)); g.addColorStop(.4, hexA(col, .18 * a)); g.addColorStop(1, hexA(col, 0));
+  c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2);
+}
+function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return "rgba(" + (n >> 16 & 255) + "," + (n >> 8 & 255) + "," + (n & 255) + "," + a + ")"; }
+function pill(c, s, x, y, o = {}) {
+  c.save(); c.font = font(o.w || 600, o.size || 26);
+  const w = c.measureText(s).width + (o.dot ? 58 : 40), h = (o.size || 26) * 1.9;
+  const x0 = o.align === "center" ? x - w / 2 : o.align === "right" ? x - w : x;
+  c.globalAlpha *= o.a == null ? 1 : o.a;
+  rrect(c, x0, y - h / 2, w, h, h / 2); c.fillStyle = o.fill || "rgba(44,44,46,.85)"; c.fill();
+  c.lineWidth = 1.5; c.strokeStyle = o.stroke || "rgba(255,255,255,.12)"; c.stroke();
+  if (o.dot) { c.beginPath(); c.arc(x0 + 26, y, 8, 0, 7); c.fillStyle = o.dot; c.shadowColor = o.dot; c.shadowBlur = 16; c.fill(); c.shadowBlur = 0; }
+  c.fillStyle = o.color || C.white; c.textBaseline = "middle"; c.textAlign = "left";
+  c.fillText(s, x0 + (o.dot ? 44 : 20), y + 1);
+  c.restore();
+  return w;
+}
+
+// Walking person, side view, drawn with rounded strokes. phase in radians.
+function walker(c, x, y, s, phase, o = {}) {
+  const body = o.color || "#e9e9ee";
+  c.save(); c.translate(x, y); c.scale(s * (o.flip ? -1 : 1), s);
+  c.lineCap = "round"; c.lineJoin = "round"; c.strokeStyle = body; c.fillStyle = body;
+  const sw = Math.sin(phase), bob = Math.abs(Math.cos(phase)) * 3;
+  c.translate(0, -bob);
+  const hip = [0, -95], sh = [4, -175];
+  function limb(base, a1, a2, l1, l2, w) {
+    const k = [base[0] + Math.sin(a1) * l1, base[1] + Math.cos(a1) * l1];
+    const e = [k[0] + Math.sin(a1 + a2) * l2, k[1] + Math.cos(a1 + a2) * l2];
+    c.lineWidth = w; c.beginPath(); c.moveTo(base[0], base[1]); c.lineTo(k[0], k[1]); c.lineTo(e[0], e[1]); c.stroke();
+    return e;
+  }
+  c.globalAlpha *= .55; limb(hip, -sw * .5, Math.max(0, sw) * -.6, 50, 50, 19); limb(sh, sw * .55, -.35, 40, 38, 14); c.globalAlpha /= .55;
+  c.lineWidth = 30; c.beginPath(); c.moveTo(hip[0], hip[1]); c.lineTo(sh[0], sh[1]); c.stroke();
+  limb(hip, sw * .5, Math.max(0, -sw) * -.6, 50, 50, 20);
+  const hand = limb(sh, -sw * .55, -.35, 40, 38, 15);
+  c.beginPath(); c.arc(8, -205, 21, 0, 7); c.fill();
+  if (o.band) {   // the band on the front wrist
+    c.save(); c.fillStyle = "#111"; c.beginPath(); c.arc(hand[0], hand[1] - 9, 8, 0, 7); c.fill();
+    c.restore();
+    c.restore();
+    return [x + hand[0] * s * (o.flip ? -1 : 1), y + (hand[1] - 9 - bob) * s];
+  }
+  c.restore();
+  return null;
+}
+
+/* =============================================================== SCENES
+   Each scene draws itself from local time lt (seconds since its start).
+   ================================================================== */
+
+// 0  Intro — "Every place you go leaves a trail."  Vexo x Wayback Trail lockup.
+function sIntro(c, lt) {
+  c.fillStyle = "#000"; c.fillRect(0, 0, W, H);
+  // slowly turning Apple-Intelligence style glow
+  c.save(); c.translate(W / 2, H / 2);
+  const a = lt * .35;
+  c.globalCompositeOperation = "lighter";
+  GLOW.forEach((col, i) => {
+    const ang = a + i * Math.PI / 3;
+    glowBlob(c, Math.cos(ang) * 420, Math.sin(ang) * 180, 520, col, .55 * seg(lt, 0, 1.6));
+  });
+  c.restore();
+  // a trail being drawn across the frame (the shape of the recorded walk, stretched)
+  const k = eio(seg(lt, .2, 3.4));
+  c.save(); c.translate(W / 2, H / 2 + 230); c.lineWidth = 6; c.lineCap = "round"; c.lineJoin = "round";
+  const g = c.createLinearGradient(-900, 0, 900, 0); GLOW.forEach((col, i) => g.addColorStop(i / 5, col));
+  c.strokeStyle = g; c.shadowColor = C.pink; c.shadowBlur = 24; c.beginPath();
+  for (let s = 0; s <= 200 * k; s++) { const u = s / 200, px = -900 + u * 1800, py = Math.sin(u * 7.5) * 38 * Math.sin(u * Math.PI) - 20; s ? c.lineTo(px, py) : c.moveTo(px, py); }
+  c.stroke();
+  if (k > 0 && k < 1) { const u = k, px = -900 + u * 1800, py = Math.sin(u * 7.5) * 38 * Math.sin(u * Math.PI) - 20; c.shadowBlur = 0; c.beginPath(); c.arc(px, py, 11, 0, 7); c.fillStyle = "#fff"; c.fill(); }
+  c.restore();
+  const lineA = 1 - seg(lt, 3.0, 3.5);
+  reveal(c, "Every place you go", W / 2, 470, lt, .8, { size: 104, w: 700, align: "center", ls: -2, a: lineA });
+  reveal(c, "leaves a trail.", W / 2, 590, lt, 1.5, { size: 104, w: 700, align: "center", ls: -2, grad: GLOW, a: lineA });
+  // lockup
+  const kl = eout(seg(lt, 3.4, 4.4));
+  if (kl > 0) {
+    c.save(); c.globalAlpha = kl; c.filter = "blur(" + ((1 - kl) * 12) + "px)";
+    text(c, "VEXO", W / 2 - 40, 545, { size: 86, w: 800, align: "right", ls: 14 });
+    text(c, "×", W / 2, 540, { size: 60, w: 300, align: "center", color: C.gray });
+    text(c, "Wayback Trail", W / 2 + 40, 545, { size: 86, w: 700, align: "left", ls: -1, grad: GLOW });
+    text(c, "A Vexo partnership", W / 2, 625, { size: 30, w: 500, align: "center", color: C.gray, ls: 6 });
+    c.restore();
+  }
+}
+
+// 1  Close-up of the band on a wrist: listening (blue), saved (purple), recording (amber)
+function drawWrist(c, lt, ledCol, ledPulse) {
+  // studio backdrop
+  const bg = c.createRadialGradient(W * .55, H * .45, 100, W * .5, H * .5, 1300);
+  bg.addColorStop(0, "#2a2a2e"); bg.addColorStop(1, "#050506"); c.fillStyle = bg; c.fillRect(0, 0, W, H);
+  // bokeh
+  const r = rng(7); c.save(); c.globalCompositeOperation = "lighter";
+  for (let i = 0; i < 26; i++) { const x = r() * W, y = r() * H * .7, s = 30 + r() * 90; glowBlob(c, x + Math.sin(lt * .3 + i) * 20, y, s, [C.blue, C.purple, C.teal, C.orange][i % 4], .25); }
+  c.restore();
+  // forearm: tapered rounded shape from lower-left to right
+  c.save(); c.translate(W * .5, H * .58); c.rotate(-.16);
+  const skin = c.createLinearGradient(0, -200, 0, 200);
+  skin.addColorStop(0, "#d9a27c"); skin.addColorStop(.5, "#b97b56"); skin.addColorStop(1, "#7c4c32");
+  c.fillStyle = skin;
+  c.beginPath();
+  c.moveTo(-1300, -230); c.bezierCurveTo(-600, -215, -150, -150, 260, -140);
+  c.bezierCurveTo(520, -135, 760, -175, 980, -210);       // hand
+  c.bezierCurveTo(1150, -230, 1250, -40, 1100, 40);
+  c.bezierCurveTo(900, 150, 600, 140, 260, 145);
+  c.bezierCurveTo(-150, 150, -600, 210, -1300, 240); c.closePath(); c.fill();
+  // subtle highlight
+  const hl = c.createLinearGradient(0, -150, 0, 0); hl.addColorStop(0, "rgba(255,255,255,.18)"); hl.addColorStop(1, "rgba(255,255,255,0)");
+  c.fillStyle = hl; c.fill();
+  // the band
+  const bx = 120;
+  const band = c.createLinearGradient(bx - 90, 0, bx + 90, 0);
+  band.addColorStop(0, "#0b0b0c"); band.addColorStop(.5, "#26262a"); band.addColorStop(1, "#0b0b0c");
+  c.fillStyle = band; rrect(c, bx - 85, -185, 170, 370, 60); c.fill();
+  c.strokeStyle = "rgba(255,255,255,.12)"; c.lineWidth = 2; c.stroke();
+  // the pod
+  c.shadowColor = "rgba(0,0,0,.6)"; c.shadowBlur = 30;
+  rrect(c, bx - 105, -110, 210, 200, 54); const pod = c.createLinearGradient(0, -110, 0, 90);
+  pod.addColorStop(0, "#3a3a3e"); pod.addColorStop(1, "#151517"); c.fillStyle = pod; c.fill(); c.shadowBlur = 0;
+  c.strokeStyle = "rgba(255,255,255,.2)"; c.lineWidth = 2; c.stroke();
+  // LED
+  if (ledCol) {
+    c.save(); c.globalCompositeOperation = "lighter";
+    glowBlob(c, bx, -10, 260 * ledPulse, ledCol, ledPulse);
+    c.restore();
+    c.beginPath(); c.arc(bx, -10, 22, 0, 7); c.fillStyle = ledCol; c.shadowColor = ledCol; c.shadowBlur = 40 * ledPulse; c.fill(); c.shadowBlur = 0;
+  } else { c.beginPath(); c.arc(bx, -10, 22, 0, 7); c.fillStyle = "#222"; c.fill(); }
+  text(c, "VEXO", bx, 62, { size: 22, w: 700, align: "center", ls: 6, color: "rgba(255,255,255,.45)" });
+  c.restore();
+  return [W * .5 + 120 * Math.cos(-.16) + 10 * Math.sin(.16), H * .58 - 120 * Math.sin(.16) - 10];
+}
+function sCloseup(c, lt) {
+  const zoom = 1 + eio(seg(lt, 0, 7.5)) * .14;
+  let led = null, pulse = 1;
+  if (lt > .3 && lt < 2.9) { led = C.blue; pulse = .9 + .1 * Math.sin(lt * 4); }
+  else if (lt >= 2.9 && lt < 4.7) { led = C.purple; pulse = 1; }
+  else if (lt >= 4.7) { led = C.orange; pulse = .45 + .55 * (.5 + .5 * Math.sin((lt - 4.7) * 3.2)); }
+  c.save(); c.translate(W / 2, H / 2); c.scale(zoom, zoom); c.translate(-W / 2, -H / 2);
+  drawWrist(c, lt, led, pulse);
+  c.restore();
+  // speech bubble
+  const kb = espring(seg(lt, .6, 1.5)), kbOut = 1 - seg(lt, 2.8, 3.2);
+  if (kb > 0 && kbOut > 0) {
+    c.save(); c.globalAlpha = kbOut; c.translate(1250, 250); c.scale(kb, kb);
+    glass(c, -360, -70, 720, 140, 70);
+    text(c, "“Remember this as the entrance.”", 0, 14, { size: 36, w: 600, align: "center" });
+    c.restore();
+  }
+  // saved toast
+  const ks = espring(seg(lt, 3.0, 3.8)), ksOut = 1 - seg(lt, 6.8, 7.4);
+  if (ks > 0) {
+    c.save(); c.globalAlpha = ksOut; c.translate(1250, 250); c.scale(ks, ks);
+    glass(c, -300, -80, 600, 160, 40);
+    c.beginPath(); c.arc(-210, 0, 40, 0, 7); c.fillStyle = C.purple; c.fill();
+    text(c, "📍", -210, 14, { size: 38, align: "center" });
+    text(c, "Saved", -145, -12, { size: 26, w: 500, color: C.gray });
+    text(c, "Entrance · step 0", -145, 30, { size: 38, w: 700 });
+    c.restore();
+  }
+  // LED legend (the real LED vocabulary from the plan)
+  const states = [["Listening", C.blue, .3], ["Landmark saved", C.purple, 2.9], ["Recording your path", C.orange, 4.7]];
+  states.forEach((s, i) => {
+    const a = seg(lt, s[2], s[2] + .4) * (1 - seg(lt, 7.1, 7.5));
+    const on = (i === 0 && lt < 2.9) || (i === 1 && lt >= 2.9 && lt < 4.7) || (i === 2 && lt >= 4.7);
+    pill(c, s[0], 110, 230 + i * 74, { dot: s[1], a: a * (on ? 1 : .45), size: 26 });
+  });
+  text(c, "The light on your wrist tells you what it’s doing.", 110, 160, { size: 30, w: 500, color: C.gray, a: seg(lt, .5, 1) * (1 - seg(lt, 7.1, 7.5)) });
+}
+
+// 2  Walking + live app overlay drawing the recorded path
+function sWalk(c, lt) {
+  // hallway backdrop with moving floor tiles
+  const bg = c.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, "#15161a"); bg.addColorStop(1, "#050506");
+  c.fillStyle = bg; c.fillRect(0, 0, W, H);
+  const hz = 430, vx = 520;
+  c.save(); c.strokeStyle = "rgba(255,255,255,.07)"; c.lineWidth = 2;
+  for (let i = -12; i <= 12; i++) { c.beginPath(); c.moveTo(vx, hz); c.lineTo(vx + i * 260, H); c.stroke(); }
+  const speed = lt < 6.6 ? 1 : lt < 7.1 ? 1 - seg(lt, 6.6, 7.1) : seg(lt, 7.1, 7.6) ;
+  const off = (lt * .9) % 1;
+  for (let j = 0; j < 14; j++) { const z = (j + off) / 14, y = hz + Math.pow(z, 2.2) * (H - hz); c.globalAlpha = z; c.beginPath(); c.moveTo(0, y); c.lineTo(1080, y); c.stroke(); }
+  c.restore();
+  // ceiling lights streaming by
+  c.save(); c.globalCompositeOperation = "lighter";
+  for (let j = 0; j < 6; j++) { const z = ((j / 6) + lt * .12) % 1; const x = vx - 40 - z * 700, y = hz - 30 - z * z * 380; glowBlob(c, x, y, 40 + z * 160, C.white, .35); }
+  c.restore();
+  // door on the far wall (the entrance)
+  c.fillStyle = "rgba(255,255,255,.05)"; c.fillRect(vx - 40, hz - 140, 80, 140);
+  const ph = lt * 6.2;
+  const wrist = walker(c, 470, 960, 2.55, ph, { band: true, color: "#ececf1" });
+  // haptic + LED glow at wrist
+  if (wrist) {
+    const guiding = lt > 6.4;
+    const col = guiding ? C.white : C.orange;
+    c.save(); c.globalCompositeOperation = "lighter"; glowBlob(c, wrist[0], wrist[1], 60, col, .9); c.restore();
+  }
+  text(c, "Close-up", 90, 120, { size: 24, w: 600, color: C.gray, ls: 4, a: seg(lt, 0, .4) });
+  text(c, "Walking, recording, guiding.", 90, 170, { size: 46, w: 700, a: seg(lt, 0, .5) });
+
+  // ---- app overlay (glass phone card)
+  const kIn = espring(seg(lt, .2, 1.2));
+  const ox = 1110, oy = 70, ow = 720, oh = 940;
+  c.save(); c.translate(ox + ow / 2, oy + oh / 2); c.scale(.9 + .1 * kIn, .9 + .1 * kIn); c.globalAlpha = seg(lt, .2, .7); c.translate(-(ox + ow / 2), -(oy + oh / 2));
+  glass(c, ox, oy, ow, oh, 56, { fill: "rgba(22,22,24,.86)" });
+  text(c, "Wayback Trail", ox + 48, oy + 78, { size: 34, w: 700 });
+  const rec = lt < 6.4;
+  pill(c, rec ? "Recording" : "Guiding back", ox + ow - 48, oy + 66, { dot: rec ? C.orange : C.white, align: "right", size: 22 });
+
+  // progress through the recorded walk: 0.9 s .. 6.2 s maps onto the whole log
+  const p = eio(seg(lt, .9, 6.2));
+  const target = p * TOTAL_M;
+  let i = 0; while (i < CUM.length - 2 && CUM[i + 1] < target) i++;
+  const f = CUM[i + 1] > CUM[i] ? clamp((target - CUM[i]) / (CUM[i + 1] - CUM[i])) : 0;
+  const cur = [lerp(WALK[i][0], WALK[i + 1][0], f), lerp(WALK[i][1], WALK[i + 1][1], f)];
+  const steps = Math.round(lerp(WALK[i][2], WALK[i + 1][2], f));
+
+  // map area
+  const mx = ox + 40, my = oy + 120, mw = ow - 80, mh = 380;
+  rrect(c, mx, my, mw, mh, 32); c.fillStyle = "rgba(0,0,0,.55)"; c.fill();
+  c.save(); rrect(c, mx, my, mw, mh, 32); c.clip();
+  c.strokeStyle = "rgba(255,255,255,.05)"; c.lineWidth = 1;
+  for (let gx = mx; gx < mx + mw; gx += 40) { c.beginPath(); c.moveTo(gx, my); c.lineTo(gx, my + mh); c.stroke(); }
+  for (let gy = my; gy < my + mh; gy += 40) { c.beginPath(); c.moveTo(mx, gy); c.lineTo(mx + mw, gy); c.stroke(); }
+  const sc = 21, cx0 = mx + mw / 2 + 8 * sc, cy0 = my + mh / 2 - 3.85 * sc;  // fit -21.7..5.6 x -7.7..0
+  const P = q => [cx0 + q[0] * sc, cy0 - q[1] * sc];
+  c.lineCap = "round"; c.lineJoin = "round";
+  // recorded path, amber
+  c.strokeStyle = C.orange; c.lineWidth = 8; c.shadowColor = C.orange; c.shadowBlur = 18; c.beginPath();
+  for (let k = 0; k <= i; k++) { const q = P(WALK[k]); k ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1]); }
+  const qc = P(cur); c.lineTo(qc[0], qc[1]); c.stroke(); c.shadowBlur = 0;
+  // landmarks
+  LANDMARKS.forEach(L => {
+    if (CUM[L.i] > target + .01 && L.i > 0) return;
+    const q = P(WALK[L.i]);
+    c.beginPath(); c.arc(q[0], q[1], 13, 0, 7); c.fillStyle = L.color; c.fill(); c.strokeStyle = "#fff"; c.lineWidth = 3; c.stroke();
+    text(c, L.label, q[0] + (L.i ? 22 : 0), q[1] + (L.i ? 44 : -26), { size: 22, w: 600, align: L.i ? "left" : "center" });
+  });
+  // guidance back to the Elevator (white), with a moving dot
+  let me = qc;
+  if (lt > 6.4) {
+    const g = eio(seg(lt, 6.9, 8.9));
+    const from = TOTAL_M, to = CUM[20], d = lerp(from, lerp(from, to, .62), g);
+    let j = 0; while (j < CUM.length - 2 && CUM[j + 1] < d) j++;
+    const fj = clamp((d - CUM[j]) / (CUM[j + 1] - CUM[j]));
+    const gp = P([lerp(WALK[j][0], WALK[j + 1][0], fj), lerp(WALK[j][1], WALK[j + 1][1], fj)]);
+    c.setLineDash([2, 18]); c.lineWidth = 8; c.strokeStyle = "rgba(255,255,255,.9)"; c.beginPath();
+    c.moveTo(gp[0], gp[1]); for (let k = j; k >= 20; k--) { const q = P(WALK[k]); c.lineTo(q[0], q[1]); } c.stroke(); c.setLineDash([]);
+    me = gp;
+  }
+  c.beginPath(); c.arc(me[0], me[1], 14, 0, 7); c.fillStyle = C.blue; c.fill(); c.lineWidth = 4; c.strokeStyle = "#fff"; c.stroke();
+  c.save(); c.globalCompositeOperation = "lighter"; glowBlob(c, me[0], me[1], 70, C.blue, .7 + .3 * Math.sin(lt * 6)); c.restore();
+  c.restore();
+
+  // stats
+  const sy = my + mh + 40;
+  const dist = rec ? target : TOTAL_M;
+  const stat = (label, val, unit, x) => { text(c, label, x, sy + 30, { size: 22, w: 500, color: C.gray }); text(c, val, x, sy + 92, { size: 60, w: 700 }); text(c, unit, x, sy + 128, { size: 22, w: 500, color: C.gray }); };
+  stat("Steps", String(rec ? steps : WALK[WALK.length - 1][2]), "by the band", mx);
+  stat("Distance", dist.toFixed(1), "metres", mx + 230);
+  stat("Landmarks", String(LANDMARKS.filter(L => CUM[L.i] <= target + .01).length), "pinned", mx + 460);
+
+  // instruction card / haptic
+  const iy = sy + 180;
+  rrect(c, mx, iy, mw, 160, 32); c.fillStyle = "rgba(255,255,255,.06)"; c.fill();
+  if (!rec) {
+    const k = seg(lt, 6.5, 7.0);
+    text(c, "“Take me back to the elevator.”", mx + 30, iy + 52, { size: 26, w: 500, color: C.gray, a: k });
+    text(c, RETURN_STEPS[0] + ", then " + (RETURN_STEPS[1] || "").toLowerCase() + ".", mx + 30, iy + 104, { size: 34, w: 700, a: k });
+    // haptic pattern bars: turn_left from store/haptics.py
+    const pat = PATTERNS.turn_left; let bx = mx + 30; const by = iy + 132;
+    text(c, "Buzz", bx, by + 8, { size: 20, w: 600, color: C.gray, a: k }); bx += 70;
+    const tt = ((lt - 7.0) * 1000) % 1600;
+    let acc = 0;
+    pat.forEach((ms, n) => {
+      const w = ms / 3.2;
+      const on = n % 2 === 0;
+      if (on) { const live = tt >= acc && tt < acc + ms; rrect(c, bx, by - 8, w, 16, 8); c.fillStyle = live ? C.white : "rgba(255,255,255,.3)"; c.globalAlpha = k; c.fill(); c.globalAlpha = 1; }
+      bx += w + 8; acc += ms;
+    });
+    text(c, "turn left · long, short", bx + 12, by + 8, { size: 20, w: 500, color: C.gray, a: k });
+  } else {
+    text(c, "Every step and turn, mapped by code.", mx + 30, iy + 64, { size: 28, w: 600 });
+    text(c, "No floor plan. No GPS. Just the way you walked.", mx + 30, iy + 112, { size: 24, w: 500, color: C.gray });
+  }
+  text(c, "Replay of a recorded test walk (walk3) · simulated in real time", ox + ow / 2, oy + oh - 22, { size: 18, w: 500, color: C.gray, align: "center" });
+  c.restore();
+
+  // haptic ripples on the wrist when the turn cue fires
+  if (wrist && lt > 7.0) {
+    const tt = ((lt - 7.0) * 1000) % 1600;
+    if (tt < 800) for (let r = 0; r < 3; r++) {
+      const k = clamp(tt / 800 - r * .2);
+      c.beginPath(); c.arc(wrist[0], wrist[1], 20 + k * 120, 0, 7); c.strokeStyle = hexA(C.white, (1 - k) * .7); c.lineWidth = 3; c.stroke();
+    }
+  }
+}
+
+// 3  🙈 🙉 🙊 — usable whether you can't see, can't hear, or can't speak
+function sSenses(c, lt) {
+  c.fillStyle = "#000"; c.fillRect(0, 0, W, H);
+  c.save(); c.globalCompositeOperation = "lighter";
+  glowBlob(c, 300, 300, 700, C.blue, .35); glowBlob(c, W / 2, 800, 700, C.green, .25); glowBlob(c, W - 300, 300, 700, C.purple, .35);
+  c.restore();
+  const cards = [
+    { e: "🙈", t: "Can’t see.", s: "It speaks.", col: C.blue, at: .2,
+      items: ["Spoken turn-by-turn", "Left / right-ear sound cues", "Buzz cues on iPhone & Apple Watch"] },
+    { e: "🙉", t: "Can’t hear.", s: "It glows and buzzes.", col: C.green, at: 2.6,
+      items: ["LED colours for every state", "Haptic patterns for turns", "Large on-screen text"] },
+    { e: "🙊", t: "Can’t speak.", s: "Tap and type.", col: C.purple, at: 4.9,
+      items: ["Typed commands", "One-tap Talk & Stop buttons", "Same tools, no voice needed"] },
+  ];
+  const cw = 520, ch = 640, gap = 60, x0 = (W - (cw * 3 + gap * 2)) / 2, y0 = 170;
+  const outK = seg(lt, 7.0, 7.6);
+  cards.forEach((cd, i) => {
+    const k = espring(seg(lt, cd.at, cd.at + 1.0));
+    if (k <= 0) return;
+    const x = x0 + i * (cw + gap), y = y0 + (1 - k) * 120;
+    c.save(); c.globalAlpha = clamp(k) * (1 - outK); c.translate(W / 2, H / 2); c.scale(1 - outK * .12, 1 - outK * .12); c.translate(-W / 2, -H / 2);
+    glass(c, x, y, cw, ch, 48);
+    const active = lt >= cd.at && (i === 2 || lt < cards[i + 1].at);
+    if (active) { c.save(); rrect(c, x, y, cw, ch, 48); c.lineWidth = 3; c.strokeStyle = cd.col; c.shadowColor = cd.col; c.shadowBlur = 30; c.stroke(); c.restore(); }
+    // emoji with a soft bounce
+    const eb = espring(seg(lt, cd.at + .1, cd.at + .9));
+    c.save(); c.translate(x + cw / 2, y + 170); c.scale(eb, eb);
+    text(c, cd.e, 0, 60, { size: 170, align: "center" }); c.restore();
+    text(c, cd.t, x + cw / 2, y + 330, { size: 52, w: 800, align: "center" });
+    text(c, cd.s, x + cw / 2, y + 384, { size: 32, w: 600, align: "center", color: cd.col });
+    cd.items.forEach((it, n) => {
+      const ka = seg(lt, cd.at + .6 + n * .18, cd.at + 1.0 + n * .18);
+      c.beginPath(); c.arc(x + 60, y + 462 + n * 58, 7, 0, 7); c.fillStyle = cd.col; c.globalAlpha *= 1; c.fill();
+      text(c, it, x + 84, y + 471 + n * 58, { size: 25, w: 500, a: ka, color: "#d1d1d6" });
+    });
+    // mini demos
+    if (i === 1) { [C.green, C.orange, C.purple, C.white, C.red].forEach((col, n) => { const on = Math.floor(lt * 2.5) % 5 === n; c.beginPath(); c.arc(x + cw / 2 - 120 + n * 60, y + 60, on ? 14 : 10, 0, 7); c.fillStyle = col; c.globalAlpha = on ? 1 : .35; c.shadowColor = col; c.shadowBlur = on ? 24 : 0; c.fill(); c.shadowBlur = 0; c.globalAlpha = clamp(k) * (1 - outK); }); }
+    if (i === 2) { const typed = "take me back"; const nch = Math.floor(clamp((lt - 5.6) / 1.2) * typed.length); rrect(c, x + 60, y + 30, cw - 120, 56, 28); c.fillStyle = "rgba(255,255,255,.08)"; c.fill(); text(c, typed.slice(0, nch) + (Math.floor(lt * 3) % 2 ? "|" : ""), x + 86, y + 68, { size: 24, w: 500 }); }
+    if (i === 0) { for (let n = 0; n < 5; n++) { const hgt = 10 + 26 * Math.abs(Math.sin(lt * 7 + n * 1.3)) * (active ? 1 : .2); rrect(c, x + cw / 2 - 70 + n * 30, y + 60 - hgt / 2, 14, hgt, 7); c.fillStyle = C.blue; c.fill(); } }
+    c.restore();
+  });
+  // closing line
+  const kt = seg(lt, 7.0, 7.4);
+  if (kt > 0) {
+    c.save(); c.globalAlpha = kt;
+    text(c, "🙈  🙉  🙊", W / 2, 470, { size: 120, align: "center" });
+    reveal(c, "Built for every sense.", W / 2, 640, lt, 7.1, { size: 96, w: 800, align: "center", ls: -2, grad: [C.blue, C.green, C.purple] });
+    c.restore();
+  }
+}
+
+// helpers for big scene titles
+function sceneTitle(c, lt, title, sub, col, dark) {
+  const k = seg(lt, .1, .6);
+  reveal(c, title, 110, 210, lt, .1, { size: 120, w: 800, ls: -3, color: dark ? "#1c1c1e" : C.white });
+  text(c, sub, 114, 280, { size: 34, w: 500, color: dark ? "rgba(28,28,30,.75)" : "rgba(245,245,247,.8)", a: seg(lt, .7, 1.2) });
+  return k;
+}
+
+// 4  Crowded: a plaza from above, a trail threading the crowd
+function sCrowd(c, lt) {
+  c.fillStyle = "#0b0c10"; c.fillRect(0, 0, W, H);
+  // floor pattern
+  c.strokeStyle = "rgba(255,255,255,.04)"; c.lineWidth = 2;
+  for (let x = 0; x < W; x += 120) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, H); c.stroke(); }
+  for (let y = 0; y < H; y += 120) { c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); }
+  const zoom = 1.08 - .08 * eio(seg(lt, 0, 5));
+  c.save(); c.translate(W / 2, H / 2); c.scale(zoom, zoom); c.translate(-W / 2, -H / 2);
+  const r = rng(42);
+  for (let n = 0; n < 340; n++) {
+    const sx = r() * W, sy = r() * H, ang = r() * Math.PI * 2, sp = 30 + r() * 70;
+    let x = (sx + Math.cos(ang) * sp * lt) % W; if (x < 0) x += W;
+    let y = (sy + Math.sin(ang) * sp * lt) % H; if (y < 0) y += H;
+    c.beginPath(); c.arc(x, y, 9, 0, 7); c.fillStyle = "rgba(174,174,178," + (.35 + r() * .35) + ")"; c.fill();
+  }
+  // our walker's path through the crowd
+  const path = [[1700, 950], [1500, 820], [1320, 860], [1100, 700], [880, 760], [700, 560], [480, 600], [300, 380]];
+  const k = eio(seg(lt, .3, 4.6));
+  const curve = t => { const f = t * (path.length - 1), i = Math.min(path.length - 2, Math.floor(f)), u = f - i; const a = path[i], b = path[i + 1]; return [lerp(a[0], b[0], u), lerp(a[1], b[1], u)]; };
+  c.lineCap = "round"; c.lineJoin = "round"; c.lineWidth = 10; c.strokeStyle = C.blue; c.shadowColor = C.blue; c.shadowBlur = 30; c.beginPath();
+  const N = 120; for (let s = 0; s <= N * k; s++) { const p = curve(s / N); s ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]); } c.stroke(); c.shadowBlur = 0;
+  const me = curve(k);
+  c.save(); c.globalCompositeOperation = "lighter"; glowBlob(c, me[0], me[1], 120, C.blue, 1); c.restore();
+  c.beginPath(); c.arc(me[0], me[1], 16, 0, 7); c.fillStyle = "#fff"; c.fill();
+  // meeting point pin
+  c.beginPath(); c.arc(1700, 950, 16, 0, 7); c.fillStyle = C.purple; c.fill(); c.strokeStyle = "#fff"; c.lineWidth = 4; c.stroke();
+  pill(c, "Meeting point", 1700, 890, { align: "center", dot: C.purple, size: 24 });
+  c.restore();
+  sceneTitle(c, lt, "Crowded.", "Retrace your steps when the crowd hides every landmark.");
+}
+
+// 5  Unfamiliar: desert | Antarctica split
+function dunes(c, x, y, w, h, lt, cols, seed) {
+  cols.forEach((col, n) => {
+    c.beginPath(); c.moveTo(x, y + h);
+    for (let px = 0; px <= w; px += 20) {
+      const yy = y + h * (.45 + n * .14) + Math.sin(px / (260 - n * 40) + seed + n + lt * .05) * (60 - n * 10) + Math.sin(px / 90 + n * 3) * 8;
+      c.lineTo(x + px, yy);
+    }
+    c.lineTo(x + w, y + h); c.closePath(); c.fillStyle = col; c.fill();
+  });
+}
+function footTrail(c, pts, k, col) {
+  c.save(); c.setLineDash([4, 22]); c.lineCap = "round"; c.lineWidth = 9; c.strokeStyle = col; c.shadowColor = col; c.shadowBlur = 18; c.beginPath();
+  const n = Math.max(1, Math.floor(k * 60));
+  for (let s = 0; s <= n; s++) { const t = s / 60, f = t * (pts.length - 1), i = Math.min(pts.length - 2, Math.floor(f)), u = f - i; const p = [lerp(pts[i][0], pts[i + 1][0], u), lerp(pts[i][1], pts[i + 1][1], u)]; s ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]); }
+  c.stroke(); c.restore();
+}
+function sUnfamiliar(c, lt) {
+  const split = lerp(W, W / 2, eio(seg(lt, .4, 1.4)));
+  // desert
+  c.save(); c.beginPath(); c.rect(0, 0, split, H); c.clip();
+  let g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#ff9f6b"); g.addColorStop(.45, "#ffcf8a"); g.addColorStop(1, "#e7a35e");
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+  c.save(); c.globalCompositeOperation = "lighter"; glowBlob(c, 760, 330, 320, "#FFF4D6", 1); c.restore();
+  c.beginPath(); c.arc(760, 330, 70, 0, 7); c.fillStyle = "#fff7e0"; c.fill();
+  dunes(c, 0, 0, W, H, lt, ["#f0b46c", "#e39a52", "#c97c3c", "#a9612b"], 1);
+  footTrail(c, [[820, 1000], [700, 880], [560, 840], [460, 720], [300, 690]], eio(seg(lt, .8, 5.2)), "#ffffff");
+  walker(c, lerp(820, 300, eio(seg(lt, .8, 5.2))) , lerp(1000, 690, eio(seg(lt, .8, 5.2))) - 4, .5, lt * 6, { color: "#3b2414", flip: true });
+  pill(c, "Camp", 820, 1030, { align: "center", dot: C.purple, size: 22, fill: "rgba(28,28,30,.7)" });
+  c.restore();
+  // Antarctica
+  c.save(); c.beginPath(); c.rect(split, 0, W - split, H); c.clip();
+  g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#9fc9ee"); g.addColorStop(.5, "#e3f1fb"); g.addColorStop(1, "#ffffff");
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+  dunes(c, 0, 0, W, H, lt, ["#d6e9f7", "#c3dcef", "#e9f4fb", "#ffffff"], 4);
+  const r = rng(9); for (let n = 0; n < 160; n++) { const x = r() * W, y = (r() * H + lt * (60 + r() * 80)) % H; c.beginPath(); c.arc(x + Math.sin(lt + n) * 10, y, 2 + r() * 3, 0, 7); c.fillStyle = "rgba(255,255,255,.9)"; c.fill(); }
+  footTrail(c, [[1500, 1010], [1380, 900], [1480, 800], [1330, 720], [1220, 660]], eio(seg(lt, .8, 5.2)), C.blue);
+  walker(c, lerp(1500, 1220, eio(seg(lt, .8, 5.2))), lerp(1010, 660, eio(seg(lt, .8, 5.2))) - 4, .5, lt * 6, { color: "#1c2a3a", flip: true });
+  pill(c, "Research hut", 1500, 1040, { align: "center", dot: C.purple, size: 22, fill: "rgba(28,28,30,.7)" });
+  c.restore();
+  // divider
+  c.fillStyle = "rgba(255,255,255,.9)"; c.fillRect(split - 2, 0, 4, H);
+  text(c, "Desert", 110, H - 70, { size: 30, w: 700, color: "#3b2414", a: seg(lt, 1.2, 1.6), ls: 4 });
+  text(c, "Antarctica", W - 110, H - 70, { size: 30, w: 700, align: "right", color: "#1c2a3a", a: seg(lt, 1.2, 1.6), ls: 4 });
+  sceneTitle(c, lt, "Unfamiliar.", "No map of the place needed. It remembers the way you came.", null, true);
+}
+
+// 6  Isolated: out of the cave, down the mountain
+function sIsolated(c, lt) {
+  const pan = eio(seg(lt, 2.3, 3.6));     // 0 = cave, 1 = mountain
+  // mountain vista (revealed)
+  c.save(); c.translate(0, (1 - pan) * -H * .25);
+  let g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#1b1f4b"); g.addColorStop(.5, "#5E5CE6"); g.addColorStop(1, "#ff9f8a");
+  c.fillStyle = g; c.fillRect(0, -H, W, H * 2.5);
+  [["#3b3a8f", .40], ["#2a2870", .55], ["#191849", .72]].forEach((m, n) => {
+    c.beginPath(); c.moveTo(0, H);
+    for (let x = 0; x <= W; x += 30) c.lineTo(x, H * m[1] + Math.sin(x / (180 + n * 70) + n * 2) * 90 - Math.abs(Math.sin(x / 400 + n)) * 140);
+    c.lineTo(W, H * 1.5); c.lineTo(0, H * 1.5); c.closePath(); c.fillStyle = m[0]; c.fill();
+  });
+  // switchback trail down the mountain
+  const sw = [[1460, 380], [1060, 470], [1380, 560], [880, 660], [1240, 760], [620, 860], [900, 1000]];
+  const km = eio(seg(lt, 3.2, 5.9));
+  footTrail(c, sw, km, C.green);
+  const f = km * (sw.length - 1), i = Math.min(sw.length - 2, Math.floor(f)), u = f - i;
+  const me = [lerp(sw[i][0], sw[i + 1][0], u), lerp(sw[i][1], sw[i + 1][1], u)];
+  if (lt > 3.2) { c.save(); c.globalCompositeOperation = "lighter"; glowBlob(c, me[0], me[1], 80, C.green, 1); c.restore(); c.beginPath(); c.arc(me[0], me[1], 12, 0, 7); c.fillStyle = "#fff"; c.fill(); }
+  pill(c, "Trailhead", 900, 1040, { align: "center", dot: C.purple, size: 22, a: seg(lt, 3.4, 3.8) });
+  c.restore();
+  // the cave (fades and scales away like a camera stepping out)
+  const caveA = 1 - pan;
+  if (caveA > 0) {
+    c.save(); c.globalAlpha = caveA; c.translate(W / 2, H / 2); c.scale(1 + pan * .8, 1 + pan * .8); c.translate(-W / 2, -H / 2);
+    c.fillStyle = "#070708"; c.fillRect(0, 0, W, H);
+    // cave mouth light, far away
+    c.save(); c.globalCompositeOperation = "lighter"; glowBlob(c, 1500, 420, 360, "#FFE7B0", .9); c.restore();
+    c.beginPath(); c.ellipse(1500, 430, 120, 170, 0, 0, 7); c.fillStyle = "#ffe9bf"; c.fill();
+    // rock walls
+    const r = rng(3);
+    c.fillStyle = "#121214";
+    for (let n = 0; n < 14; n++) { c.beginPath(); const x = r() * W, y = r() < .5 ? -40 : H + 40, rr = 160 + r() * 260; c.ellipse(x, y, rr, rr * .7, r(), 0, 7); c.fill(); }
+    // headlamp cone
+    const kc = eio(seg(lt, 0, 2.3));
+    c.save(); c.globalCompositeOperation = "lighter";
+    const hx = lerp(380, 1150, kc), hy = lerp(820, 520, kc);
+    const cone = c.createRadialGradient(hx, hy, 10, hx, hy, 520); cone.addColorStop(0, "rgba(255,240,210,.35)"); cone.addColorStop(1, "rgba(255,240,210,0)");
+    c.fillStyle = cone; c.beginPath(); c.moveTo(hx, hy); c.arc(hx, hy, 520, -.65, .25); c.closePath(); c.fill(); c.restore();
+    footTrail(c, [[380, 820], [620, 760], [820, 620], [1150, 520], [1460, 440]], kc, C.green);
+    c.beginPath(); c.arc(hx, hy, 12, 0, 7); c.fillStyle = "#fff"; c.fill();
+    pill(c, "Turn right · 12 steps", hx + 30, hy - 60, { dot: C.white, size: 22, a: seg(lt, .6, 1.0) * (1 - seg(lt, 1.8, 2.1)) });
+    c.restore();
+  }
+  sceneTitle(c, lt, "Isolated.", "Out of the cave. Down the mountain. One step at a time.");
+}
+
+// 7  Across the nation, then around the globe
+const US = [[-124.7,48.4],[-123,49],[-95.2,49],[-94.8,49.4],[-89.6,48],[-88,48.2],[-84.5,46.5],[-82.4,43],[-79,43.3],[-76.5,44.2],[-75,45],[-71.5,45],[-69.2,47.4],[-67.8,47.1],[-67,44.8],[-70.2,43.6],[-70.6,42],[-71.9,41.3],[-74,40.6],[-74.9,38.9],[-75.9,37],[-75.5,35.2],[-77,34.5],[-79,33.5],[-80.9,32],[-81.4,30.7],[-80.1,27],[-80.4,25.2],[-81.8,26],[-82.8,28],[-82.6,29.8],[-84.3,30],[-86.5,30.4],[-89.6,30.2],[-89.4,29.1],[-90.8,29.1],[-93.8,29.7],[-95,29],[-97.2,27.6],[-97.4,26],[-99.1,26.5],[-101.4,29.8],[-103.2,29],[-104.6,29.9],[-106.5,31.8],[-108.2,31.3],[-111.1,31.3],[-114.8,32.5],[-117.1,32.5],[-118.5,34],[-120.6,34.6],[-121.9,36.6],[-122.5,37.8],[-123.8,39.5],[-124.4,40.4],[-124.2,42],[-124.1,44],[-124,46.3]];
+const US_CITIES = [[-74,40.7,"New York"],[-118.2,34],[-87.6,41.9,"Chicago"],[-95.4,29.8],[-112,33.4],[-75.2,40],[-98.5,29.4],[-117.2,32.7],[-96.8,32.8,"Dallas"],[-122.3,47.6,"Seattle"],[-105,39.7,"Denver"],[-84.4,33.7,"Atlanta"],[-80.2,25.8,"Miami"],[-71,42.4],[-93.3,45],[-90,30],[-83,42.3],[-122.4,37.8,"San Francisco"],[-111.9,40.8],[-86.8,36.2],[-77,38.9],[-122.7,45.5],[-94.6,39.1],[-115.1,36.2],[-97.7,30.3],[-81.7,41.5],[-90.2,38.6],[-106.6,35.1],[-80.8,35.2]];
+const WORLD = [[139.7,35.7],[77.2,28.6],[121.5,31.2],[-46.6,-23.5],[-99.1,19.4],[31.2,30],[72.9,19],[116.4,39.9],[90.4,23.8],[135.5,34.7],[-74,40.7],[67,24.9],[-58.4,-34.6],[29,41],[88.4,22.6],[3.4,6.5],[121,14.6],[-43.2,-22.9],[15.3,-4.3],[-118.2,34],[37.6,55.8],[2.35,48.9],[-0.1,51.5],[106.8,-6.2],[-77,-12],[100.5,13.8],[127,37.6],[36.8,-1.3],[28,-26.2],[151.2,-33.9],[145,-37.8],[-79.4,43.7],[-3.7,40.4],[13.4,52.5],[46.7,24.7],[51.4,35.7],[38.7,9],[-74,4.7],[-70.7,-33.4],[103.8,1.35],[106.7,10.8],[18.4,-33.9],[174.8,-36.8],[-21.9,64.1],[-8,31.6],[-87.6,41.9],[55.3,25.2],[-6.3,53.3],[12.5,41.9],[24.9,60.2],[-123.1,49.3],[-66.9,10.5],[32.6,0.3],[-17.4,14.7],[85.3,27.7],[69.2,34.5],[-1.6,6.7],[44.4,33.3],[30.5,50.4],[-9.1,38.7],[166.7,-77.8],[-68.1,-16.5],[114.2,22.3],[101.7,3.1],[-90.5,14.6],[149.1,-35.3]];
+function usProj(lon, lat) { const x = (lon + 96) * 31 * Math.cos(38 * Math.PI / 180), y = -(lat - 38) * 31; return [W / 2 + x, H / 2 + 40 + y]; }
+function inPoly(x, y, poly) { let ins = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1]; if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) ins = !ins; } return ins; }
+const US_DOTS = (() => { const d = []; for (let lat = 24; lat <= 50; lat += .62) for (let lon = -125; lon <= -66; lon += .62 / Math.cos(38 * Math.PI / 180)) if (inPoly(lon, lat, US)) d.push([lon, lat]); return d; })();
+const WORLD_DOTS = (() => { const r = rng(11), d = []; WORLD.forEach(p => { for (let n = 0; n < 26; n++) { const a = r() * 7, s = Math.pow(r(), 1.6) * 6; d.push([p[0] + Math.cos(a) * s, p[1] + Math.sin(a) * s * .7]); } }); return d; })();
+function sGlobe(c, lt) {
+  c.fillStyle = "#000"; c.fillRect(0, 0, W, H);
+  const toGlobe = eio(seg(lt, 3.0, 4.0));
+  // --- nation
+  if (toGlobe < 1) {
+    c.save(); c.globalAlpha = 1 - toGlobe;
+    c.translate(W / 2, H / 2); c.scale(1 - toGlobe * .6, 1 - toGlobe * .6); c.translate(-W / 2, -H / 2);
+    const sweep = seg(lt, .2, 2.6);
+    US_DOTS.forEach(p => {
+      const q = usProj(p[0], p[1]); const lit = (p[0] + 125) / 59 < sweep * 1.1;
+      c.beginPath(); c.arc(q[0], q[1], 4.2, 0, 7); c.fillStyle = lit ? "rgba(10,132,255,.75)" : "rgba(255,255,255,.12)"; c.fill();
+    });
+    c.save(); c.globalCompositeOperation = "lighter";
+    US_CITIES.forEach((p, n) => { if ((p[0] + 125) / 59 > sweep * 1.1) return; const q = usProj(p[0], p[1]); glowBlob(c, q[0], q[1], 60 + 20 * Math.sin(lt * 3 + n), [C.teal, C.blue, C.purple, C.pink][n % 4], 1); });
+    c.restore();
+    US_CITIES.forEach(p => { if (!p[2] || (p[0] + 125) / 59 > sweep * 1.1) return; const q = usProj(p[0], p[1]); text(c, p[2], q[0] + 12, q[1] - 12, { size: 20, w: 600, color: "rgba(245,245,247,.85)" }); });
+    c.restore();
+    reveal(c, "Across the nation.", W / 2, 150, lt, .2, { size: 80, w: 800, align: "center", ls: -2, a: 1 - toGlobe });
+  }
+  // --- globe
+  if (toGlobe > 0) {
+    const R = lerp(900, 380, toGlobe), cx = W / 2, cy = H / 2 + 40, lon0 = -40 + lt * 26, lat0 = 18 * Math.PI / 180;
+    c.save(); c.globalAlpha = toGlobe;
+    c.save(); c.globalCompositeOperation = "lighter"; glowBlob(c, cx, cy, R * 1.6, C.blue, .45); c.restore();
+    const sph = c.createRadialGradient(cx - R * .35, cy - R * .35, R * .1, cx, cy, R);
+    sph.addColorStop(0, "#1a2a4a"); sph.addColorStop(1, "#05070d");
+    c.beginPath(); c.arc(cx, cy, R, 0, 7); c.fillStyle = sph; c.fill();
+    c.lineWidth = 1.5; c.strokeStyle = "rgba(100,210,255,.35)"; c.stroke();
+    const proj = (lon, lat) => { const l = (lon - lon0) * Math.PI / 180, p = lat * Math.PI / 180; const cosc = Math.sin(lat0) * Math.sin(p) + Math.cos(lat0) * Math.cos(p) * Math.cos(l); return [cx + R * Math.cos(p) * Math.sin(l), cy - R * (Math.cos(lat0) * Math.sin(p) - Math.sin(lat0) * Math.cos(p) * Math.cos(l)), cosc]; };
+    // graticule
+    c.strokeStyle = "rgba(255,255,255,.07)"; c.lineWidth = 1;
+    for (let lon = -180; lon < 180; lon += 20) { c.beginPath(); let pen = false; for (let lat = -90; lat <= 90; lat += 4) { const q = proj(lon, lat); if (q[2] > 0) { pen ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1]); pen = true; } else pen = false; } c.stroke(); }
+    for (let lat = -60; lat <= 60; lat += 20) { c.beginPath(); let pen = false; for (let lon = -180; lon <= 180; lon += 4) { const q = proj(lon, lat); if (q[2] > 0) { pen ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1]); pen = true; } else pen = false; } c.stroke(); }
+    // population dots
+    WORLD_DOTS.forEach((p, n) => { const q = proj(p[0], p[1]); if (q[2] <= 0) return; c.beginPath(); c.arc(q[0], q[1], 2.6 * (.4 + q[2] * .6), 0, 7); c.fillStyle = hexA(GLOW[n % 6], .35 + .5 * q[2]); c.fill(); });
+    c.save(); c.globalCompositeOperation = "lighter";
+    WORLD.forEach((p, n) => { const q = proj(p[0], p[1]); if (q[2] <= .05) return; glowBlob(c, q[0], q[1], 26 * q[2] * (1 + .3 * Math.sin(lt * 4 + n)), GLOW[n % 6], q[2]); });
+    c.restore();
+    c.restore();
+    reveal(c, "Around the globe.", W / 2, 150, lt, 3.4, { size: 80, w: 800, align: "center", ls: -2, a: toGlobe });
+    const ks = seg(lt, 4.2, 4.8);
+    text(c, "2.2 billion", 150, 470, { size: 78, w: 800, grad: [C.blue, C.teal], a: ks });
+    text(c, "people live with a vision impairment.", 150, 520, { size: 26, w: 500, color: "#d1d1d6", a: ks });
+    const ks2 = seg(lt, 4.6, 5.2);
+    text(c, "1.5 billion", W - 150, 470, { size: 78, w: 800, align: "right", grad: [C.purple, C.pink], a: ks2 });
+    text(c, "people live with hearing loss.", W - 150, 520, { size: 26, w: 500, align: "right", color: "#d1d1d6", a: ks2 });
+    text(c, "Source: WHO World Report on Vision (2019) and World Report on Hearing (2021).", W / 2, H - 50, { size: 18, w: 500, align: "center", color: C.gray, a: ks });
+  }
+}
+
+// 8  End card
+function sEnd(c, lt) {
+  c.fillStyle = "#000"; c.fillRect(0, 0, W, H);
+  c.save(); c.globalCompositeOperation = "lighter";
+  GLOW.forEach((col, i) => { const a = lt * .3 + i; glowBlob(c, W / 2 + Math.cos(a) * 380, H / 2 + Math.sin(a) * 140, 460, col, .35 * seg(lt, 0, 1.5)); });
+  c.restore();
+  reveal(c, "This is the", W / 2, 470, lt, .9, { size: 70, w: 500, align: "center", ls: -1, color: "#d1d1d6" });
+  reveal(c, "Wayback Trail.", W / 2, 620, lt, 1.3, { size: 150, w: 800, align: "center", ls: -4, grad: GLOW });
+  const k = seg(lt, 2.4, 3.0);
+  text(c, "VEXO  ×  WAYBACK TRAIL", W / 2, 740, { size: 26, w: 700, align: "center", ls: 8, color: C.gray, a: k });
+  text(c, "🙈 🙉 🙊   Spatial memory · Distance tracking · Haptic cues · Built for every sense", W / 2, 800, { size: 24, w: 500, align: "center", color: "#d1d1d6", a: k });
+  text(c, "Dramatization. The app overlay replays a recorded test walk. Haptics play on a paired iPhone or Apple Watch;", W / 2, H - 74, { size: 19, w: 500, align: "center", color: "rgba(134,134,139,.95)", a: k });
+  text(c, "the band shows light. Experimental navigation aid, not a safety-critical system.", W / 2, H - 46, { size: 19, w: 500, align: "center", color: "rgba(134,134,139,.95)", a: k });
+}
+
+/* ============================================================ TIMELINE
+   Scene boundaries and the Apple-style transition used to enter each scene. */
+const SCENES = [
+  { a: 0, b: 5.5, draw: sIntro },
+  { a: 5.5, b: 13, draw: sCloseup, enter: "zoom" },      // push in through the glow onto the wrist
+  { a: 13, b: 22, draw: sWalk, enter: "push" },           // slide over, parallax
+  { a: 22, b: 31, draw: sSenses, enter: "card" },         // scene shrinks into a card and falls away
+  { a: 31, b: 36, draw: sCrowd, enter: "iris" },          // circular reveal
+  { a: 36, b: 42, draw: sUnfamiliar, enter: "blur" },     // blur dissolve
+  { a: 42, b: 48, draw: sIsolated, enter: "push" },
+  { a: 48, b: 55, draw: sGlobe, enter: "zoom" },
+  { a: 55, b: 60, draw: sEnd, enter: "blur" },
+];
+const TR = .9;   // transition length (s), centred on each boundary
+const layerA = document.createElement("canvas"), layerB = document.createElement("canvas");
+[layerA, layerB].forEach(l => { l.width = W; l.height = H; });
+const lA = layerA.getContext("2d"), lB = layerB.getContext("2d");
+
+let showCaptions = true;
+function render(t) {
+  t = clamp(t, 0, DURATION);
+  ctx.save(); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+  let idx = SCENES.findIndex(s => t >= s.a && t < s.b); if (idx < 0) idx = SCENES.length - 1;
+  const s = SCENES[idx];
+  const prev = idx > 0 ? SCENES[idx - 1] : null, next = SCENES[idx + 1];
+  let mode = null, k = 0, out = null, inn = null;
+  if (prev && t < s.a + TR / 2 && s.enter) { mode = s.enter; k = eio((t - (s.a - TR / 2)) / TR); out = prev; inn = s; }
+  else if (next && t > s.b - TR / 2 && next.enter) { mode = next.enter; k = eio((t - (s.b - TR / 2)) / TR); out = s; inn = next; }
+  if (!mode) {
+    lA.clearRect(0, 0, W, H); s.draw(lA, t - s.a); ctx.drawImage(layerA, 0, 0);
+  } else {
+    lA.clearRect(0, 0, W, H); lB.clearRect(0, 0, W, H);
+    out.draw(lA, t - out.a); inn.draw(lB, Math.max(0, t - inn.a));
+    composite(mode, k);
+  }
+  if (showCaptions) drawCaption(t);
+  // fade from/to black at the very ends
+  const edge = Math.max(1 - seg(t, 0, .4), seg(t, 59.4, 60));
+  if (edge > 0) { ctx.fillStyle = "rgba(0,0,0," + edge + ")"; ctx.fillRect(0, 0, W, H); }
+  ctx.restore();
+}
+function composite(mode, k) {
+  const c = ctx;
+  if (mode === "zoom") {
+    c.save(); c.globalAlpha = 1 - k; c.filter = "blur(" + (k * 18) + "px)"; c.translate(W / 2, H / 2); c.scale(1 + k * .35, 1 + k * .35); c.drawImage(layerA, -W / 2, -H / 2); c.restore();
+    c.save(); c.globalAlpha = k; c.filter = "blur(" + ((1 - k) * 18) + "px)"; c.translate(W / 2, H / 2); c.scale(.85 + k * .15, .85 + k * .15); c.drawImage(layerB, -W / 2, -H / 2); c.restore();
+  } else if (mode === "push") {
+    c.save(); c.translate(-k * W * .35, 0); c.globalAlpha = 1 - k * .7; c.drawImage(layerA, 0, 0); c.restore();
+    c.save(); c.translate((1 - k) * W, 0); c.shadowColor = "rgba(0,0,0,.6)"; c.shadowBlur = 80; c.drawImage(layerB, 0, 0); c.restore();
+  } else if (mode === "card") {
+    c.drawImage(layerB, 0, 0);
+    const s = 1 - k * .45, r = 20 + k * 60;
+    c.save(); c.globalAlpha = 1 - seg(k, .55, 1); c.translate(W / 2, H / 2 + k * k * 500); c.scale(s, s);
+    c.shadowColor = "rgba(0,0,0,.7)"; c.shadowBlur = 90; rrect(c, -W / 2, -H / 2, W, H, r / s); c.fillStyle = "#000"; c.fill(); c.shadowBlur = 0;
+    rrect(c, -W / 2, -H / 2, W, H, r / s); c.clip(); c.drawImage(layerA, -W / 2, -H / 2); c.restore();
+  } else if (mode === "iris") {
+    c.drawImage(layerA, 0, 0);
+    c.save(); c.beginPath(); c.arc(W / 2, H / 2, k * Math.hypot(W, H) / 2 + 1, 0, 7); c.clip(); c.drawImage(layerB, 0, 0); c.restore();
+  } else {   // blur dissolve
+    c.save(); c.filter = "blur(" + (k * 24) + "px)"; c.globalAlpha = 1 - k; c.drawImage(layerA, 0, 0); c.restore();
+    c.save(); c.filter = "blur(" + ((1 - k) * 24) + "px)"; c.globalAlpha = k; c.drawImage(layerB, 0, 0); c.restore();
+  }
+}
+function drawCaption(t) {
+  const v = VO.find(l => t >= l.t - .05 && t < l.t + l.d + .35);
+  if (!v) return;
+  const a = Math.min(seg(t, v.t - .05, v.t + .15), 1 - seg(t, v.t + v.d + .1, v.t + v.d + .35));
+  ctx.save(); ctx.font = font(600, 34);
+  const words = v.text.split(" "), lines = []; let line = "";
+  words.forEach(w => { const tryL = line ? line + " " + w : w; if (ctx.measureText(tryL).width > (v.maxw || 1300) && line) { lines.push(line); line = w; } else line = tryL; });
+  lines.push(line);
+  const lh = 48, bw = Math.max(...lines.map(l => ctx.measureText(l).width)) + 56, bh = lines.length * lh + 26;
+  const y = H - 72 - bh;
+  const cx = v.cx || W / 2;
+  ctx.globalAlpha = a;
+  rrect(ctx, cx - bw / 2, y, bw, bh, 22); ctx.fillStyle = "rgba(0,0,0,.62)"; ctx.fill();
+  ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+  lines.forEach((l, i) => ctx.fillText(l, cx, y + 16 + i * lh));
+  ctx.restore();
+}
+
+/* ============================================================ PLAYBACK */
+const params = new URLSearchParams(location.search);
+const renderMode = params.has("render");
+if (renderMode) document.body.classList.add("render");
+const track = document.getElementById("track");
+const playBtn = document.getElementById("play"), scrub = document.getElementById("scrub"), timeEl = document.getElementById("time"), ccBtn = document.getElementById("cc");
+let playing = false, t0 = 0, startAt = 0, now = 0, haveTrack = false, spoken = new Set();
+// narration.mp3 = music + River narration (build.py). Without it: music.mp3 + the browser's voice.
+let useSpeech = false;
+track.addEventListener("canplaythrough", () => { haveTrack = true; });
+track.addEventListener("error", () => {
+  haveTrack = false;
+  if (!useSpeech) { useSpeech = true; track.src = "audio/music.mp3"; track.load(); }
+});
+fetch("audio/timing.json").then(r => r.ok ? r.json() : null).then(j => { if (j && Array.isArray(j.vo)) j.vo.forEach(x => { const v = VO.find(y => y.id === x.id); if (v) { v.t = x.t; v.d = x.d; } }); }).catch(() => {});
+
+function fmt(s) { s = Math.max(0, s); return Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0"); }
+function frame(ts) {
+  if (playing) {
+    now = haveTrack && !track.paused ? track.currentTime : startAt + (ts - t0) / 1000;
+    if (!haveTrack || useSpeech) speakFallback(now);
+    if (now >= DURATION) { now = DURATION; stop(); }
+  }
+  render(now);
+  scrub.value = now; timeEl.textContent = fmt(now) + " / 1:00";
+  if (!renderMode) requestAnimationFrame(frame);
+}
+function speakFallback(t) {   // only when the narration file is missing: browser voice
+  if (!("speechSynthesis" in window)) return;
+  VO.forEach(v => { if (t >= v.t && t < v.t + .3 && !spoken.has(v.id)) { spoken.add(v.id); const u = new SpeechSynthesisUtterance(v.text.replace(/[“”]/g, "")); u.rate = 1.05; speechSynthesis.speak(u); } });
+}
+function start() {
+  playing = true; playBtn.textContent = "Pause"; if (now >= DURATION) now = 0;
+  startAt = now; t0 = performance.now(); spoken = new Set(VO.filter(v => v.t < now).map(v => v.id));
+  if (haveTrack) { track.currentTime = now; track.play().catch(() => { haveTrack = false; }); }
+}
+function stop() { playing = false; playBtn.textContent = "Play"; track.pause(); if ("speechSynthesis" in window) speechSynthesis.cancel(); }
+playBtn.onclick = () => playing ? stop() : start();
+scrub.oninput = () => { now = +scrub.value; if (playing) start(); };
+ccBtn.onclick = () => { showCaptions = !showCaptions; ccBtn.setAttribute("aria-pressed", String(showCaptions)); };
+addEventListener("keydown", e => { if (e.code === "Space") { e.preventDefault(); playBtn.click(); } });
+
+window.__render = t => render(t);           // used by render.mjs for frame-exact video
+window.__ready = document.fonts.ready.then(() => document.fonts.load("800 40px Montserrat")).then(() => true);
+window.__ready.then(() => { render(0); if (!renderMode) requestAnimationFrame(frame); });
+</script>
+</body>
+</html>
