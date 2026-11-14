@@ -26,6 +26,7 @@ class SpatialMemoryApp:
         self.clock = clock
         self.mode = config.OUTPUT_MODE
         self.guidance = []                # Instructions of the current return trip
+        self.on_result = []               # functions called with every ToolResult (e.g. the dashboard)
         tracker.on_sample(store.add_point)
 
     # --- dispatch ----------------------------------------------------------------
@@ -48,6 +49,8 @@ class SpatialMemoryApp:
             self.speak(result.say)
         if self.mode != "voice-only" and result.led and self.led is not None:
             self.led.show(result.led)
+        for fn in self.on_result:
+            fn(result)
         return result
 
     # --- tools ---------------------------------------------------------------------

@@ -21,11 +21,12 @@ def require_band_number() -> int:
     return config.BAND
 
 
-def connect(tracker, logger=None, on_double_tap=None, on_link=None):
+def connect(tracker, logger=None, on_double_tap=None, on_link=None, usb=False):
     """Connect to the team's band, stream motion and steps into tracker, log every sample.
 
     on_double_tap(): called on a double-tap (starts one listening turn).
     on_link(text): called with "connected", "reconnecting" or "reconnected".
+    usb: use the USB cable instead of Bluetooth (still only the team's band number).
     Returns the connected band (vexo_open.sync.Band).
     """
     number = require_band_number()
@@ -33,7 +34,10 @@ def connect(tracker, logger=None, on_double_tap=None, on_link=None):
         sys.path.insert(0, KIT_PYTHON)
     from vexo_open.sync import Band
 
-    band = Band.connect(number, auto_reconnect=True)
+    if usb:
+        band = Band.connect(number, transport="serial", auto_reconnect=True)
+    else:
+        band = Band.connect(number, auto_reconnect=True)
     if band.number != number:          # Band.connect already checks; belt and braces
         band.disconnect()
         raise SystemExit("Connected to band %s, expected %s. Disconnected." % (band.number, number))

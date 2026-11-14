@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vexo Spatial Memory</title>
+<style>
+  :root {
+    --bg: #f4f3ef;
+    --panel: #ffffff;
+    --ink: #1c1c1a;
+    --muted: #6b6a64;
+    --line: #e2e0d8;
+    --grid: #ebe9e2;
+    --grid-strong: #d9d6cc;
+    --path: #1c1c1a;
+    --accent: #c76a00;
+    --start: #1f8a4c;
+    --pin: #7b2fc9;
+    --live: #1f8a4c;
+    --warn: #b45309;
+    --bad: #c0392b;
+    --chip: #f0eee8;
+    --shadow: 0 1px 2px rgba(0,0,0,.05), 0 4px 16px rgba(0,0,0,.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121211; --panel: #1b1b19; --ink: #ecebe6; --muted: #9a988f; --line: #2c2b28;
+      --grid: #1f1f1d; --grid-strong: #2b2a27; --path: #ecebe6; --accent: #f0a030; --start: #3ccf7d;
+      --pin: #b98cff; --live: #3ccf7d; --warn: #f0a030; --bad: #ff6b5b; --chip: #24241f;
+      --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121211; --panel: #1b1b19; --ink: #ecebe6; --muted: #9a988f; --line: #2c2b28;
+    --grid: #1f1f1d; --grid-strong: #2b2a27; --path: #ecebe6; --accent: #f0a030; --start: #3ccf7d;
+    --pin: #b98cff; --live: #3ccf7d; --warn: #f0a030; --bad: #ff6b5b; --chip: #24241f;
+    --shadow: none;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  h1 { font-size: 17px; margin: 0 8px 0 0; letter-spacing: -.01em; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
+    background: var(--chip); font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+  .pill b { color: var(--ink); font-weight: 600; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .pill.live .dot { background: var(--live); }
+  .pill.warn { background: color-mix(in srgb, var(--warn) 15%, var(--chip)); color: var(--warn); }
+  .pill.warn b { color: var(--warn); }
+  .pill.bad .dot { background: var(--bad); }
+  .spacer { flex: 1; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; padding: 16px 20px 24px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+  .map { position: relative; min-height: 520px; overflow: hidden; }
+  .map svg { width: 100%; height: 100%; min-height: 520px; display: block; }
+  .map .legend { position: absolute; left: 12px; bottom: 10px; font-size: 12px; color: var(--muted);
+    display: flex; gap: 14px; flex-wrap: wrap; }
+  .map .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px;
+    vertical-align: -1px; }
+  .map .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted);
+    text-align: center; padding: 24px; pointer-events: none; }
+  aside { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+    margin: 0 0 10px; font-weight: 600; }
+  .card .body { padding: 14px 16px; }
+  .led-row { display: flex; align-items: center; gap: 14px; }
+  .led { width: 44px; height: 44px; border-radius: 50%; flex: none; background: #333;
+    box-shadow: 0 0 0 4px var(--chip); --period: 1000ms; }
+  .led.off { background: var(--chip); }
+  .led.blink { animation: blink var(--period) steps(1, end) infinite; }
+  .led.breathe { animation: breathe var(--period) ease-in-out infinite; }
+  .led.flash { animation: blink calc(var(--period) / 2) steps(1, end) infinite; }
+  .led.rainbow { background: conic-gradient(red, orange, yellow, lime, cyan, blue, magenta, red);
+    animation: spin var(--period) linear infinite; }
+  @keyframes blink { 50% { opacity: .15; } }
+  @keyframes breathe { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .led { animation: none !important; } }
+  .led-name { font-weight: 600; font-size: 16px; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .stat .v { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .stat .k { font-size: 12px; color: var(--muted); }
+  .say { font-size: 17px; line-height: 1.4; min-height: 1.4em; }
+  .say.empty { color: var(--muted); font-size: 14px; }
+  ol.guide { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+  ol.guide li { display: flex; gap: 10px; align-items: center; }
+  ol.guide .arrow { width: 28px; height: 28px; border-radius: 8px; background: var(--chip); display: grid;
+    place-items: center; flex: none; font-size: 15px; }
+  ul.marks { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+  ul.marks li { display: flex; gap: 10px; align-items: flex-start; }
+  ul.marks .pin { width: 10px; height: 10px; border-radius: 50%; background: var(--pin); margin-top: 6px; flex: none; }
+  ul.marks .grow { flex: 1; min-width: 0; }
+  ul.marks .name { font-weight: 600; overflow-wrap: anywhere; }
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  button { font: inherit; font-size: 13px; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    border-radius: 8px; padding: 5px 10px; cursor: pointer; }
+  button:hover { border-color: var(--muted); }
+  button.primary { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+  form { display: flex; gap: 8px; }
+  input[type=text] { flex: 1; min-width: 0; font: inherit; padding: 9px 12px; border-radius: 9px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+  input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .chips button { background: var(--chip); border-color: transparent; color: var(--muted); }
+  .reply { margin-top: 10px; font-size: 13px; color: var(--muted); min-height: 1.2em; }
+  .reply.bad { color: var(--bad); }
+  label.toggle { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); margin-top: 10px; }
+  .banner { display: none; padding: 8px 20px; font-size: 13px; background: color-mix(in srgb, var(--warn) 14%, var(--panel));
+    color: var(--warn); border-bottom: 1px solid var(--line); }
+  .banner.show { display: block; }
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; padding: 12px 16px 20px; }
+    header { padding: 12px 16px; }
+    .map, .map svg { min-height: 360px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Vexo Spatial Memory</h1>
+  <span class="pill" id="label"><span class="dot"></span><b>—</b></span>
+  <span class="pill" id="link"><span class="dot"></span>Band <b>—</b></span>
+  <span class="pill">Output <b id="mode">—</b></span>
+  <span class="spacer"></span>
+  <span class="pill" id="conn"><span class="dot"></span><b>connecting…</b></span>
+</header>
+<div class="banner" id="banner"></div>
+<main>
+  <section class="card map" aria-label="Map of the recorded route">
+    <svg id="svg" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Recorded route"></svg>
+    <div class="empty" id="empty">No route yet. Say or type “start route”, then walk.</div>
+    <div class="legend">
+      <span><i style="background:var(--start)"></i>Start</span>
+      <span><i style="background:var(--pin)"></i>Landmark</span>
+      <span><i style="background:var(--accent)"></i>You</span>
+      <span id="scale">grid: 1 m</span>
+    </div>
+  </section>
+  <aside>
+    <div class="card"><div class="body">
+      <h2>Band light</h2>
+      <div class="led-row">
+        <div class="led off" id="led" aria-hidden="true"></div>
+        <div><div class="led-name" id="ledName">Off</div><div class="sub" id="ledSub">—</div></div>
+      </div>
+    </div></div>
+
+    <div class="card"><div class="body">
+      <h2>Position</h2>
+      <div class="stats">
+        <div class="stat"><div class="v" id="steps">0</div><div class="k">steps</div></div>
+        <div class="stat"><div class="v" id="dist">0.0</div><div class="k">m walked</div></div>
+        <div class="stat"><div class="v" id="heading">0°</div><div class="k">heading</div></div>
+      </div>
+      <div class="sub" id="track" style="margin-top:8px">—</div>
+    </div></div>
+
+    <div class="card"><div class="body">
+      <h2>Last spoken</h2>
+      <div class="say empty" id="say">Nothing yet.</div>
+      <label class="toggle"><input type="checkbox" id="speak"> Also speak it in this browser</label>
+    </div></div>
+
+    <div class="card" id="guideCard" hidden><div class="body">
+      <h2>Way back</h2>
+      <ol class="guide" id="guide"></ol>
+    </div></div>
+
+    <div class="card"><div class="body">
+      <h2>Landmarks</h2>
+      <ul class="marks" id="marks"><li class="sub">None saved yet.</li></ul>
+    </div></div>
+
+    <div class="card"><div class="body">
+      <h2>Command</h2>
+      <form id="cmd">
+        <input type="text" id="text" placeholder="e.g. remember this as the elevator" autocomplete="off" aria-label="Command">
+        <button class="primary" type="submit">Send</button>
+      </form>
+      <div class="chips">
+        <button type="button" data-cmd="start route">start route</button>
+        <button type="button" data-cmd="remember this as the ">remember this as…</button>
+        <button type="button" data-cmd="take me back to the start">take me back to the start</button>
+        <button type="button" data-cmd="stop route">stop route</button>
+      </div>
+      <div class="reply" id="reply"></div>
+    </div></div>
+  </aside>
+</main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const NS = "http://www.w3.org/2000/svg";
+  const LED_NAMES = {
+    idle: "Off", route_started: "Route started", recording: "Recording", landmark_saved: "Landmark saved",
+    navigating: "Navigating back", turn_now: "Turn now", arrived: "Arrived", arrived_party: "Arrived",
+    uncertain: "Position uncertain",
+  };
+  const ARROWS = { straight: "↑", left: "↰", right: "↱", around: "↶", arrive: "◎" };
+  let lastSay = null;
+  let lastState = null;
+
+  function el(tag, attrs = {}, parent) {
+    const n = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    if (parent) parent.appendChild(n);
+    return n;
+  }
+  function li(children) {
+    const n = document.createElement("li");
+    children.forEach((c) => n.appendChild(c));
+    return n;
+  }
+  function div(cls, text) {
+    const n = document.createElement("div");
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  function drawMap(s) {
+    const svg = $("svg");
+    svg.replaceChildren();
+    const pts = (s.route && s.route.points) || [];
+    $("empty").style.display = pts.length > 1 ? "none" : "grid";
+    const xs = pts.map((p) => p[0]).concat([s.pose.x]);
+    const ys = pts.map((p) => p[1]).concat([s.pose.y]);
+    let minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+    const span = Math.max(maxX - minX, maxY - minY, 8);
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, half = span / 2 + 3;
+    const box = svg.getBoundingClientRect();
+    const aspect = box.width && box.height ? box.width / box.height : 1.4;
+    const w = aspect >= 1 ? 2 * half * aspect : 2 * half, h = aspect >= 1 ? 2 * half : 2 * half / aspect;
+    const vx = cx - w / 2, vy = -cy - h / 2;   // screen y = -world y
+    svg.setAttribute("viewBox", `${vx} ${vy} ${w} ${h}`);
+    const unit = h / 520;                       // ~1 screen px, for sizes in metres
+
+    const step = span > 60 ? 10 : span > 25 ? 5 : 1;
+    $("scale").textContent = `grid: ${step} m`;
+    const grid = el("g", {}, svg);
+    for (let x = Math.floor(vx / step) * step; x <= vx + w; x += step) {
+      el("line", { x1: x, y1: vy, x2: x, y2: vy + h, stroke: Math.round(x) % (step * 5) === 0 ? "var(--grid-strong)" : "var(--grid)",
+        "stroke-width": 1, "vector-effect": "non-scaling-stroke" }, grid);
+    }
+    for (let y = Math.floor(vy / step) * step; y <= vy + h; y += step) {
+      el("line", { x1: vx, y1: y, x2: vx + w, y2: y, stroke: Math.round(y) % (step * 5) === 0 ? "var(--grid-strong)" : "var(--grid)",
+        "stroke-width": 1, "vector-effect": "non-scaling-stroke" }, grid);
+    }
+
+    if (pts.length > 1) {
+      el("polyline", { points: pts.map((p) => `${p[0]},${-p[1]}`).join(" "), fill: "none", stroke: "var(--path)",
+        "stroke-width": 3, "stroke-linejoin": "round", "stroke-linecap": "round", "vector-effect": "non-scaling-stroke" }, svg);
+    }
+    if (pts.length) {
+      el("circle", { cx: pts[0][0], cy: -pts[0][1], r: 7 * unit, fill: "var(--start)" }, svg);
+    }
+    for (const lm of s.landmarks) {
+      el("circle", { cx: lm.x, cy: -lm.y, r: 7 * unit, fill: "var(--pin)", stroke: "var(--panel)", "stroke-width": 2,
+        "vector-effect": "non-scaling-stroke" }, svg);
+      const t = el("text", { x: lm.x + 11 * unit, y: -lm.y + 5 * unit, "font-size": 14 * unit, fill: "var(--ink)",
+        "font-weight": 600, "paint-order": "stroke", stroke: "var(--bg)", "stroke-width": 4 * unit }, svg);
+      t.textContent = lm.label + (lm.floor ? ` (${lm.floor})` : "");
+    }
+    if (s.route) {
+      const g = el("g", { transform: `translate(${s.pose.x} ${-s.pose.y}) rotate(${s.pose.heading})` }, svg);
+      el("circle", { r: 16 * unit, fill: "var(--accent)", opacity: 0.18 }, g);
+      el("path", { d: `M0 ${-13 * unit} L${9 * unit} ${9 * unit} L0 ${4 * unit} L${-9 * unit} ${9 * unit} Z`,
+        fill: "var(--accent)" }, g);
+    }
+  }
+
+  function render(s) {
+    lastState = s;
+    const label = $("label");
+    label.className = "pill " + (s.label === "LIVE" ? "live" : "warn");
+    label.querySelector("b").textContent = s.label;
+    const banner = $("banner");
+    banner.classList.toggle("show", s.label !== "LIVE");
+    banner.textContent = s.label === "REPLAY" ? "Replay of a logged walk. This is not live sensing."
+      : s.label === "SIMULATION" ? "Simulation on a synthetic walk. This is not live sensing." : "";
+
+    const link = $("link");
+    link.className = "pill " + (s.link === "connected" || s.link === "reconnected" ? "live" : s.link === "none" ? "" : "bad");
+    link.querySelector("b").textContent = s.link === "none" ? "not used" : s.link;
+    $("mode").textContent = s.mode.replace("-", " ");
+
+    const led = $("led");
+    led.className = "led " + (s.led.pattern || "off");
+    led.style.background = s.led.pattern === "rainbow" ? "" : s.led.color || "";
+    led.style.setProperty("--period", (s.led.period || 1000) + "ms");
+    $("ledName").textContent = LED_NAMES[s.led.state] || s.led.state;
+    $("ledSub").textContent = s.led.pattern === "off" ? "light off" : `${s.led.color || "multicolour"}, ${s.led.pattern}`;
+
+    $("steps").textContent = s.pose.steps;
+    $("dist").textContent = ((s.pose.steps || 0) * s.tracking.step_length_m).toFixed(1);
+    $("heading").textContent = Math.round(s.pose.heading) + "°";
+    const tr = s.tracking;
+    $("track").textContent = !tr.running ? (s.route ? "Route stopped." : "Not recording.")
+      : !tr.calibrated ? "Calibrating the gyro: stand still…"
+      : `Recording · ${tr.state} · step length ${tr.step_length_m.toFixed(2)} m`;
+
+    const say = $("say");
+    say.classList.toggle("empty", !s.say);
+    say.textContent = s.say || "Nothing yet.";
+    if (s.say && s.say !== lastSay && lastSay !== null && $("speak").checked && "speechSynthesis" in window) {
+      speechSynthesis.cancel();
+      speechSynthesis.speak(new SpeechSynthesisUtterance(s.say));
+    }
+    lastSay = s.say;
+
+    $("guideCard").hidden = !s.guidance.length;
+    $("guide").replaceChildren(...s.guidance.map((g) => {
+      const a = div("arrow", ARROWS[g.turn] || "•");
+      return li([a, div("", g.text)]);
+    }));
+
+    const marks = $("marks");
+    if (!s.landmarks.length) {
+      marks.replaceChildren(li([div("sub", "None saved yet.")]));
+    } else {
+      marks.replaceChildren(...s.landmarks.map((lm) => {
+        const body = div("grow");
+        body.appendChild(div("name", lm.label + (lm.floor ? ` · floor ${lm.floor}` : "")));
+        if (lm.note) body.appendChild(div("sub", lm.note));
+        const actions = div("actions");
+        const go = document.createElement("button");
+        go.textContent = "Guide me here";
+        go.onclick = () => send(`take me back to the ${lm.label}`);
+        const here = document.createElement("button");
+        here.textContent = "I'm here";
+        here.onclick = () => send(`I'm at the ${lm.label}`);
+        actions.append(go, here);
+        body.appendChild(actions);
+        return li([div("pin"), body]);
+      }));
+    }
+    drawMap(s);
+  }
+
+  async function send(text) {
+    const reply = $("reply");
+    reply.className = "reply";
+    reply.textContent = "…";
+    try {
+      const r = await fetch("/command", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }) });
+      const body = r.headers.get("Content-Type", "").includes("json") ? await r.json() : { ok: false, say: await r.text() };
+      reply.className = "reply" + (body.ok ? "" : " bad");
+      reply.textContent = body.say || (body.ok ? "Done." : "That didn't work.");
+    } catch (e) {
+      reply.className = "reply bad";
+      reply.textContent = "Could not reach the dashboard server.";
+    }
+  }
+
+  $("cmd").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const t = $("text").value.trim();
+    if (t) { send(t); $("text").value = ""; }
+  });
+  document.querySelectorAll(".chips button").forEach((b) => b.addEventListener("click", () => {
+    const c = b.dataset.cmd;
+    if (c.endsWith(" ")) { $("text").value = c; $("text").focus(); } else send(c);
+  }));
+  window.addEventListener("resize", () => lastState && drawMap(lastState));
+
+  const conn = $("conn");
+  const es = new EventSource("/events");
+  es.onopen = () => { conn.className = "pill live"; conn.querySelector("b").textContent = "dashboard live"; };
+  es.onerror = () => { conn.className = "pill bad"; conn.querySelector("b").textContent = "reconnecting…"; };
+  es.onmessage = (e) => render(JSON.parse(e.data));
+})();
+</script>
+</body>
+</html>
