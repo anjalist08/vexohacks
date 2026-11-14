@@ -464,7 +464,7 @@ struct Coach {
             hint["state"] = "turn_soon"
             return (hint, due("turn_soon", 0.35 * Double(s)) ? "turn_soon" : nil)
         }
-        return (hint, due("tick", 4) ? "tick" : nil)
+        return (hint, due("tick", 1.5) ? "tick" : nil)
     }
 }
 

@@ -202,7 +202,10 @@ final class Guide: ObservableObject {
     private func carryBand() {
         guard band == nil else { return }
         let link = BandLink()
-        link.onStatus = { [weak self] text in Task { @MainActor in self?.bandStatus = text } }
+        link.onStatus = { [weak self] text in
+            print("[band] \(text)")
+            Task { @MainActor in self?.bandStatus = text }
+        }
         link.onMessage = { [weak self] msg in
             Task { @MainActor in
                 guard let self else { return }

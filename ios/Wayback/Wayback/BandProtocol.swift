@@ -2,7 +2,11 @@ import Foundation
 
 /// The team's band. The kit's rule: one number, in one place, and never any other band.
 enum BandConfig {
-    static let number = 80
+    /// The band this iPhone pairs with. Set once in the app (gear > Band number); default 80.
+    static var number: Int {
+        let n = UserDefaults.standard.integer(forKey: "bandNumber")
+        return (1...999).contains(n) ? n : 80
+    }
     static var name: String { String(format: "Vexo-HACK-%02d", number) }
 }
 
