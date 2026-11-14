@@ -18,6 +18,7 @@ LOGS = os.path.join(ROOT, "data", "logs")
 
 def replay(name, **kw):
     events = read_log(os.path.join(LOGS, name))
+    kw.setdefault("step_source", "accel")
     tr = WristTracker(step_length_m=0.7, snap_turns=True, **kw)
     tr.start(events[0][1])
     feed(tr, events)
@@ -51,6 +52,16 @@ class RealWalkTests(unittest.TestCase):
     def test_walk1_carried(self):
         tr = replay("walk1-hallway-loop.csv")
         self.assertLess(math.hypot(tr.x, tr.y), 10.0)               # measured: 7.9 m after 83 m
+
+    def test_band_steps_ignore_arm_moves_while_standing(self):
+        # 13:49 live log: standing, typing and moving an arm; the motion detector counted 34 "steps"
+        tr = replay("walk-20261114-134925.csv", step_source="band")
+        self.assertEqual(tr.pose.steps, 0)
+
+    def test_band_steps_close_the_loops(self):
+        for name, most in (("walk3-wrist-loop.csv", 7.0), ("walk2-wristband.csv", 8.0), ("walk1-hallway-loop.csv", 8.0)):
+            tr = replay(name, step_source="band")
+            self.assertLess(math.hypot(tr.x, tr.y), most, name)
 
     def test_band_step_source_counts_band_steps(self):
         tr = replay("walk3-wrist-loop.csv", step_source="band")

@@ -24,7 +24,7 @@ export const DEFAULTS = {
   snapHyst: 50,          // degrees away from the current grid line before moving
   snapHoldS: 0.5,        // ...for at least this long
   flip: false,           // swap left and right if the band's axes are mirrored
-  stepSource: 'accel',   // 'accel' (detector below) or 'band' (band's step counter: starts ~15 s late)
+  stepSource: 'band',    // 'band' (band's counter: ignores typing and arm moves) or 'accel' (detector below: faster, but arm moves count)
   accThr: 1.12,          // g: smoothed |a| above this is a step...
   accLow: 1.03,          // ...once it has dropped below this since the last step
   accMinGapS: 0.28,      // at most ~3.5 steps a second
