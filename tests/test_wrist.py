@@ -106,3 +106,54 @@ class SyntheticTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PhoneFusionTests(unittest.TestCase):
+    """iPhone heading and pedometer (phone_motion messages) fused with the wrist."""
+
+    def walk(self, legs):
+        """legs: (samples, phone_heading, wrist_gz, walking). 50 samples/s; phone 10/s."""
+        tr = WristTracker(step_length_m=0.7, step_source="band", phone_heading=True)
+        clock = [0.0]
+        tr.clock = lambda: clock[0]
+        tr.start(0.0)
+        steps = 1000
+        for n, phone, gz, walking in legs:
+            for i in range(n):
+                clock[0] += 0.02
+                tr.on_motion(clock[0], 0.0, 0.0, 1.0, 0.0, 0.0, gz)
+                if i % 5 == 0:
+                    tr.on_phone({"type": "phone_motion", "heading_deg": phone(i / n) if callable(phone) else phone})
+                if walking and i % 25 == 0:
+                    steps += 1
+                    tr.on_activity(clock[0], steps, "walk")
+        return tr
+
+    def test_body_turn_shows_on_phone_and_wrist(self):
+        tr = self.walk([(50, 30.0, 0.0, False),                      # calibrate; phone at 30 deg in a pocket
+                        (500, 30.0, 0.0, True),                       # 20 steps ahead
+                        (50, lambda f: 30.0 + 90.0 * f, -90.0, False),  # turn right: phone and wrist
+                        (500, 120.0, 0.0, True)])                     # 20 steps
+        tr.on_phone({"type": "phone_motion", "heading_deg": 120.0, "steps": 40, "distance_m": 32.0})
+        self.assertEqual(tr.heading_source, "phone")
+        self.assertEqual(tr.heading, 90.0)
+        self.assertGreater(tr.x, 10.0)
+        self.assertAlmostEqual(tr.step_length_m, 0.8)                 # 32 m / 40 steps (pedometer)
+        self.assertEqual(tr.phone_handled, 0)
+
+    def test_phone_moved_in_the_hand_is_ignored(self):
+        tr = self.walk([(50, 0.0, 0.0, False),
+                        (300, 0.0, 0.0, True),
+                        (25, lambda f: 100.0 * f, 0.0, False),        # phone out of the pocket: wrist still
+                        (300, 100.0, 0.0, True)])
+        self.assertEqual(tr.heading, 0.0)
+        self.assertEqual(tr.phone_handled, 1)
+        self.assertAlmostEqual(tr.x, 0.0, delta=0.5)
+
+    def test_wrist_spin_is_ignored_while_the_phone_is_fresh(self):
+        tr = self.walk([(50, 0.0, 0.0, False), (250, 0.0, 90.0, False)])
+        self.assertEqual(tr.heading, 0.0)
+
+    def test_no_wrist_calibration_wait_with_a_phone(self):
+        tr = self.walk([(100, 0.0, 30.0, True)])                      # wrist never still; phone present
+        self.assertGreater(tr.pose.steps, 0)

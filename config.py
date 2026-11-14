@@ -14,6 +14,7 @@ BAND = 80                     # Vexo-HACK-80, the team's band (from the bag)
 TRACKER_MODEL = "wrist"       # "wrist" (tracker/wrist.py, tuned on real wrist walks) or "classic" (tracker/pdr.py)
 STEP_SOURCE = "band"          # "band": the band's own step counter (ignores typing/arm moves, starts a few steps late); "accel": motion footfalls (faster, but arm moves count)
 STEP_LENGTH_M = 0.70          # PLACEHOLDER: walk a measured distance, divide by steps
+PHONE_HEADING = False         # use the iPhone app's heading for the walking direction (experimental)
 MOTION_RATE_HZ = 50           # motion samples a second (10, 25, 50, 100)
 ACTIVITY_RATE = "fastest"     # step readings up to 10 a second on firmware 1.1
 GRAVITY_ALPHA = 0.05          # low-pass weight for the gravity estimate (0..1)
