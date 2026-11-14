@@ -24,7 +24,7 @@ API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 DEFAULT_TIMEOUT = 30.0
 
 # Verified Gemini 4 model IDs from the official hackathon builder guide.
-# `config.GEMINI_MODEL` stays `None` in `config.py` for the team to set explicitly.
+# `config.GEMINI_MODEL` is set in `config.py` (gemini-4-hydrogen, per the builder guide).
 GEMINI_4_MODELS = {
     "gemini-4-hydrogen": "Fast interactive workhorse recommended for tap-to-talk tool calling",
     "gemini-4-argon": "Balanced Gemini 4 model",

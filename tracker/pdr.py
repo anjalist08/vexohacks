@@ -80,6 +80,7 @@ class PathTracker:
         self.heading = 0.0        # heading used for moves (snapped when snap_turns)
         self.raw_heading = 0.0    # integrated gyro heading
         self.bias = 0.0
+        self.yaw_rate = 0.0       # latest bias-corrected yaw rate, degrees/second, + = left
         self.calibrated = False
         self._calib: List[float] = []
         self._calib_until = t + config.CALIBRATION_S
@@ -117,6 +118,12 @@ class PathTracker:
     def stop(self):
         with self._lock:
             self.running = False
+
+    def resume(self):
+        """Keep tracking from the current position (e.g. to guide someone back after stop)."""
+        with self._lock:
+            self.running = True
+            self._last_motion_t = None
 
     def on_sample(self, fn: Callable[[PoseSample], None]):
         """Call fn(PoseSample) for every new route point."""
@@ -198,6 +205,7 @@ class PathTracker:
             self.bias += config.BIAS_UPDATE_ALPHA * (yaw - self.bias)
             rate = yaw - self.bias
 
+        self.yaw_rate = rate
         self.raw_heading = wrap_deg(self.raw_heading - rate * dt)
         self._track_turn(t, rate, dt)
 
