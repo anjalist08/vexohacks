@@ -6,6 +6,9 @@ system colours and the Montserrat font.
     open commercial/index.html                 # or serve the folder and open it in a browser
     python3 commercial/build.py audio          # music bed + ElevenLabs narration (voice River)
     python3 commercial/build.py video          # renders every frame and writes out/wayback-trail-commercial.mp4
+    python3 commercial/build.py snapshot "Title" "what changed"   # keep this cut in demo-versions/
+
+Every cut so far is kept in [../demo-versions](../demo-versions/README.md).
 
 The page draws every frame from one function of time, so it plays live in a browser and
 renders frame-for-frame to video (`render.mjs`, using the pre-installed Playwright).

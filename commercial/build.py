@@ -3,6 +3,8 @@
     python3 commercial/build.py audio    # music bed + ElevenLabs narration (River) -> commercial/audio/
     python3 commercial/build.py video    # render frames (node render.mjs) and mux -> commercial/out/*.mp4
     python3 commercial/build.py all
+    python3 commercial/build.py snapshot "Short title" "change one" "change two"
+                                         # copy the current MP4 into demo-versions/ as the next version
 
 The ElevenLabs key is read only through keys.py (VEXO_ELEVENLABS_API_KEY) and sent in
 the xi-api-key header, as voice/elevenlabs_tts.py does. With no key, the request still
@@ -167,7 +169,62 @@ def build_video():
     print("Video:", out, "(%.1f s)" % duration(out))
 
 
+VERSIONS = os.path.join(os.path.dirname(HERE), "demo-versions")
+
+
+def write_versions_readme(versions):
+    lines = ["# Demo versions", "",
+             "Every rendered cut of the 60-second Wayback Trail x Vexo commercial, so each iteration",
+             "can be tracked and watched. Open the `.mp4` files directly, or serve this folder and",
+             "open `index.html` to see them all with their change notes:", "",
+             "    cd demo-versions && python3 -m http.server 8090   # then http://localhost:8090", "",
+             "Add the next version after a render with",
+             "`python3 commercial/build.py snapshot \"Title\" \"change\" ...`. That copies",
+             "`commercial/out/wayback-trail-commercial.mp4` here, makes a thumbnail, and updates",
+             "`versions.json` and this file.", "",
+             "| Version | Date | Commit | File | What changed |", "| --- | --- | --- | --- | --- |"]
+    for v in sorted(versions, key=lambda v: -v["version"]):
+        lines.append("| v%d: %s | %s | `%s` | [%s](%s) | %s |" % (
+            v["version"], v["title"], v["date"], v["commit"], v["file"], v["file"].replace(" ", "%20"),
+            "<br>".join(c.replace("|", "\\|") for c in v["changes"])))
+    with open(os.path.join(VERSIONS, "README.md"), "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+
+def snapshot(title, changes):
+    import datetime
+    import re
+    src = os.path.join(OUT, "wayback-trail-commercial.mp4")
+    path = os.path.join(VERSIONS, "versions.json")
+    versions = json.load(open(path)) if os.path.exists(path) else []
+    n = max([v["version"] for v in versions] or [0]) + 1
+    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-") or "cut"
+    name = "v%d-%s.mp4" % (n, slug)
+    os.makedirs(os.path.join(VERSIONS, "thumbs"), exist_ok=True)
+    import shutil
+    shutil.copyfile(src, os.path.join(VERSIONS, name))
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", "39.5", "-i", src, "-frames:v", "1", "-vf", "scale=640:-1",
+                    os.path.join(VERSIONS, "thumbs", name[:-4] + ".jpg")], check=True)
+    commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True,
+                            cwd=HERE).stdout.strip()
+    versions.append({"version": n, "file": name, "date": datetime.date.today().isoformat(),
+                     "commit": commit, "title": title, "changes": list(changes)})
+    with open(path, "w") as f:
+        json.dump(versions, f, indent=1, ensure_ascii=False)
+        f.write("\n")
+    write_versions_readme(versions)
+    print("Saved demo-versions/%s as v%d" % (name, n))
+
+
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "snapshot":
+        if len(sys.argv) < 3:
+            raise SystemExit('usage: build.py snapshot "Title" ["change" ...]')
+        snapshot(sys.argv[2], sys.argv[3:])
+        raise SystemExit(0)
+    if len(sys.argv) > 1 and sys.argv[1] == "readme":
+        write_versions_readme(json.load(open(os.path.join(VERSIONS, "versions.json"))))
+        raise SystemExit(0)
     what = sys.argv[1] if len(sys.argv) > 1 else "all"
     if what in ("audio", "all"):
         build_audio()

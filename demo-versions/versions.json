@@ -1,0 +1,26 @@
+[
+ {
+  "version": 1,
+  "file": "v1-desert-antarctica-music-only.mp4",
+  "date": "2026-11-14",
+  "commit": "304163c",
+  "title": "First cut",
+  "changes": [
+   "Full 60-second spot: intro, wrist close-up, walk with live app overlay, 🙈🙉🙊 cards, crowded, unfamiliar, isolated, nation and globe, end card",
+   "Unfamiliar scene: desert and Antarctica split screen",
+   "Music bed and burned-in captions only, no spoken narration (the ElevenLabs key was refused)"
+  ]
+ },
+ {
+  "version": 2,
+  "file": "v2-three-walkers-river-narration.mp4",
+  "date": "2026-11-14",
+  "commit": "2bd5924",
+  "title": "Three walkers + River narration",
+  "changes": [
+   "Unfamiliar scene now has three slots: a blind walker (cane, spoken + left-ear cue), a Deaf walker (light + buzz) and a non-speaking walker (typed command)",
+   "Desert and Antarctica removed; all other scenes unchanged",
+   "ElevenLabs narration in the team's River voice, captions timed to the real clips, ending on \"This is the Wayback Trail.\""
+  ]
+ }
+]
