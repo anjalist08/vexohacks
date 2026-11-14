@@ -222,8 +222,8 @@ class GeminiClientTests(unittest.TestCase):
         self.assertEqual(low_payload["generationConfig"]["thinkingConfig"]["thinkingLevel"], "low")
 
     def test_choose_tool_fails_when_model_unset(self):
-        self.assertIsNone(config.GEMINI_MODEL)
-        with mock.patch.dict(os.environ, {"VEXO_GEMINI_API_KEY": "test-vexo-gemini-tok"}, clear=True):
+        with mock.patch.object(config, "GEMINI_MODEL", None), \
+                mock.patch.dict(os.environ, {"VEXO_GEMINI_API_KEY": "test-vexo-gemini-tok"}, clear=True):
             with self.assertRaises(GeminiError) as ctx:
                 choose_tool("start route", landmark_summary="none")
         self.assertIn("GEMINI_MODEL", str(ctx.exception))
