@@ -566,3 +566,4 @@ body {
 .trk-badge.warn { color: var(--warning); border-color: var(--warning); }
 .trk-badge.err { color: var(--danger); border-color: var(--danger); }
 .trk-log { display: inline-block; margin-top: 10px; font-size: 13px; color: var(--accent); }
+.trk-log[hidden] { display: none; }

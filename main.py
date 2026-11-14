@@ -200,6 +200,9 @@ def run_band(ws_port=8765, http_port=8000, no_web=False, usb=False):
             return {"log": log_url}
 
         start_status_pump(ws, tracker, status_stop, extra=status_extra)
+    if ws is not None:
+        print("Map:  http://localhost:%d/web/trail.html?ws_port=%d   (team map: http://localhost:%d/web/?ws_port=%d)"
+              % (http_port, ws.port, http_port, ws.port))
     print("Connected to %s. Double-tap the band to speak, or type commands below." % band.name)
     print("Logging every sample to %s" % logger.path)
     print('Press "start route" on the map page (or type it here), hold your arm still a moment, then walk.')

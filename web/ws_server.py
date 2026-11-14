@@ -657,7 +657,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if not args.no_http:
         try:
             httpd = _start_static_http(args.host, args.http_port, repo_root)
-            print("Map page:  http://localhost:%d/web/" % args.http_port)
+            print("Map page:  http://localhost:%d/web/trail.html?ws_port=%d  (team map: /web/?ws_port=%d)" % (args.http_port, args.ws_port, args.ws_port))
         except OSError as exc:
             print("HTTP port %d busy (%s); run python3 -m http.server --bind 127.0.0.1 separately." % (args.http_port, exc))
     print("WebSocket: ws://%s:%d" % (ws.host, ws.port))
