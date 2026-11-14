@@ -18,14 +18,22 @@ export const DEFAULTS = {
   turnRate: 25,          // deg/s above this counts as turning
   settleS: 0.6,          // quiet time before a turn counts as finished
   minTurn: 45,           // net turns smaller than this are ignored (snap only)
-  stillGyro: 3,          // deg/s: below this while "still" re-estimates the bias
+  quietGyro: 4,          // deg/s: total gyro below this for quietN samples = band at rest
+  quietN: 25,            // ~0.5 s at 50/s
+  calibMaxGyro: 12,      // deg/s: calibration ignores samples moving faster than this
   biasAlpha: 0.02,
   flip: false,           // swap left and right if the band's axes are mirrored
-  stepSource: 'band',    // 'band' (band's step counter) or 'accel' (detector below)
+  stepSource: 'accel',   // 'accel' (detector below) or 'band' (band's step counter: starts ~15 s late)
   accThr: 1.12,          // g: smoothed |a| above this is a step...
   accLow: 1.03,          // ...once it has dropped below this since the last step
   accMinGapS: 0.28,      // at most ~3.5 steps a second
   accSmooth: 0.35,       // smoothing weight for |a|
+};
+
+const median = (xs) => {
+  const v = [...xs].sort((a, b) => a - b);
+  const m = v.length >> 1;
+  return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
 };
 
 export const wrap = (a) => {
@@ -43,7 +51,7 @@ export class Trail {
     this.running = false;
     this.x = 0; this.y = 0;
     this.heading = 0; this.raw = 0; this.bias = 0;
-    this.calib = []; this.calibUntil = Infinity; this.calibrated = false;
+    this.calib = []; this.calibUntil = Infinity; this.calibrated = false; this.quiet = [];
     this.g = null; this.lastT = null;
     this.turning = false; this.turnStart = 0; this.quietSince = null;
     this.bandLast = null; this.bandSteps = 0;
@@ -78,19 +86,28 @@ export class Trail {
     let yaw = (gx * g[0] + gy * g[1] + gz * g[2]) / norm;
     if (this.o.flip) yaw = -yaw;
 
-    if (t < this.calibUntil) { this.calib.push(yaw); this.lastT = t; return; }
+    const gyroMag = Math.hypot(gx, gy, gz);
+    if (t < this.calibUntil) {
+      if (gyroMag < this.o.calibMaxGyro) this.calib.push(yaw);   // a hand movement must not skew the bias
+      this.lastT = t;
+      return;
+    }
     if (!this.calibrated) {
-      if (this.calib.length) this.bias = this.calib.reduce((s, v) => s + v, 0) / this.calib.length;
+      if (this.calib.length) this.bias = median(this.calib);
       this.calibrated = true;
     }
 
     const dt = this.lastT == null ? 0 : Math.max(0, Math.min(0.2, t - this.lastT));
     this.lastT = t;
-    let rate = yaw - this.bias;
-    if (this.state === 'still' && !this.turning && Math.abs(rate) < this.o.stillGyro) {
-      this.bias += this.o.biasAlpha * (yaw - this.bias);
-      rate = yaw - this.bias;
+    // Band at rest (whatever its "state" says, which lags ~10 s): keep the bias honest.
+    if (gyroMag < this.o.quietGyro) {
+      this.quiet.push(yaw);
+      if (this.quiet.length > this.o.quietN) this.quiet.shift();
+      if (this.quiet.length === this.o.quietN && !this.turning) this.bias += this.o.biasAlpha * (median(this.quiet) - this.bias);
+    } else {
+      this.quiet = [];
     }
+    const rate = yaw - this.bias;
     // positive yaw about "up" = counter-clockwise = left = lower heading
     this.raw = wrap(this.raw - rate * dt);
     this._turn(t, rate);
