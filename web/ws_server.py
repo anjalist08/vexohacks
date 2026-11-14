@@ -260,6 +260,16 @@ class MapWebSocketServer:
         self.link_status = status
         self.broadcast({"type": "link", "status": status})
 
+    def send_metric(self, kind: str, fields: dict) -> None:
+        """A band reading for the page's Band card: "info", "battery", "temperature", "activity"
+        or "event". The latest of each kind is also sent to pages opened later."""
+        msg = dict(fields, type="band_metric", kind=kind, time=time.time())
+        if kind != "event":
+            if not hasattr(self, "_band_metrics"):
+                self._band_metrics = {}
+            self._band_metrics[kind] = msg
+        self.broadcast(msg)
+
     def send_led(self, state: str, period: Optional[int] = None) -> None:
         self._led_state = state
         self._led_period = period
@@ -360,6 +370,7 @@ class MapWebSocketServer:
         msgs: List[dict] = []
         with self._app_lock:
             msgs.append({"type": "mode", "mode": self.mode})
+            msgs.extend(getattr(self, "_band_metrics", {}).values())
             bridge = getattr(self, "bridge", None)
             # Chrome may connect the band only when this app is bridging; otherwise Python holds it.
             msgs.append({"type": "band_number", "band": bridge.number if bridge is not None else None})

@@ -49,6 +49,15 @@
   #vHeard { color:var(--muted); font-size:12.5px; overflow-wrap:anywhere; }
   #vHeard q { color:var(--fg); font-style:italic; }
   .try { color:var(--muted); font-size:12px; }
+  /* band card: connection and battery */
+  .battery { height:10px; border-radius:999px; background:#eef1f5; overflow:hidden; }
+  .battery > div { height:100%; width:0; background:var(--green); transition:width .4s; }
+  .battery > div.low { background:var(--red); }
+  .battery > div.mid { background:#f9ab00; }
+  #bandConn.live { background:#e6f4ea; color:var(--green); }
+  #bandConn.cal { background:#fef7e0; color:#a56c00; }
+  #bandConn.bad { background:#fce8e6; color:var(--red); }
+  #bandWarn { color:var(--red); font-weight:500; }
   #bridgeBtn[data-level="ok"] { color:var(--green); border-color:var(--green); }
   #bridgeBtn[data-level="err"] { color:var(--red); border-color:var(--red); }
 </style>
@@ -84,6 +93,16 @@
 <main>
   <canvas id="map"></canvas>
   <aside class="side">
+    <section class="card" id="bandCard" aria-label="Band connection and battery">
+      <div class="stat"><h2>Band</h2><span id="bandConn" class="pill">not connected</span></div>
+      <div class="stat"><span id="bandName">Vexo band</span><b id="bandVia">–</b></div>
+      <div class="stat"><span>Battery</span><b id="batPct">–</b></div>
+      <div class="battery" role="img" aria-label="Battery level"><div id="batFill"></div></div>
+      <div class="stat"><span id="batState">waiting for the band…</span><b id="bandTemp"></b></div>
+      <p id="bandWarn" class="hint" hidden></p>
+      <p id="bandSeen" class="hint"></p>
+    </section>
+
     <section class="card">
       <div class="stat"><h2>Tracking</h2><span id="status" class="pill">idle</span></div>
       <div class="stat"><span>Steps (used for the map)</span><b id="steps">0</b></div>
@@ -149,5 +168,6 @@
 </script>
 <script type="module" src="trail.js"></script>
 <script type="module" src="trail-voice.js"></script>
+<script type="module" src="band-status.js"></script>
 </body>
 </html>

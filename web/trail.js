@@ -122,7 +122,15 @@ window.trailBackend = {
   command: (text) => command(text),
 };
 
+// Recent non-point messages, so add-on scripts that load a moment later can catch up.
+window.trailBackendHistory = [];
+
 function onBackend(m) {
+  if (m.type === 'point') window.trailBackendLastPoint = m;
+  if (m.type !== 'point' && m.type !== 'tracker') {
+    window.trailBackendHistory.push(m);
+    if (window.trailBackendHistory.length > 300) window.trailBackendHistory.shift();
+  }
   window.dispatchEvent(new CustomEvent('trail-backend', { detail: m }));
   switch (m.type) {
     case 'mode': {

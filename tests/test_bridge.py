@@ -109,5 +109,21 @@ class ServerBridgeTests(unittest.TestCase):
         self.assertEqual(out[-1]["args"]["color"], "#ffffff")
 
 
+
+class BandMetricTests(unittest.TestCase):
+    def test_latest_metrics_reach_new_pages(self):
+        app = SpatialMemoryApp(PathTracker(), RouteStore(), speak=lambda t: None, clock=time.time)
+        server = MapWebSocketServer(app, mode="LIVE")
+        server.send_metric("info", {"name": "Vexo-HACK-80", "transport": "Bluetooth"})
+        server.send_metric("battery", {"percent": 40, "millivolts": 3800, "state": "battery"})
+        server.send_metric("battery", {"percent": 39, "millivolts": 3790, "state": "battery"})
+        server.send_metric("event", {"kind": "tap"})
+        msgs = [m for m in server._build_initial_snapshot() if m.get("type") == "band_metric"]
+        kinds = {m["kind"]: m for m in msgs}
+        self.assertEqual(set(kinds), {"info", "battery"})      # events are not replayed
+        self.assertEqual(kinds["battery"]["percent"], 39)        # only the latest reading
+        self.assertEqual(kinds["info"]["name"], "Vexo-HACK-80")
+
+
 if __name__ == "__main__":
     unittest.main()

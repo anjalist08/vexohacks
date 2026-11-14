@@ -204,6 +204,7 @@ def run_band(ws_port=8765, http_port=8000, no_web=False, usb=False):
             on_double_tap=voice_loop.on_double_tap,
             on_link=on_link,
             usb=usb,
+            on_metric=ws.send_metric if ws is not None else None,   # battery etc. for the Band card
         )
     except BaseException:
         _stop_web_servers(ws, httpd)
@@ -266,7 +267,7 @@ def run_bridge(ws_port=8765, http_port=8000):
         print("The map page server could not start; the Chrome bridge needs it.")
         return 1
     band = bridge_band.BridgeBand(ws.broadcast)
-    bridge_band.wire(band, tracker, logger, on_double_tap=voice_loop.on_double_tap)
+    bridge_band.wire(band, tracker, logger, on_double_tap=voice_loop.on_double_tap, on_metric=ws.send_metric)
 
     def on_status(msg):
         status = msg.get("status", "")
@@ -274,6 +275,8 @@ def run_bridge(ws_port=8765, http_port=8000):
         ws.send_link(status)
         if status in ("connected", "reconnected"):
             band.connected = True
+            ws.send_metric("info", {"name": msg.get("name") or band.name, "transport": "Chrome Bluetooth",
+                                    "firmware": msg.get("firmware")})
             bridge_band.configure_streams(band)
             led.reapply()
         elif status == "disconnected":
