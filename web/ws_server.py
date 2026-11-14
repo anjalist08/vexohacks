@@ -522,8 +522,8 @@ class _SafeStaticHandler(SimpleHTTPRequestHandler):
         pass
 
 
-def start_status_pump(ws, tracker, stop_event: threading.Event, extra=None, every: float = 0.25) -> threading.Thread:
-    """Broadcast tracker_status() (calibrating, live heading, step counts) a few times a second."""
+def start_status_pump(ws, tracker, stop_event: threading.Event, extra=None, every: float = 0.05) -> threading.Thread:
+    """Broadcast tracker_status() (calibrating, live heading, step counts) 20 times a second, so the facing cone moves smoothly."""
     from tracker.wrist import tracker_status
 
     def loop():
