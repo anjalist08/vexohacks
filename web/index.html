@@ -30,6 +30,10 @@
           <span title="This page ↔ laptop app (WebSocket). Reconnects by itself after a restart.">Page ↔ app:</span>
           <strong id="ws-text">connecting</strong>
         </span>
+        <button id="bridge-btn" type="button" class="bridge-btn" disabled
+                title="Connect the band over Bluetooth from this Chrome tab (like the kit dashboard)">
+          <span aria-hidden="true">&#x1F4F6;</span> <span id="bridge-label">Connect band</span>
+        </button>
         <button id="fit-btn" type="button" class="btn-ghost">Fit Map</button>
         <button id="theme-btn" type="button" class="btn-ghost">Light Theme</button>
       </div>
@@ -148,5 +152,6 @@
   </div>
 
   <script src="./app.js"></script>
+  <script type="module" src="./band-bridge.js"></script>
 </body>
 </html>

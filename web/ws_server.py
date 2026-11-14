@@ -360,6 +360,9 @@ class MapWebSocketServer:
         msgs: List[dict] = []
         with self._app_lock:
             msgs.append({"type": "mode", "mode": self.mode})
+            bridge = getattr(self, "bridge", None)
+            # Chrome may connect the band only when this app is bridging; otherwise Python holds it.
+            msgs.append({"type": "band_number", "band": bridge.number if bridge is not None else None})
             msgs.append({"type": "link", "status": self.link_status})
 
             led_state = getattr(self.app, "led_state", self._led_state) or "idle"
@@ -477,6 +480,16 @@ class MapWebSocketServer:
             mtype = parsed.get("type")
             if mtype == "ping":
                 client.send_json({"type": "pong"})
+                return
+            if mtype == "band_event":            # band data relayed by Chrome (web/band-bridge.js)
+                bridge = getattr(self, "bridge", None)
+                if bridge is not None:
+                    bridge.receive(parsed)
+                return
+            if mtype == "band_status":
+                handler = getattr(self, "on_bridge_status", None)
+                if handler is not None:
+                    handler(parsed)
                 return
             if mtype == "talk":                  # the page's Talk / Stop button: same as a double-tap
                 loop = getattr(self, "voice_loop", None)

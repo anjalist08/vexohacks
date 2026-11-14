@@ -4,6 +4,7 @@
     python3 main.py --replay FILE     replay a logged real walk + live map page (label it a replay)
     python3 main.py --band            live band (set BAND in config.py first) + voice loop + live map page
     python3 main.py --band --usb      the same over the USB cable
+    python3 main.py --bridge          the band connects through Chrome (click "Connect band" on the map page)
 
 Typed commands use the keyword fallback, e.g. "start route", "remember this as the elevator",
 "where was the elevator", "take me back to the start", "I'm at the elevator", "quit".
@@ -200,12 +201,67 @@ def run_band(ws_port=8765, http_port=8000, no_web=False, usb=False):
     return 0
 
 
+def run_bridge(ws_port=8765, http_port=8000):
+    """The band connects through Chrome (Web Bluetooth, like the kit's dashboard); this
+    program does everything else. Use it when Python itself cannot use Bluetooth."""
+    from tracker import band_source
+    from voice.elevenlabs_tts import ElevenLabsSpeaker
+    from voice.led_states import LedController
+    from voice.loop import VoiceLoop
+    from web import bridge_band
+
+    band_source.require_band_number()
+    log_dir = config.LOG_DIR if os.path.isabs(config.LOG_DIR) else os.path.join(REPO_ROOT, config.LOG_DIR)
+    routes_file = config.ROUTES_FILE if os.path.isabs(config.ROUTES_FILE) else os.path.join(REPO_ROOT, config.ROUTES_FILE)
+    tracker = PathTracker()
+    logger = SampleLogger(log_dir)
+    led = LedController()
+    speaker = ElevenLabsSpeaker()
+    app = SpatialMemoryApp(tracker, RouteStore(routes_file), speak=speaker, led=led)
+    voice_loop = VoiceLoop(app, listen_seconds=config.LISTEN_SECONDS)
+    ws, httpd = _start_web_servers(app, mode="LIVE", ws_port=ws_port, http_port=http_port)
+    if ws is None:
+        print("The map page server could not start; the Chrome bridge needs it.")
+        return 1
+    band = bridge_band.BridgeBand(ws.broadcast)
+    bridge_band.wire(band, tracker, logger, on_double_tap=voice_loop.on_double_tap)
+
+    def on_status(msg):
+        status = msg.get("status", "")
+        print("\n    [CHROME] band %s" % status)
+        ws.send_link(status)
+        if status in ("connected", "reconnected"):
+            band.connected = True
+            bridge_band.configure_streams(band)
+            led.reapply()
+        elif status == "disconnected":
+            band.connected = False
+
+    ws.bridge = band
+    ws.on_bridge_status = on_status
+    ws.voice_loop = voice_loop
+    led.band = band
+    voice_loop.band = band
+    voice_loop.start_background()
+    print("Open http://localhost:%d/web/ in Chrome, double-tap the band, then click \"Connect band\"." % http_port)
+    print("Logging every sample to %s" % logger.path)
+    try:
+        repl(app)
+    finally:
+        voice_loop.stop()
+        _stop_web_servers(ws, httpd)
+        logger.close()
+    return 0
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     g = p.add_mutually_exclusive_group(required=True)
     g.add_argument("--sim", action="store_true", help="scripted demo on a synthetic walk")
     g.add_argument("--replay", metavar="FILE", help="replay a logged walk CSV")
     g.add_argument("--band", action="store_true", help="use the team's band (config.BAND)")
+    g.add_argument("--bridge", action="store_true",
+                   help="the band connects through Chrome's Bluetooth (click Connect band on the map page)")
     p.add_argument("--ws-port", type=int, default=8765, help="WebSocket port for the map page (default: 8765)")
     p.add_argument("--http-port", type=int, default=8000, help="HTTP port for the map page (default: 8000)")
     p.add_argument("--usb", action="store_true", help="with --band: use the USB cable instead of Bluetooth")
@@ -215,6 +271,8 @@ def main(argv=None):
         return run_sim()
     if a.replay:
         return run_replay(a.replay, ws_port=a.ws_port, http_port=a.http_port, no_web=a.no_web)
+    if a.bridge:
+        return run_bridge(ws_port=a.ws_port, http_port=a.http_port)
     return run_band(ws_port=a.ws_port, http_port=a.http_port, no_web=a.no_web, usb=a.usb)
 
 
