@@ -1,14 +1,15 @@
 """Wearable spatial memory on the Vexo band.
 
     python3 main.py --sim             scripted demo on a synthetic walk (no band, no keys)
-    python3 main.py --replay FILE     replay a logged real walk, then type commands (label it a replay)
-    python3 main.py --band            live band (set BAND in config.py first), type commands
+    python3 main.py --replay FILE     replay a logged real walk + live map page (label it a replay)
+    python3 main.py --band            live band (set BAND in config.py first) + voice loop + live map page
 
 Typed commands use the keyword fallback, e.g. "start route", "remember this as the elevator",
 "where was the elevator", "take me back to the start", "I'm at the elevator", "quit".
-The voice loop (double-tap, Deepgram, Gemini, ElevenLabs) is built in voice/.
+On --band, double-tap triggers one spoken turn: band mic -> Deepgram -> Gemini 4 -> ElevenLabs -> LED.
 """
 import argparse
+import os
 import sys
 
 import keys
@@ -17,9 +18,13 @@ keys.prepare()   # before any AI SDK or the kit's speech module is imported
 
 import config  # noqa: E402
 from app import SpatialMemoryApp  # noqa: E402
+from store.band_mirror import BandLandmarkMirror  # noqa: E402
 from store.route_store import RouteStore  # noqa: E402
 from tracker.events import SampleLogger, feed, read_log, synthetic_walk  # noqa: E402
 from tracker.pdr import PathTracker  # noqa: E402
+from web.ws_server import MapWebSocketServer, _start_static_http  # noqa: E402
+
+REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
 class PrintLed:
@@ -37,6 +42,32 @@ class PrintLed:
 
 def say(text):
     print("    [SAY] %s" % text)
+
+
+def _start_web_servers(app, mode, host="127.0.0.1", ws_port=8765, http_port=8000, enable_ws=True, enable_http=True):
+    ws = None
+    httpd = None
+    if enable_ws:
+        try:
+            ws = MapWebSocketServer(app, host=host, port=ws_port, mode=mode).start()
+            print("WebSocket: ws://%s:%d" % (ws.host, ws.port))
+        except OSError as exc:
+            print("WebSocket port %d busy (%s); continuing without map feed." % (ws_port, exc))
+    if enable_http:
+        try:
+            httpd = _start_static_http(host, http_port, REPO_ROOT)
+            print("Map page:  http://localhost:%d/web/" % http_port)
+        except OSError:
+            print("Map page:  http://localhost:%d/web/ (using existing server on port %d)" % (http_port, http_port))
+    return ws, httpd
+
+
+def _stop_web_servers(ws, httpd):
+    if ws is not None:
+        ws.stop()
+    if httpd is not None:
+        httpd.shutdown()
+        httpd.server_close()
 
 
 def run_sim():
@@ -80,44 +111,86 @@ def repl(app):
         if text in ("quit", "exit"):
             break
         if text == "delete all":
-            app.store.delete_all()
+            app.delete_all()
             print("    All routes deleted.")
             continue
         if text:
             app.keyword_command(text)
 
 
-def run_replay(path):
+def run_replay(path, ws_port=8765, http_port=8000, no_web=False):
     print("REPLAY of a logged walk (%s). This is not live sensing.\n" % path)
     events = read_log(path)
-    now = [events[0][1]]
+    now = [events[0][1]] if events else [0.0]
     app = SpatialMemoryApp(PathTracker(), RouteStore(), speak=say, led=PrintLed(), clock=lambda: now[0])
-    app.call_tool("start_route", {"title": "replay"})
-    feed(app.tracker, events)
-    now[0] = events[-1][1]
-    p = app.tracker.pose
-    print("    [POS] x=%.1f m  y=%.1f m  heading=%.0f deg  steps=%d" % (p.x_m, p.y_m, p.heading_deg, p.steps))
-    repl(app)
+    ws, httpd = _start_web_servers(
+        app, mode="REPLAY", ws_port=ws_port, http_port=http_port,
+        enable_ws=not no_web, enable_http=not no_web,
+    )
+    try:
+        app.call_tool("start_route", {"title": "replay"})
+        if events:
+            feed(app.tracker, events)
+            now[0] = events[-1][1]
+        p = app.tracker.pose
+        print("    [POS] x=%.1f m  y=%.1f m  heading=%.0f deg  steps=%d" % (p.x_m, p.y_m, p.heading_deg, p.steps))
+        repl(app)
+    finally:
+        _stop_web_servers(ws, httpd)
     return 0
 
 
-def run_band():
+def run_band(ws_port=8765, http_port=8000, no_web=False):
     from tracker import band_source
+    from voice.elevenlabs_tts import ElevenLabsSpeaker
     from voice.led_states import LedController
+    from voice.loop import VoiceLoop
+
     band_source.require_band_number()
+    log_dir = config.LOG_DIR if os.path.isabs(config.LOG_DIR) else os.path.join(REPO_ROOT, config.LOG_DIR)
+    routes_file = config.ROUTES_FILE if os.path.isabs(config.ROUTES_FILE) else os.path.join(REPO_ROOT, config.ROUTES_FILE)
     tracker = PathTracker()
-    logger = SampleLogger(config.LOG_DIR)
+    logger = SampleLogger(log_dir)
     led = LedController()
-    app = SpatialMemoryApp(tracker, RouteStore(config.ROUTES_FILE), speak=say, led=led)
-    band = band_source.connect(
-        tracker, logger,
-        on_double_tap=lambda: print("\n    (double-tap: the voice loop is not built yet, type instead)"),
-        on_link=lambda s: print("\n    [LINK] %s" % s))
+    speaker = ElevenLabsSpeaker()
+    app = SpatialMemoryApp(tracker, RouteStore(routes_file), speak=speaker, led=led)
+    voice_loop = VoiceLoop(app, listen_seconds=config.LISTEN_SECONDS)
+    ws, httpd = _start_web_servers(
+        app, mode="LIVE", ws_port=ws_port, http_port=http_port,
+        enable_ws=not no_web, enable_http=not no_web,
+    )
+
+    def on_link(status):
+        print("\n    [LINK] %s" % status)
+        if status == "reconnected":
+            led.reapply()
+        if ws is not None:
+            ws.send_link(status)
+
+    try:
+        band = band_source.connect(
+            tracker,
+            logger,
+            on_double_tap=voice_loop.on_double_tap,
+            on_link=on_link,
+        )
+    except BaseException:
+        _stop_web_servers(ws, httpd)
+        logger.close()
+        raise
+
     led.band = band
-    print("Connected to %s. Logging every sample to %s" % (band.name, logger.path))
+    voice_loop.band = band
+    if getattr(band, "storage", None) is not None:
+        app.band_mirror = BandLandmarkMirror(band.storage)
+    voice_loop.start_background()
+    print("Connected to %s. Double-tap the band to speak, or type commands below." % band.name)
+    print("Logging every sample to %s" % logger.path)
     try:
         repl(app)
     finally:
+        voice_loop.stop()
+        _stop_web_servers(ws, httpd)
         logger.close()
         band.disconnect()
     return 0
@@ -129,12 +202,15 @@ def main(argv=None):
     g.add_argument("--sim", action="store_true", help="scripted demo on a synthetic walk")
     g.add_argument("--replay", metavar="FILE", help="replay a logged walk CSV")
     g.add_argument("--band", action="store_true", help="use the team's band (config.BAND)")
+    p.add_argument("--ws-port", type=int, default=8765, help="WebSocket port for the map page (default: 8765)")
+    p.add_argument("--http-port", type=int, default=8000, help="HTTP port for the map page (default: 8000)")
+    p.add_argument("--no-web", action="store_true", help="disable local HTTP/WebSocket servers on --band/--replay")
     a = p.parse_args(argv)
     if a.sim:
         return run_sim()
     if a.replay:
-        return run_replay(a.replay)
-    return run_band()
+        return run_replay(a.replay, ws_port=a.ws_port, http_port=a.http_port, no_web=a.no_web)
+    return run_band(ws_port=a.ws_port, http_port=a.http_port, no_web=a.no_web)
 
 
 if __name__ == "__main__":

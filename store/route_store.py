@@ -12,6 +12,7 @@ from typing import List, Optional, Tuple
 
 import config
 from interfaces import Instruction, Landmark, PoseSample
+from store.guidance import GuidanceSession, build_guidance_session
 
 STOPWORDS = {"the", "a", "an", "to", "back", "where", "was", "is", "my", "me", "take", "i", "of", "this",
              "that", "it", "go", "get", "find", "please", "at", "by", "near", "next", "in", "on", "and",
@@ -132,54 +133,42 @@ class RouteStore:
         return found
 
     # --- return guidance -----------------------------------------------------------
-    def path_back(self, target_index: int) -> List[PoseSample]:
+    def path_back(self, target_index: int, from_pose: Optional[PoseSample] = None) -> List[PoseSample]:
         """Points from the current position back to target_index, in walking order."""
         pts = self.current.points
-        return list(reversed(pts[target_index:]))
+        if not pts:
+            return []
+        if from_pose is None or math.hypot(from_pose.x_m - pts[-1].x_m, from_pose.y_m - pts[-1].y_m) <= 1e-4:
+            return list(reversed(pts[target_index:]))
+        # Walker moved during a previous return trip without appending reverse points:
+        # start from the closest recorded point on the route.
+        from_idx = min(
+            range(len(pts)),
+            key=lambda idx: math.hypot(from_pose.x_m - pts[idx].x_m, from_pose.y_m - pts[idx].y_m),
+        )
+        if from_idx >= target_index:
+            sub = list(reversed(pts[target_index : from_idx + 1]))
+        else:
+            sub = list(pts[from_idx : target_index + 1])
+        if sub and math.hypot(from_pose.x_m - sub[0].x_m, from_pose.y_m - sub[0].y_m) > 0.25:
+            sub = [from_pose] + sub
+        return sub
 
     def distance_back(self, target_index: int) -> float:
         pts = self.path_back(target_index)
         return sum(math.hypot(b.x_m - a.x_m, b.y_m - a.y_m) for a, b in zip(pts, pts[1:]))
 
+    def plan_return_session(self, target_index: int, target_name: str, facing_deg: float,
+                            step_length_m: Optional[float] = None,
+                            from_pose: Optional[PoseSample] = None) -> GuidanceSession:
+        """Build a step-by-step GuidanceSession back to target_index."""
+        pts = self.path_back(target_index, from_pose=from_pose)
+        return build_guidance_session(pts, target_name, facing_deg, step_length_m)
+
     def plan_return(self, target_index: int, target_name: str, facing_deg: float,
                     step_length_m: float = None) -> List[Instruction]:
         """Turn-by-turn steps along the recorded path, back to target_index."""
-        step_len = step_length_m or config.STEP_LENGTH_M
-        pts = self.path_back(target_index)
-
-        segments = []    # [heading, dx, dy]
-        for a, b in zip(pts, pts[1:]):
-            dx, dy = b.x_m - a.x_m, b.y_m - a.y_m
-            if math.hypot(dx, dy) < 1e-6:
-                continue
-            h = math.degrees(math.atan2(dx, dy))
-            if segments and abs(_wrap(h - segments[-1][0])) <= config.SEGMENT_MERGE_DEG:
-                seg = segments[-1]
-                seg[1] += dx
-                seg[2] += dy
-                seg[0] = math.degrees(math.atan2(seg[1], seg[2]))
-            else:
-                segments.append([h, dx, dy])
-        segments = [s for s in segments if math.hypot(s[1], s[2]) >= config.MIN_SEGMENT_M]
-
-        out: List[Instruction] = []
-        facing = facing_deg
-        for h, dx, dy in segments:
-            dist = math.hypot(dx, dy)
-            steps = max(1, int(round(dist / step_len)))
-            delta = _wrap(h - facing)
-            if abs(delta) < 45:
-                turn, text = "straight", "Walk straight %d steps." % steps
-            elif abs(delta) > 135:
-                turn, text = "around", "Turn around, walk %d steps." % steps
-            elif delta > 0:
-                turn, text = "right", "Turn right, walk %d steps." % steps
-            else:
-                turn, text = "left", "Turn left, walk %d steps." % steps
-            out.append(Instruction(turn, steps, round(dist, 2), text))
-            facing = h
-        out.append(Instruction("arrive", 0, 0.0, "You have reached the %s." % target_name))
-        return out
+        return self.plan_return_session(target_index, target_name, facing_deg, step_length_m).instructions
 
     # --- files ---------------------------------------------------------------------
     def save(self, path: str = None):

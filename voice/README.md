@@ -1,40 +1,48 @@
 # voice/ — owner: @voice
 
-Done so far: `led_states.py` (LED vocabulary and `LedController`).
+Implemented modules on the baseline branch:
 
-## 1. Baseline loop (build first)
+- `led_states.py`: LED vocabulary (`STATES`, `LedCue`, `turn_now_period`) and `LedController`.
+- `gemini_client.py`: Pure-stdlib HTTPS Gemini 4 tool-calling client (`choose_tool`, `build_function_declarations`, `GEMINI_4_MODELS`, `RECOMMENDED_GEMINI_4_MODEL`). Sends `VEXO_GEMINI_API_KEY` via `x-goog-api-key` header (never in URL query strings), blocks HTTP redirects, declares native `functionDeclarations` with `toolConfig.functionCallingConfig.mode = "ANY"`, and omits `temperature`, `topP` / `top_p`, `topK` / `top_k`, and legacy `thinkingBudget` per the Gemini 4 builder guide.
+- `elevenlabs_tts.py`: Pure-stdlib HTTPS ElevenLabs TTS client (`ElevenLabsSpeaker`, `speak`, `synthesize_mp3`). Sends `VEXO_ELEVENLABS_API_KEY` via `xi-api-key` header to `config.ELEVENLABS_VOICE_ID` (`SAz9YHcvj6GT2YYXdXww`), plays audio on the laptop speaker (`afplay` on macOS), cleans up temporary MP3 files in `finally:`, and falls back to macOS `say` and terminal `[SAY]` output.
+- `loop.py`: Baseline tap-to-talk controller (`VoiceLoop`).
 
-Template: `vexo-open-kit/examples/python/voice_commands.py`. It already goes band mic →
-Deepgram → a tool-calling model. Replace its OpenAI call with Gemini. Do not run the kit's
-`ai.py` with anyone's personal OpenAI key.
+## Gemini 4 model configuration
 
-One turn:
+`config.GEMINI_MODEL` is left `None` in `config.py` for the team to set. Verified Gemini 4 model IDs (`voice.GEMINI_4_MODELS`):
 
-1. Double-tap on the band (`band_source.connect(..., on_double_tap=...)`).
-2. Turn the mic on for `config.LISTEN_SECONDS`. The LED is locked solid blue meanwhile.
-3. Send the audio to Deepgram for text. Turn the mic off.
-4. Send the text to Gemini (`config.GEMINI_MODEL`, a Gemini 4 id) with `interfaces.TOOLS` as
-   function declarations, plus `app.landmark_summary()` so it can use landmark ids. It must
-   answer with a tool call.
-5. Run it with `app.call_tool(name, args)`. That validates the arguments and returns a
-   `ToolResult` with `say` and `led`.
-6. Speak `say` with ElevenLabs (`config.ELEVENLABS_VOICE_ID`) on the laptop speaker. The
-   LED state is applied by `app.output` once the mic is off.
+- `GEMINI_MODEL = "gemini-4-hydrogen"` — **recommended** fast interactive workhorse for tap-to-talk tool calls
+- `GEMINI_MODEL = "gemini-4-argon"` — balanced Gemini 4 model
+- `GEMINI_MODEL = "gemini-4-carbon"` — frontier reasoning Gemini 4 model
 
-Fallbacks: if Deepgram or Gemini fails, use `app.keyword_command(text)`. If ElevenLabs
-fails, use the macOS `say` command or print.
+Per Gemini 4 API rules, requests never include custom `temperature`, `top_p`, `top_k`, or legacy `thinking_budget` (and `"minimal"` thinking level is rejected).
 
-Keys: call `keys.prepare()` once at start-up (before importing google-genai, Pipecat or the
-kit's `speech`), then pass every key explicitly: `keys.get("gemini")`, `keys.get("deepgram")`,
-`keys.get("elevenlabs")`. They read only `VEXO_GEMINI_API_KEY`, `VEXO_DEEPGRAM_API_KEY` and
-`VEXO_ELEVENLABS_API_KEY`. Never let an SDK find a key by itself: generic names such as
-`GEMINI_API_KEY` can be a teammate's personal, postpaid key. Never print them.
-Tap-to-talk only: no always-on listening.
+## 1. Baseline loop
 
-## 2. Pipecat port (needed for the Deepgram track)
+Wiring with `SpatialMemoryApp` and `tracker.band_source`:
 
-Once the baseline works, on a branch: Deepgram STT service → Gemini LLM service with the
-same tools → ElevenLabs TTS service → local audio out. Start with the laptop mic as input.
-Then feed band audio: decode the band's Opus packets to 16 kHz PCM with the kit's decoder
-(`vexo-open-kit/docs/speech.md`) and push them into the pipeline. Merge when one spoken turn
-works end to end. If it is not working by about 15:30, ship the baseline.
+```python
+from voice import LedController, VoiceLoop
+
+led = LedController()
+app = SpatialMemoryApp(tracker, store, led=led)
+voice_loop = VoiceLoop.create(app)
+band = band_source.connect(tracker, logger, on_double_tap=voice_loop.on_double_tap)
+voice_loop.band = band
+led.band = band
+voice_loop.start_background()
+```
+
+One turn (`VoiceLoop.run_turn`):
+
+1. `on_double_tap()` sets an internal `threading.Event` and returns immediately so it never blocks the band's event-dispatch thread (`vexo-open-kit/AGENTS.md`). Extra taps while a turn is running are ignored.
+2. The worker thread records `config.LISTEN_SECONDS` on the band via Deepgram (`speech.listen`). While `audio=True`, the band locks its LED solid blue.
+3. `audio=False` is guaranteed before any tool or LED call runs.
+4. `choose_tool` sends the transcript, native `interfaces.TOOLS` `functionDeclarations`, and `app.landmark_summary()` to `config.GEMINI_MODEL`. If Gemini is unconfigured or unavailable, `VoiceLoop` falls back to `app.keyword_command(words)`.
+5. `app.call_tool(name, args)` validates arguments and calls `app.output(result)`: `ElevenLabsSpeaker` speaks `result.say` (with `say` / `print` fallback) and `LedController` shows `result.led` now that the microphone is off.
+
+Keys: `keys.prepare()` runs at start-up before any SDK or kit `speech` import, stripping generic environment variables (`GEMINI_API_KEY`, `GOOGLE_API_KEY`, `OPENAI_API_KEY`, `ELEVENLABS_API_KEY`) and passing explicit `VEXO_*` keys only. Tap-to-talk only: never always-on listening.
+
+## 2. Pipecat port (separate `voice-pipecat` branch)
+
+For the Deepgram sponsor track (`DeepgramSTTService` -> `GoogleLLMService` with `interfaces.TOOLS` -> `ElevenLabsTTSService` -> local audio out, supporting both laptop microphone input and Vexo band Opus decoded via `vexo_open.audio.PcmDecoder`), see branch `voice-pipecat`.

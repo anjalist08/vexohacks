@@ -14,7 +14,7 @@ import math
 import os
 import random
 import time
-from typing import Iterable, List, Sequence, Tuple
+from typing import Iterable, List, Optional, Sequence, Tuple, Union
 
 COLUMNS = ["kind", "t", "ax", "ay", "az", "gx", "gy", "gz", "steps", "state"]
 Event = Tuple[str, float, dict]
@@ -71,23 +71,28 @@ def write_log(path: str, events: Iterable[Event]):
             w.writerow(row)
 
 
-def synthetic_walk(legs: Sequence[Tuple[int, str]] = ((20, "left"), (15, None)),
+def synthetic_walk(legs: Sequence[Tuple[int, Optional[Union[str, float]]]] = ((20, "left"), (15, None)),
                    cadence: float = 110.0, motion_hz: float = 25.0, activity_hz: float = 10.0,
                    bias_dps: float = 0.8, noise_dps: float = 1.5, still_s: float = 2.5,
                    turn_s: float = 1.5, end_still_s: float = 1.0, start_steps: int = 5000,
                    t0: float = 1_700_000_000.0, seed: int = 1) -> List[Event]:
     """A made-up walk for tests and the --sim demo. Not real sensing.
 
-    legs: (steps, then_turn) pairs; then_turn is "left", "right", "around" or None.
+    legs: (steps, then_turn) pairs; then_turn is "left", "right", "around", a yaw angle
+    in degrees (+yaw = counter-clockwise), or None.
     The walker stops at each corner while turning, so the band reads "still" during
     turns, which is the case the plan amendments fixed.
     """
     rng = random.Random(seed)
     phases = [("still", still_s, 0.0)]
     for steps, turn in legs:
-        phases.append(("walk", steps / (cadence / 60.0), steps))
-        if turn:
-            deg = {"left": 90.0, "right": -90.0, "around": 180.0}[turn]   # +yaw = counter-clockwise
+        if steps > 0:
+            phases.append(("walk", steps / (cadence / 60.0), steps))
+        if turn is not None and turn != "":
+            if isinstance(turn, (int, float)):
+                deg = float(turn)
+            else:
+                deg = {"left": 90.0, "right": -90.0, "around": 180.0}[turn]   # +yaw = counter-clockwise
             phases.append(("turn", turn_s, deg))
     phases.append(("still", end_still_s, 0.0))
 
