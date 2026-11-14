@@ -36,9 +36,10 @@ DURATION = 60.0
 LINES = [
     ("vo1", 0.9, 5.3, "Every place you go leaves a trail."),
     ("vo2", 6.1, 12.9, "Say, \"remember this as the entrance.\" Wayback Trail pins it to the path you actually walked."),
-    ("vo3", 13.6, 21.8, "Every step counted. Every turn mapped. And when it's time to go back, it guides you, step by step."),
+    ("vo3a", 13.6, 17.8, "Every step counted. Every turn mapped."),
+    ("vo3b", 17.9, 22.3, "Every time you ask, the Wayback app buzzes until you face the right way."),
     ("vo4a", 22.5, 25.0, "Can't see? It talks you through every turn."),
-    ("vo4b", 25.0, 27.4, "Can't hear? It glows, and it buzzes."),
+    ("vo4b", 25.0, 27.8, "Can't hear? The band glows, and the app buzzes."),
     ("vo4c", 27.4, 30.8, "Can't speak? Just tap, and type."),
     ("vo5", 31.5, 35.8, "In the crowd."),
     ("vo6", 36.6, 41.8, "In places you've never been."),

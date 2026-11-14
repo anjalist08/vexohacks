@@ -70,7 +70,7 @@ const WALK = [[0.0,0.0,0,0.0],[-3.5,0.0,5,25.99],[-4.9,0.0,7,27.01],[-4.9,-0.7,8
 const STEP_LENGTH_M = 0.70;          // config.STEP_LENGTH_M (placeholder until measured)
 const LANDMARKS = [{ i: 0, label: "Entrance", color: C.purple }, { i: 20, label: "Elevator", color: C.purple }];
 // Haptic patterns from store/haptics.py (ms on, off, on, ...)
-const PATTERNS = { turn_left: [500, 150, 150], on_track: [600], arrived: [700, 200, 700, 200, 700], tick: [50] };
+const PATTERNS = { wrong_left: [120, 120, 120], wrong_right: [120, 120, 120, 120, 120], on_track: [600], turn_left: [500, 150, 150], arrived: [700, 200, 700, 200, 700], tick: [50] };
 
 // cumulative distance along the walk
 const CUM = [0];
@@ -104,9 +104,10 @@ const RETURN_STEPS = planReturn(WALK.length - 1, 20);
 let VO = [
   { id: "vo1", t: 0.9, d: 2.6, text: "Every place you go leaves a trail." },
   { id: "vo2", t: 6.1, d: 5.6, text: "Say “remember this as the entrance.” Wayback Trail pins it to the path you actually walked." },
-  { id: "vo3", cx: 560, maxw: 860, t: 13.6, d: 6.8, text: "Every step counted. Every turn mapped. And when it’s time to go back, it guides you — step by step." },
+  { id: "vo3a", cx: 560, maxw: 860, t: 13.6, d: 2.4, text: "Every step counted. Every turn mapped." },
+  { id: "vo3b", cx: 560, maxw: 860, t: 17.9, d: 3.8, text: "Every time you ask, the Wayback app buzzes until you face the right way." },
   { id: "vo4a", t: 22.5, d: 2.3, text: "Can’t see? It talks you through every turn." },
-  { id: "vo4b", t: 25.0, d: 2.2, text: "Can’t hear? It glows, and it buzzes." },
+  { id: "vo4b", t: 25.0, d: 2.6, text: "Can’t hear? The band glows, and the app buzzes." },
   { id: "vo4c", t: 27.4, d: 2.0, text: "Can’t speak? Just tap and type." },
   { id: "vo5", t: 31.5, d: 1.2, text: "In the crowd." },
   { id: "vo6", bottom: 120, t: 36.6, d: 1.8, text: "In places you’ve never been." },
@@ -347,77 +348,129 @@ function sCloseup(c, lt) {
 }
 
 // 2  Walking + live app overlay drawing the recorded path
+// Every buzz comes from the Wayback iPhone app (Core Haptics, ios/Wayback/Haptics.swift), never the band.
+// The coach (store/haptics.py, PhoneBrain.swift Coach) compares where you face with the route:
+// wrong_left / wrong_right repeat until you face it, then one long on_track buzz ("locked on").
+const WALK_T = { recEnd: 4.7, talk: 4.8, wrong: 5.8, turn0: 6.9, turn1: 7.5, back: 7.9 };
+const BUZZES = [{ t: 5.9, cue: "wrong_left" }, { t: 6.65, cue: "wrong_left" }, { t: 7.55, cue: "on_track" }, { t: 8.5, cue: "tick" }];
+const BUZZ_PAT = PATTERNS;
+function buzzAt(lt) {     // {cue, on, k (0..1 through the buzz)} or null
+  for (const b of BUZZES) {
+    const pat = BUZZ_PAT[b.cue], total = pat.reduce((a, x) => a + x, 0) / 1000;
+    if (lt >= b.t && lt < b.t + total + .5) {
+      let ms = (lt - b.t) * 1000, acc = 0, on = false;
+      pat.forEach((d, n) => { if (ms >= acc && ms < acc + d && n % 2 === 0) on = true; acc += d; });
+      return { cue: b.cue, on, k: clamp((lt - b.t) / (total + .5)) };
+    }
+  }
+  return null;
+}
+function patternBars(c, cue, x, y, lt, t0, a) {
+  const pat = BUZZ_PAT[cue]; let bx = x, acc = 0; const ms = (lt - t0) * 1000;
+  pat.forEach((d, n) => {
+    const w = Math.max(10, d / 3.2);
+    if (n % 2 === 0) { const live = ms >= acc && ms < acc + d; rrect(c, bx, y - 8, w, 16, 8); c.save(); c.globalAlpha *= a; c.fillStyle = live ? C.white : "rgba(255,255,255,.3)"; c.fill(); c.restore(); }
+    bx += w + 8; acc += d;
+  });
+  return bx;
+}
 function sWalk(c, lt) {
+  const T = WALK_T;
+  const moving = lt < T.recEnd || lt > T.back;
+  const dist = Math.min(lt, T.recEnd) * .9 - Math.max(0, lt - T.back) * .9;   // walking back runs the floor the other way
   // hallway backdrop with moving floor tiles
   const bg = c.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, "#15161a"); bg.addColorStop(1, "#050506");
   c.fillStyle = bg; c.fillRect(0, 0, W, H);
   const hz = 430, vx = 520;
   c.save(); c.strokeStyle = "rgba(255,255,255,.07)"; c.lineWidth = 2;
   for (let i = -12; i <= 12; i++) { c.beginPath(); c.moveTo(vx, hz); c.lineTo(vx + i * 260, H); c.stroke(); }
-  const speed = lt < 6.6 ? 1 : lt < 7.1 ? 1 - seg(lt, 6.6, 7.1) : seg(lt, 7.1, 7.6) ;
-  const off = (lt * .9) % 1;
+  const off = ((dist % 1) + 1) % 1;
   for (let j = 0; j < 14; j++) { const z = (j + off) / 14, y = hz + Math.pow(z, 2.2) * (H - hz); c.globalAlpha = z; c.beginPath(); c.moveTo(0, y); c.lineTo(1080, y); c.stroke(); }
   c.restore();
-  // ceiling lights streaming by
   c.save(); c.globalCompositeOperation = "lighter";
-  for (let j = 0; j < 6; j++) { const z = ((j / 6) + lt * .12) % 1; const x = vx - 40 - z * 700, y = hz - 30 - z * z * 380; glowBlob(c, x, y, 40 + z * 160, C.white, .35); }
+  for (let j = 0; j < 6; j++) { const z = ((((j / 6) + dist * .13) % 1) + 1) % 1; const x = vx - 40 - z * 700, y = hz - 30 - z * z * 380; glowBlob(c, x, y, 40 + z * 160, C.white, .35); }
   c.restore();
-  // door on the far wall (the entrance)
   c.fillStyle = "rgba(255,255,255,.05)"; c.fillRect(vx - 40, hz - 140, 80, 140);
-  const ph = lt * 6.2;
-  const wrist = walker(c, 470, 960, 2.55, ph, { band: true, color: "#ececf1" });
-  // haptic + LED glow at wrist
+
+  // the walker: walks, stops to ask, turns when the buzz says so, walks back
+  const wx = 470, wy = 960, ws = 2.55;
+  const ph = (Math.min(lt, T.recEnd) + Math.max(0, lt - T.back)) * 6.2;
+  const sx = Math.cos(Math.PI * eio(seg(lt, T.turn0, T.turn1)));
+  c.save(); c.translate(wx, 0); c.scale(Math.abs(sx) < .04 ? .04 * Math.sign(sx || 1) : sx, 1); c.translate(-wx, 0);
+  const wr = walker(c, wx, wy, ws, moving ? ph : T.recEnd * 6.2, { band: true, color: "#ececf1" });
+  c.restore();
+  const wrist = wr ? [wx + (wr[0] - wx) * sx, wr[1]] : null;
+  const pocket = [wx + 10 * sx, wy - 92 * ws];
+  // band light: amber recording, blue listening, white guiding (the band never buzzes)
   if (wrist) {
-    const guiding = lt > 6.4;
-    const col = guiding ? C.white : C.orange;
+    const col = lt < T.talk ? C.orange : lt < T.wrong ? C.blue : C.white;
     c.save(); c.globalCompositeOperation = "lighter"; glowBlob(c, wrist[0], wrist[1], 60, col, .9); c.restore();
+  }
+  // the phone in the pocket, and its buzz
+  const bz = buzzAt(lt);
+  rrect(c, pocket[0] - 13, pocket[1] - 22, 26, 44, 6); c.fillStyle = "#1c1c1e"; c.fill(); c.strokeStyle = "rgba(255,255,255,.6)"; c.lineWidth = 2; c.stroke();
+  if (bz) for (let r = 0; r < 3; r++) {
+    const k = clamp(bz.k * 1.3 - r * .18);
+    if (k <= 0 || k >= 1) continue;
+    c.beginPath(); c.arc(pocket[0], pocket[1], 26 + k * 110, 0, 7); c.strokeStyle = hexA(bz.cue === "on_track" ? C.green : C.white, (1 - k) * .8); c.lineWidth = 3; c.stroke();
+  }
+  // "you ask"
+  const kb = espring(seg(lt, T.talk, T.talk + .6)) * (1 - seg(lt, T.wrong - .1, T.wrong + .2));
+  if (kb > 0) {
+    c.save(); c.translate(560, 300); c.scale(kb, kb); c.globalAlpha = clamp(kb);
+    glass(c, -330, -55, 660, 110, 55);
+    text(c, "“Take me back to the elevator.”", 0, 12, { size: 32, w: 600, align: "center" });
+    c.restore();
   }
   text(c, "Close-up", 90, 120, { size: 24, w: 600, color: C.gray, ls: 4, a: seg(lt, 0, .4) });
   text(c, "Walking, recording, guiding.", 90, 170, { size: 46, w: 700, a: seg(lt, 0, .5) });
+  pill(c, "📳  Every buzz comes from the Wayback iPhone app", 90, 236, { size: 22, a: seg(lt, T.wrong - .2, T.wrong + .3), fill: "rgba(44,44,46,.85)" });
 
-  // ---- app overlay (glass phone card)
+  // ---- app overlay: the Wayback iPhone app. It shakes when it buzzes.
   const kIn = espring(seg(lt, .2, 1.2));
   const ox = 1110, oy = 70, ow = 720, oh = 940;
-  c.save(); c.translate(ox + ow / 2, oy + oh / 2); c.scale(.9 + .1 * kIn, .9 + .1 * kIn); c.globalAlpha = seg(lt, .2, .7); c.translate(-(ox + ow / 2), -(oy + oh / 2));
+  const shake = bz && bz.on ? Math.sin(lt * 260) * 5 : 0;
+  c.save(); c.translate(ox + ow / 2 + shake, oy + oh / 2); c.scale(.9 + .1 * kIn, .9 + .1 * kIn); c.globalAlpha = seg(lt, .2, .7); c.translate(-(ox + ow / 2), -(oy + oh / 2));
+  if (bz) for (let r = 0; r < 2; r++) {
+    const k = clamp(bz.k * 1.2 - r * .25);
+    if (k > 0 && k < 1) { rrect(c, ox - k * 40, oy - k * 40, ow + k * 80, oh + k * 80, 56 + k * 40); c.strokeStyle = hexA(bz.cue === "on_track" ? C.green : C.white, (1 - k) * .55); c.lineWidth = 3; c.stroke(); }
+  }
   glass(c, ox, oy, ow, oh, 56, { fill: "rgba(22,22,24,.86)" });
-  text(c, "Wayback Trail", ox + 48, oy + 78, { size: 34, w: 700 });
-  const rec = lt < 6.4;
-  pill(c, rec ? "Recording" : "Guiding back", ox + ow - 48, oy + 66, { dot: rec ? C.orange : C.white, align: "right", size: 22 });
+  text(c, "Wayback", ox + 48, oy + 78, { size: 34, w: 700 });
+  const rec = lt < T.talk;
+  pill(c, rec ? "Recording" : lt < T.wrong ? "Listening" : "Guiding back", ox + ow - 48, oy + 66, { dot: rec ? C.orange : lt < T.wrong ? C.blue : C.white, align: "right", size: 22 });
 
-  // progress through the recorded walk: 0.9 s .. 6.2 s maps onto the whole log
-  const p = eio(seg(lt, .9, 6.2));
+  // progress through the recorded walk
+  const p = eio(seg(lt, .9, T.recEnd - .2));
   const target = p * TOTAL_M;
   let i = 0; while (i < CUM.length - 2 && CUM[i + 1] < target) i++;
   const f = CUM[i + 1] > CUM[i] ? clamp((target - CUM[i]) / (CUM[i + 1] - CUM[i])) : 0;
   const cur = [lerp(WALK[i][0], WALK[i + 1][0], f), lerp(WALK[i][1], WALK[i + 1][1], f)];
   const steps = Math.round(lerp(WALK[i][2], WALK[i + 1][2], f));
 
-  // map area
+  // map
   const mx = ox + 40, my = oy + 120, mw = ow - 80, mh = 380;
   rrect(c, mx, my, mw, mh, 32); c.fillStyle = "rgba(0,0,0,.55)"; c.fill();
   c.save(); rrect(c, mx, my, mw, mh, 32); c.clip();
   c.strokeStyle = "rgba(255,255,255,.05)"; c.lineWidth = 1;
   for (let gx = mx; gx < mx + mw; gx += 40) { c.beginPath(); c.moveTo(gx, my); c.lineTo(gx, my + mh); c.stroke(); }
   for (let gy = my; gy < my + mh; gy += 40) { c.beginPath(); c.moveTo(mx, gy); c.lineTo(mx + mw, gy); c.stroke(); }
-  const sc = 21, cx0 = mx + mw / 2 + 8 * sc, cy0 = my + mh / 2 - 3.85 * sc;  // fit -21.7..5.6 x -7.7..0
+  const sc = 21, cx0 = mx + mw / 2 + 8 * sc, cy0 = my + mh / 2 - 3.85 * sc;
   const P = q => [cx0 + q[0] * sc, cy0 - q[1] * sc];
   c.lineCap = "round"; c.lineJoin = "round";
-  // recorded path, amber
   c.strokeStyle = C.orange; c.lineWidth = 8; c.shadowColor = C.orange; c.shadowBlur = 18; c.beginPath();
   for (let k = 0; k <= i; k++) { const q = P(WALK[k]); k ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1]); }
   const qc = P(cur); c.lineTo(qc[0], qc[1]); c.stroke(); c.shadowBlur = 0;
-  // landmarks
   LANDMARKS.forEach(L => {
     if (CUM[L.i] > target + .01 && L.i > 0) return;
     const q = P(WALK[L.i]);
     c.beginPath(); c.arc(q[0], q[1], 13, 0, 7); c.fillStyle = L.color; c.fill(); c.strokeStyle = "#fff"; c.lineWidth = 3; c.stroke();
     text(c, L.label, q[0] + (L.i ? 22 : 0), q[1] + (L.i ? 44 : -26), { size: 22, w: 600, align: L.i ? "left" : "center" });
   });
-  // guidance back to the Elevator (white), with a moving dot
   let me = qc;
-  if (lt > 6.4) {
-    const g = eio(seg(lt, 6.9, 8.9));
-    const from = TOTAL_M, to = CUM[20], d = lerp(from, lerp(from, to, .62), g);
+  if (lt > T.wrong) {   // guidance line back to the Elevator
+    const g = eio(seg(lt, T.back, T.back + 1.4));
+    const from = TOTAL_M, d = lerp(from, lerp(from, CUM[20], .5), g);
     let j = 0; while (j < CUM.length - 2 && CUM[j + 1] < d) j++;
     const fj = clamp((d - CUM[j]) / (CUM[j + 1] - CUM[j]));
     const gp = P([lerp(WALK[j][0], WALK[j + 1][0], fj), lerp(WALK[j][1], WALK[j + 1][1], fj)]);
@@ -425,52 +478,61 @@ function sWalk(c, lt) {
     c.moveTo(gp[0], gp[1]); for (let k = j; k >= 20; k--) { const q = P(WALK[k]); c.lineTo(q[0], q[1]); } c.stroke(); c.setLineDash([]);
     me = gp;
   }
+  // facing cone: starts facing up the hall (wrong), turns left onto the route when the buzz says so
+  if (lt > T.talk) {
+    const ang = lerp(-Math.PI / 2, -Math.PI, eio(seg(lt, T.turn0, T.turn1)));
+    const locked = lt >= T.turn1;
+    const cg = c.createRadialGradient(me[0], me[1], 0, me[0], me[1], 120);
+    cg.addColorStop(0, hexA(locked ? C.green : C.blue, .55)); cg.addColorStop(1, hexA(locked ? C.green : C.blue, 0));
+    c.fillStyle = cg; c.beginPath(); c.moveTo(me[0], me[1]); c.arc(me[0], me[1], 120, ang - .38, ang + .38); c.closePath(); c.fill();
+  }
   c.beginPath(); c.arc(me[0], me[1], 14, 0, 7); c.fillStyle = C.blue; c.fill(); c.lineWidth = 4; c.strokeStyle = "#fff"; c.stroke();
   c.save(); c.globalCompositeOperation = "lighter"; glowBlob(c, me[0], me[1], 70, C.blue, .7 + .3 * Math.sin(lt * 6)); c.restore();
   c.restore();
 
   // stats
   const sy = my + mh + 40;
-  const dist = rec ? target : TOTAL_M;
   const stat = (label, val, unit, x) => { text(c, label, x, sy + 30, { size: 22, w: 500, color: C.gray }); text(c, val, x, sy + 92, { size: 60, w: 700 }); text(c, unit, x, sy + 128, { size: 22, w: 500, color: C.gray }); };
   stat("Steps", String(rec ? steps : WALK[WALK.length - 1][2]), "by the band", mx);
-  stat("Distance", dist.toFixed(1), "metres", mx + 230);
+  stat("Distance", (rec ? target : TOTAL_M).toFixed(1), "metres", mx + 230);
   stat("Landmarks", String(LANDMARKS.filter(L => CUM[L.i] <= target + .01).length), "pinned", mx + 460);
 
-  // instruction card / haptic
+  // instruction panel: what the app says and how it buzzes
   const iy = sy + 180;
   rrect(c, mx, iy, mw, 160, 32); c.fillStyle = "rgba(255,255,255,.06)"; c.fill();
-  if (!rec) {
-    const k = seg(lt, 6.5, 7.0);
-    text(c, "“Take me back to the elevator.”", mx + 30, iy + 52, { size: 26, w: 500, color: C.gray, a: k });
-    text(c, RETURN_STEPS[0] + ", then " + (RETURN_STEPS[1] || "").toLowerCase() + ".", mx + 30, iy + 104, { size: 34, w: 700, a: k });
-    // haptic pattern bars: turn_left from store/haptics.py
-    const pat = PATTERNS.turn_left; let bx = mx + 30; const by = iy + 132;
-    text(c, "Buzz", bx, by + 8, { size: 20, w: 600, color: C.gray, a: k }); bx += 70;
-    const tt = ((lt - 7.0) * 1000) % 1600;
-    let acc = 0;
-    pat.forEach((ms, n) => {
-      const w = ms / 3.2;
-      const on = n % 2 === 0;
-      if (on) { const live = tt >= acc && tt < acc + ms; rrect(c, bx, by - 8, w, 16, 8); c.fillStyle = live ? C.white : "rgba(255,255,255,.3)"; c.globalAlpha = k; c.fill(); c.globalAlpha = 1; }
-      bx += w + 8; acc += ms;
-    });
-    text(c, "turn left · long, short", bx + 12, by + 8, { size: 20, w: 500, color: C.gray, a: k });
-  } else {
+  const line = (small, big, smallCol, a) => { text(c, small, mx + 30, iy + 46, { size: 22, w: 600, color: smallCol || C.gray, a }); text(c, big, mx + 30, iy + 96, { size: 30, w: 700, a }); };
+  if (rec) {
     text(c, "Every step and turn, mapped by code.", mx + 30, iy + 64, { size: 28, w: 600 });
     text(c, "No floor plan. No GPS. Just the way you walked.", mx + 30, iy + 112, { size: 24, w: 500, color: C.gray });
+  } else if (lt < T.wrong) {
+    const a = seg(lt, T.talk, T.talk + .3);
+    line("You ask, by voice or by typing", "“Take me back to the elevator.”", null, a);
+  } else if (lt < T.turn1) {
+    const a = seg(lt, T.wrong, T.wrong + .3);
+    line("Facing the wrong way", "Turn left", C.orange, a);
+    const ex = patternBars(c, "wrong_left", mx + 30, iy + 130, lt, lt >= 6.65 ? 6.65 : 5.9, a);
+    text(c, "2 short, soft · repeats until you turn", ex + 6, iy + 138, { size: 19, w: 500, color: C.gray, a });
+  } else if (lt < T.back + .3) {
+    const a = seg(lt, T.turn1, T.turn1 + .2);
+    line("Locked on", "Facing the right way", C.green, a);
+    const ex = patternBars(c, "on_track", mx + 30, iy + 130, lt, 7.55, a);
+    text(c, "one long buzz", ex + 6, iy + 138, { size: 19, w: 500, color: C.gray, a });
+  } else {
+    const a = seg(lt, T.back + .3, T.back + .5);
+    line("Guiding you back", RETURN_STEPS[0] + ", then " + (RETURN_STEPS[1] || "").toLowerCase() + ".", null, a);
+    const ex = patternBars(c, "tick", mx + 30, iy + 130, lt, 8.5, a);
+    text(c, "light tick while on track", ex + 6, iy + 138, { size: 19, w: 500, color: C.gray, a });
+  }
+  // direction arrow, like the app's: points where the route is, relative to where you face
+  if (lt > T.wrong) {
+    const err = lerp(-90, 0, eio(seg(lt, T.turn0, T.turn1)));
+    const ax = mx + mw - 66, ay = iy + 80;
+    c.beginPath(); c.arc(ax, ay, 44, 0, 7); c.fillStyle = lt >= T.turn1 ? hexA(C.green, .25) : hexA(C.orange, .22); c.fill();
+    c.save(); c.translate(ax, ay); c.rotate(err * Math.PI / 180); c.fillStyle = lt >= T.turn1 ? C.green : C.orange;
+    c.beginPath(); c.moveTo(0, -28); c.lineTo(20, 3); c.lineTo(7, 3); c.lineTo(7, 25); c.lineTo(-7, 25); c.lineTo(-7, 3); c.lineTo(-20, 3); c.closePath(); c.fill(); c.restore();
   }
   text(c, "Replay of a recorded test walk (walk3) · simulated in real time", ox + ow / 2, oy + oh - 22, { size: 18, w: 500, color: C.gray, align: "center" });
   c.restore();
-
-  // haptic ripples on the wrist when the turn cue fires
-  if (wrist && lt > 7.0) {
-    const tt = ((lt - 7.0) * 1000) % 1600;
-    if (tt < 800) for (let r = 0; r < 3; r++) {
-      const k = clamp(tt / 800 - r * .2);
-      c.beginPath(); c.arc(wrist[0], wrist[1], 20 + k * 120, 0, 7); c.strokeStyle = hexA(C.white, (1 - k) * .7); c.lineWidth = 3; c.stroke();
-    }
-  }
 }
 
 // 3  🙈 🙉 🙊 — usable whether you can't see, can't hear, or can't speak
@@ -481,9 +543,9 @@ function sSenses(c, lt) {
   c.restore();
   const cards = [
     { e: "🙈", t: "Can’t see.", s: "It speaks.", col: C.blue, at: .2,
-      items: ["Spoken turn-by-turn", "Left / right-ear sound cues", "Buzz cues on iPhone & Apple Watch"] },
-    { e: "🙉", t: "Can’t hear.", s: "It glows and buzzes.", col: C.green, at: 2.6,
-      items: ["LED colours for every state", "Haptic patterns for turns", "Large on-screen text"] },
+      items: ["Spoken turn-by-turn", "Left / right-ear sound cues", "Buzzes from the Wayback iPhone app"] },
+    { e: "🙉", t: "Can’t hear.", s: "Band glows, app buzzes.", col: C.green, at: 2.6,
+      items: ["LED colours for every state", "App buzzes for every turn", "Large on-screen text"] },
     { e: "🙊", t: "Can’t speak.", s: "Tap and type.", col: C.purple, at: 4.9,
       items: ["Typed commands", "One-tap Talk & Stop buttons", "Same tools, no voice needed"] },
   ];
@@ -621,10 +683,11 @@ function sUnfamiliar(c, lt) {
       const blink = Math.floor(lt * 3) % 2 === 0;
       if (blink) { c.save(); c.globalCompositeOperation = "lighter"; glowBlob(c, hand[0], hand[1], 90, C.white, 1); c.restore(); }
       const pk = [wx + 14, wy - 100 * 1.75];
+      rrect(c, pk[0] - 9, pk[1] - 15, 18, 30, 4); c.fillStyle = "#1c1c1e"; c.fill(); c.strokeStyle = "rgba(255,255,255,.6)"; c.lineWidth = 2; c.stroke();
       const tt = (lt * 1000) % 1400;
       if (tt < 800) for (let r = 0; r < 3; r++) { const kk = clamp(tt / 800 - r * .2); c.beginPath(); c.arc(pk[0], pk[1], 16 + kk * 80, 0, 7); c.strokeStyle = hexA(C.green, (1 - kk) * .8); c.lineWidth = 3; c.stroke(); }
-      pill(c, "Light + buzz: turn left", cx, 380, { align: "center", dot: C.white, size: 24 });
-      pill(c, "No sound needed", cx, 450, { align: "center", size: 20, color: "#d1d1d6", fill: "rgba(44,44,46,.6)" });
+      pill(c, "App buzz: turn left", cx, 380, { align: "center", dot: C.white, size: 24 });
+      pill(c, "Band light + iPhone app buzz", cx, 450, { align: "center", size: 20, color: "#d1d1d6", fill: "rgba(44,44,46,.6)" });
     } else {
       // phone in hand, typing the command
       c.save(); c.translate(hand[0] + 6, hand[1] - 40); c.rotate(-.15);
@@ -761,8 +824,8 @@ function sEnd(c, lt) {
   const k = seg(lt, 2.4, 3.0);
   text(c, "VEXO  ×  WAYBACK TRAIL", W / 2, 740, { size: 26, w: 700, align: "center", ls: 8, color: C.gray, a: k });
   text(c, "🙈 🙉 🙊   Spatial memory · Distance tracking · Haptic cues · Built for every sense", W / 2, 800, { size: 24, w: 500, align: "center", color: "#d1d1d6", a: k });
-  text(c, "Dramatization. The app overlay replays a recorded test walk. Haptics play on a paired iPhone or Apple Watch;", W / 2, H - 74, { size: 19, w: 500, align: "center", color: "rgba(134,134,139,.95)", a: k });
-  text(c, "the band shows light. Experimental navigation aid, not a safety-critical system.", W / 2, H - 46, { size: 19, w: 500, align: "center", color: "rgba(134,134,139,.95)", a: k });
+  text(c, "Dramatization. The app overlay replays a recorded test walk. Every buzz comes from the Wayback iPhone app;", W / 2, H - 74, { size: 19, w: 500, align: "center", color: "rgba(134,134,139,.95)", a: k });
+  text(c, "the band listens and shows light. Experimental navigation aid, not a safety-critical system.", W / 2, H - 46, { size: 19, w: 500, align: "center", color: "rgba(134,134,139,.95)", a: k });
 }
 
 /* ============================================================ TIMELINE

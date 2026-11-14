@@ -19,8 +19,8 @@ renders frame-for-frame to video (`render.mjs`, using the pre-installed Playwrig
 | --- | --- | --- |
 | 0:00 | "Every place you go leaves a trail." Vexo × Wayback Trail lockup | fade from black |
 | 0:05 | Close-up of the band on a wrist: listening (blue), landmark saved (purple), recording (amber) | zoom through |
-| 0:13 | Walker, plus the app overlay drawing the path as they move, then guidance back with the turn-left buzz | push |
-| 0:22 | 🙈 can't see: it speaks · 🙉 can't hear: it glows and buzzes · 🙊 can't speak: tap and type | card fall-away |
+| 0:13 | Walker, plus the Wayback app drawing the path as they move. Then the walker asks "Take me back to the elevator": the app buzzes 2 short soft pulses (`wrong_left`) with a turn-left arrow, the walker turns, one long buzz (`on_track`) says "Locked on", and light ticks guide them back | push |
+| 0:22 | 🙈 can't see: it speaks · 🙉 can't hear: the band glows and the app buzzes · 🙊 can't speak: tap and type | card fall-away |
 | 0:31 | Crowded: a plaza from above | iris |
 | 0:36 | Unfamiliar: three slots, a blind walker (cane, spoken + left-ear cue), a Deaf walker (light + buzz) and a non-speaking walker (typed command) | blur dissolve |
 | 0:42 | Isolated: out of a cave, down a mountain | push |
@@ -34,10 +34,16 @@ renders frame-for-frame to video (`render.mjs`, using the pre-installed Playwrig
   on screen as a replay simulated in real time, never as live sensing (see `AGENTS.md`).
 - "Walk 39 steps, then turn left" is computed in the page the way `store/guidance.py`
   computes it: the saved path walked backwards, with legs merged.
-- The buzz bars use the `turn_left` pattern from `store/haptics.py`. LED colours follow
-  the plan's feedback vocabulary.
-- The band has no vibration motor. Haptics come from the paired iPhone or Apple Watch, and
-  the end card says so. The 🙊 card shows the typed command box and the Talk/Stop buttons that
+- **Every buzz comes from the Wayback iPhone app** (`ios/Wayback/Haptics.swift`, Core Haptics),
+  never the band, which has no vibration motor; it listens and shows light. On screen, the app
+  card shakes and the phone in the walker's pocket ripples on each buzz.
+- The turn-you-around sequence is the buzz coach in `store/haptics.py` (and its Swift port in
+  `ios/Wayback/Wayback/Standalone/PhoneBrain.swift`). Once you ask to go somewhere, it compares
+  where you face with the route: `wrong_left` (2 short, soft) or `wrong_right` (3 short, crisp)
+  repeats until you face it, then one long `on_track` buzz ("Locked on"), then light ticks,
+  faster pulses before a turn, a turn buzz at each corner, and the arrival buzz. The arrow
+  works like the app's: it points to the route relative to where you face. In the ad the
+  repeat is sped up to fit the time. LED colours follow the plan's feedback vocabulary. The 🙊 card shows the typed command box and the Talk/Stop buttons that
   really exist; it does not claim tap-coded commands.
 - The crowd, three-walker, cave and mountain scenes are illustrations. The end card
   carries a dramatisation and "not a safety-critical system" line.
