@@ -63,6 +63,8 @@ final class Guide: ObservableObject {
     @Published var ledState = "idle"
     @Published var lastReply = ""
     @Published var bridgeWanted = false     // the laptop runs --bridge and wants this phone to carry the band
+    @Published var level = 0                // floors up or down since the route started (barometer)
+    @Published var trackSource = ""         // which sensors lead the tracking right now
     @Published var phoneOnly = false        // iPhone only: no laptop; the phone tracks, guides, listens and speaks
 
     lazy var brain: PhoneBrain = { let b = PhoneBrain(); b.guide = self; return b }()

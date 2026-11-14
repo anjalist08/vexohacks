@@ -145,6 +145,9 @@ final class PhoneBrain {
         g.recording = tracker.running
         g.gyroBias = tracker.bias
         g.uncertain = tracker.uncertain
+        g.level = tracker.level
+        g.trackSource = tracker.source
+        g.stepLength = tracker.stepLength
         let out = coach.update(nav: nav, facing: tracker.facing, x: tracker.x, y: tracker.y,
                                stepLength: tracker.stepLength, uncertain: tracker.uncertain)
         g.showHint(out.hint)
@@ -169,7 +172,7 @@ final class PhoneBrain {
             guide?.backTrail = []; guide?.directions = []; guide?.guiding = false; guide?.waypoints = []
             tracker.start(at: t)
             publish()
-            say("Route started. Stand still for a moment.", led: "route_started")
+            say(tracker.calibrated ? "Route started." : "Route started. Hold still for a moment.", led: "route_started")
         case .stopRoute:
             routeActive = false; nav = nil; tracker.stop(); guide?.guiding = false
             publish()
@@ -179,7 +182,7 @@ final class PhoneBrain {
             let name = label.isEmpty ? "spot \(places.count + 1)" : label
             let p = points[points.count - 1]
             let id = "lm\(nextPlace)"; nextPlace += 1
-            places.append(Place(id: id, label: name, x: p.x, y: p.y, note: note, floor: nil))
+            places.append(Place(id: id, label: name, x: p.x, y: p.y, note: note, floor: tracker.level != 0 ? String(tracker.level) : nil))
             placeIndex[id] = points.count - 1
             publish()
             say("Saved: \(name).", led: "landmark_saved")
