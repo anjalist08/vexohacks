@@ -57,6 +57,22 @@
       <aside class="sidebar">
         <section class="card">
           <div class="card-header">
+            <h2 class="card-title">Tracking</h2>
+            <span id="trk-badge" class="mini-tag trk-badge">waiting for band</span>
+          </div>
+          <p id="trk-hint" class="empty-hint">Press <strong>start route</strong> (bottom of this panel, or say it), hold your arm still for a moment, then walk.</p>
+          <dl class="trk-grid">
+            <dt>Facing now</dt><dd id="trk-live">–</dd>
+            <dt>Walking direction</dt><dd id="trk-walk">–</dd>
+            <dt>Steps on the map</dt><dd id="trk-steps">0</dd>
+            <dt>Steps from motion</dt><dd id="trk-motion">–</dd>
+            <dt>Band step counter</dt><dd id="trk-band">–</dd>
+            <dt>Gyro bias</dt><dd id="trk-bias">–</dd>
+          </dl>
+          <a id="trk-log" class="trk-log" href="#" target="_blank" rel="noopener" hidden>Sensor log for this session (CSV)</a>
+        </section>
+        <section class="card">
+          <div class="card-header">
             <h2 class="card-title">Wrist LED Cue</h2>
           </div>
           <div class="led-row">

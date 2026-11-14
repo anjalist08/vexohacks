@@ -45,6 +45,13 @@ class SampleLogger:
         row.update({k: v for k, v in fields.items() if k in COLUMNS})
         self._csv.writerow(row)
 
+    def flush(self):
+        """Push what is logged so far to disk, so the map page can offer it while recording."""
+        try:
+            self._file.flush()
+        except ValueError:      # closed
+            pass
+
     def close(self):
         self._file.close()
 

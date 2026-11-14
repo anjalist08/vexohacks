@@ -219,3 +219,25 @@ def make_tracker(synthetic: bool = False, **kwargs) -> PathTracker:
         return WristTracker(**kwargs)
     kwargs.pop("step_source", None)
     return PathTracker(**kwargs)
+
+
+def tracker_status(tracker) -> dict:
+    """A small live snapshot for the map page (sent a few times a second): whether the
+    route is recording, whether the gyro is calibrated yet, where the wearer faces right
+    now (even standing still), and the step counts from both sources."""
+    live = getattr(tracker, "smooth", None)
+    return {
+        "type": "tracker",
+        "model": type(tracker).__name__,
+        "running": bool(tracker.running),
+        "calibrated": bool(tracker.calibrated),
+        "live_heading_deg": round(wrap_deg(tracker.raw_heading if live is None else live), 1),
+        "walk_heading_deg": round(wrap_deg(tracker.heading), 1),
+        "steps": tracker.pose.steps,
+        "motion_steps": getattr(tracker, "acc_steps", None),
+        "band_steps": getattr(tracker, "band_steps", None),
+        "step_source": getattr(tracker, "step_source", "band"),
+        "bias_dps": round(tracker.bias, 2),
+        "uncertain": bool(tracker.heading_uncertain),
+        "state": tracker.state,
+    }

@@ -72,6 +72,7 @@
     returnTrail: [],
     currentPose: { t: 0, x_m: 0, y_m: 0, heading_deg: 0, steps: 0 },
     hasPose: false,
+    tracker: null,
     landmarks: [],
     guidance: {
       instructions: [],
@@ -83,6 +84,15 @@
   };
 
   var els = {
+    trkBadge: document.getElementById("trk-badge"),
+    trkHint: document.getElementById("trk-hint"),
+    trkLive: document.getElementById("trk-live"),
+    trkWalk: document.getElementById("trk-walk"),
+    trkSteps: document.getElementById("trk-steps"),
+    trkMotion: document.getElementById("trk-motion"),
+    trkBand: document.getElementById("trk-band"),
+    trkBias: document.getElementById("trk-bias"),
+    trkLog: document.getElementById("trk-log"),
     fileWarning: document.getElementById("file-warning"),
     modeBanner: document.getElementById("mode-banner"),
     linkDot: document.getElementById("link-dot"),
@@ -201,6 +211,34 @@
       state.ledTimer = setTimeout(function () {
         applyLedState(cue.then, null);
       }, cue.holdMs);
+    }
+  }
+
+  function compass(deg) {
+    var d = Math.round(deg);
+    var names = ["ahead", "right", "behind", "left"];
+    return d + "° (" + names[((Math.round(d / 90) % 4) + 4) % 4] + ")";
+  }
+
+  function renderTracker() {
+    var t = state.tracker;
+    if (!t || !els.trkBadge) return;
+    var badge = "not recording", cls = "", hint = "Press start route (bottom of this panel, or say it), hold your arm still for a moment, then walk.";
+    if (t.running && !t.calibrated) { badge = "calibrating: hold still"; cls = "warn"; hint = "Hold your arm still for a moment. Nothing is tracked until the gyro is calibrated."; }
+    else if (t.running && t.uncertain) { badge = "recording, unsure"; cls = "err"; hint = "Position may be off. Say where you are (\u201cI'm at the elevator\u201d) to re-anchor."; }
+    else if (t.running) { badge = "recording"; cls = "ok"; hint = "Walk. Turns snap to a 90° grid (hallways)."; }
+    els.trkBadge.textContent = badge;
+    els.trkBadge.className = "mini-tag trk-badge " + cls;
+    els.trkHint.textContent = hint;
+    els.trkLive.textContent = t.running && t.calibrated ? compass(t.live_heading_deg) : "–";
+    els.trkWalk.textContent = t.running && t.calibrated ? compass(t.walk_heading_deg) : "–";
+    els.trkSteps.textContent = String(t.steps) + (t.step_source ? " (" + t.step_source + ")" : "");
+    els.trkMotion.textContent = t.motion_steps == null ? "–" : String(t.motion_steps);
+    els.trkBand.textContent = t.band_steps == null ? "–" : String(t.band_steps);
+    els.trkBias.textContent = t.calibrated ? t.bias_dps.toFixed(2) + " °/s" : "–";
+    if (t.log && typeof t.log === "string" && t.log.charAt(0) === "/") {
+      els.trkLog.href = t.log;
+      els.trkLog.hidden = false;
     }
   }
 
@@ -590,12 +628,25 @@
     });
 
     // Current walker position + heading arrow (0 deg = +y up, 90 deg = +x right)
-    if (state.hasPose || state.routePoints.length > 0) {
+    var trk = state.tracker;
+    var liveHeading = trk && trk.running && trk.calibrated && typeof trk.live_heading_deg === "number";
+    if (state.hasPose || state.routePoints.length > 0 || liveHeading) {
       var pose = state.currentPose;
       var wx = toScreenX(pose.x_m);
       var wy = toScreenY(pose.y_m);
-      var hdgRad = (pose.heading_deg * Math.PI) / 180;
+      // Live direction from the tracker (moves even while standing still); else the last step's.
+      var hdgDeg = liveHeading ? trk.live_heading_deg : pose.heading_deg;
+      var hdgRad = (hdgDeg * Math.PI) / 180;
       var screenAngle = hdgRad - Math.PI / 2;
+
+      if (liveHeading) {
+        ctx.fillStyle = "rgba(56, 189, 248, 0.16)";
+        ctx.beginPath();
+        ctx.moveTo(wx, wy);
+        ctx.arc(wx, wy, 56, screenAngle - 0.5, screenAngle + 0.5);
+        ctx.closePath();
+        ctx.fill();
+      }
 
       // Halo
       ctx.fillStyle = "rgba(56, 189, 248, 0.22)";
@@ -691,6 +742,11 @@
         break;
       case "reset":
         resetRouteView();
+        break;
+      case "tracker":
+        state.tracker = msg;
+        renderTracker();
+        drawMap();
         break;
       case "point":
         var pt = {

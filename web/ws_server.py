@@ -522,6 +522,25 @@ class _SafeStaticHandler(SimpleHTTPRequestHandler):
         pass
 
 
+def start_status_pump(ws, tracker, stop_event: threading.Event, extra=None, every: float = 0.25) -> threading.Thread:
+    """Broadcast tracker_status() (calibrating, live heading, step counts) a few times a second."""
+    from tracker.wrist import tracker_status
+
+    def loop():
+        while not stop_event.wait(every):
+            try:
+                msg = tracker_status(tracker)
+                if extra is not None:
+                    msg.update(extra())
+                ws.broadcast(msg)
+            except Exception as exc:     # never let the status feed kill the server
+                print("    [status] %s" % exc)
+
+    thread = threading.Thread(target=loop, name="tracker-status", daemon=True)
+    thread.start()
+    return thread
+
+
 def _start_static_http(host: str, port: int, root_dir: str) -> ThreadingHTTPServer:
     handler = functools.partial(_SafeStaticHandler, directory=root_dir)
     httpd = ThreadingHTTPServer((host, port), handler)
@@ -645,6 +664,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     print('Press Ctrl+C to stop, or type commands in the browser map page.')
 
     stop_event = threading.Event()
+    start_status_pump(ws, tracker, stop_event)
     if args.sim:
         worker = threading.Thread(
             target=_run_sim_demo,

@@ -12,6 +12,7 @@ On --band, double-tap triggers one spoken turn: band mic -> Deepgram -> Gemini 4
 import argparse
 import os
 import sys
+import threading
 
 import keys
 
@@ -23,7 +24,7 @@ from store.band_mirror import BandLandmarkMirror  # noqa: E402
 from store.route_store import RouteStore  # noqa: E402
 from tracker.events import SampleLogger, feed, read_log, synthetic_walk  # noqa: E402
 from tracker.wrist import make_tracker  # noqa: E402
-from web.ws_server import MapWebSocketServer, _start_static_http  # noqa: E402
+from web.ws_server import MapWebSocketServer, _start_static_http, start_status_pump  # noqa: E402
 
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 
@@ -128,6 +129,9 @@ def run_replay(path, ws_port=8765, http_port=8000, no_web=False):
         app, mode="REPLAY", ws_port=ws_port, http_port=http_port,
         enable_ws=not no_web, enable_http=not no_web,
     )
+    status_stop = threading.Event()
+    if ws is not None:
+        start_status_pump(ws, app.tracker, status_stop)
     try:
         app.call_tool("start_route", {"title": "replay"})
         if events:
@@ -137,6 +141,7 @@ def run_replay(path, ws_port=8765, http_port=8000, no_web=False):
         print("    [POS] x=%.1f m  y=%.1f m  heading=%.0f deg  steps=%d" % (p.x_m, p.y_m, p.heading_deg, p.steps))
         repl(app)
     finally:
+        status_stop.set()
         _stop_web_servers(ws, httpd)
     return 0
 
@@ -186,11 +191,22 @@ def run_band(ws_port=8765, http_port=8000, no_web=False, usb=False):
     if getattr(band, "storage", None) is not None:
         app.band_mirror = BandLandmarkMirror(band.storage)
     voice_loop.start_background()
+    status_stop = threading.Event()
+    if ws is not None:
+        log_url = "/" + os.path.relpath(logger.path, REPO_ROOT).replace(os.sep, "/")
+
+        def status_extra():
+            logger.flush()          # so the page's log link has everything so far
+            return {"log": log_url}
+
+        start_status_pump(ws, tracker, status_stop, extra=status_extra)
     print("Connected to %s. Double-tap the band to speak, or type commands below." % band.name)
     print("Logging every sample to %s" % logger.path)
+    print('Press "start route" on the map page (or type it here), hold your arm still a moment, then walk.')
     try:
         repl(app)
     finally:
+        status_stop.set()
         voice_loop.stop()
         _stop_web_servers(ws, httpd)
         logger.close()
