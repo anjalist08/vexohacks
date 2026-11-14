@@ -108,7 +108,14 @@
     landmarkEmpty: document.getElementById("landmark-empty"),
     landmarkList: document.getElementById("landmark-list"),
     cmdForm: document.getElementById("cmd-form"),
-    cmdInput: document.getElementById("cmd-input")
+    cmdInput: document.getElementById("cmd-input"),
+    talkBtn: document.getElementById("talk-btn"),
+    talkLabel: document.getElementById("talk-label"),
+    voiceBadge: document.getElementById("voice-badge"),
+    voiceStatus: document.getElementById("voice-status"),
+    voiceHeard: document.getElementById("voice-heard"),
+    tryChips: document.getElementById("try-chips"),
+    vsteps: document.querySelectorAll(".vstep")
   };
 
   // Warn immediately when opened via double-click (file: protocol).
@@ -674,6 +681,9 @@
     if (!msg || typeof msg !== "object") {
       return;
     }
+    if (msg.type !== "voice" && msg.type !== "pong") {
+      setTimeout(renderTryChips, 0);
+    }
     switch (msg.type) {
       case "mode":
         state.mode = msg.mode || "SIMULATION";
@@ -688,6 +698,9 @@
         break;
       case "say":
         handleSay(msg.text || "");
+        break;
+      case "voice":
+        setVoice(msg.state || "ready", msg);
         break;
       case "reset":
         resetRouteView();
@@ -729,7 +742,8 @@
           instructions: Array.isArray(msg.instructions) ? msg.instructions : [],
           current_index: Number(msg.current_index || 0),
           active: Boolean(msg.active),
-          waypoints: Array.isArray(msg.waypoints) ? msg.waypoints : []
+          waypoints: Array.isArray(msg.waypoints) ? msg.waypoints : [],
+          target_name: String(msg.target_name || "")
         };
         if (!state.guidance.active) {
           state.returnTrail = [];
@@ -795,6 +809,125 @@
     }
   }
 
+  // --- Talk to the band -----------------------------------------------------
+  var voiceTimer = null;
+  var voiceWatchdog = null;
+  var STEP_ORDER = ["listening", "thinking", "done"];
+
+  function setSteps(active) {
+    var idx = STEP_ORDER.indexOf(active);
+    for (var i = 0; i < els.vsteps.length; i++) {
+      var step = els.vsteps[i].getAttribute("data-step");
+      var j = STEP_ORDER.indexOf(step);
+      els.vsteps[i].className = "vstep" + (idx < 0 ? "" : j < idx ? " done" : j === idx ? " active" : "");
+    }
+  }
+
+  function setVoice(stateName, msg) {
+    msg = msg || {};
+    clearInterval(voiceTimer);
+    clearTimeout(voiceWatchdog);
+    els.voiceStatus.classList.remove("error");
+    var busy = stateName === "starting" || stateName === "listening" || stateName === "heard" || stateName === "thinking";
+    els.talkBtn.disabled = busy;
+    els.talkBtn.classList.toggle("listening", stateName === "listening" || stateName === "starting");
+    els.voiceBadge.textContent = {
+      starting: "starting", listening: "listening", heard: "heard", thinking: "thinking",
+      done: "done", nothing: "try again", error: "problem"
+    }[stateName] || "ready";
+
+    if (stateName === "starting") {
+      els.talkLabel.textContent = "…";
+      els.voiceStatus.textContent = "Turning the band's microphone on…";
+      els.voiceHeard.textContent = "";
+      setSteps("listening");
+    } else if (stateName === "listening") {
+      var left = Math.max(1, Math.round(Number(msg.seconds) || 5));
+      els.talkLabel.textContent = String(left);
+      setRich(els.voiceStatus, "Listening — speak now.", " The band's light is blue.");
+      els.voiceHeard.textContent = "";
+      setSteps("listening");
+      voiceTimer = setInterval(function () {
+        left -= 1;
+        els.talkLabel.textContent = left > 0 ? String(left) : "…";
+        if (left <= 0) { clearInterval(voiceTimer); }
+      }, 1000);
+    } else if (stateName === "heard" || stateName === "thinking") {
+      els.talkLabel.textContent = "…";
+      els.voiceStatus.textContent = "Understanding what you said…";
+      showHeard(msg.text, msg.typed);
+      setSteps("thinking");
+    } else if (stateName === "done") {
+      els.talkLabel.textContent = "Talk";
+      els.voiceStatus.textContent = msg.say || "Done.";
+      setSteps("done");
+    } else if (stateName === "nothing" || stateName === "error") {
+      els.talkLabel.textContent = "Talk";
+      els.voiceStatus.textContent = msg.text || "Something went wrong. Try again.";
+      els.voiceStatus.classList.add("error");
+      setSteps(null);
+    } else {
+      els.talkLabel.textContent = "Talk";
+      setRich(els.voiceStatus, "Tap Talk", " (or double-tap the band), then speak.");
+      setSteps(null);
+    }
+    if (busy) {   // never leave the button stuck if the band stops answering
+      voiceWatchdog = setTimeout(function () {
+        setVoice("error", { text: "No answer from the band. Check the terminal, then try again." });
+      }, 20000);
+    }
+  }
+
+  function setRich(node, boldText, rest) {
+    clearChildren(node);
+    var b = document.createElement("b");
+    b.textContent = boldText;
+    node.appendChild(b);
+    node.appendChild(document.createTextNode(rest));
+  }
+
+  function showHeard(text, typed) {
+    if (!text) { return; }
+    els.voiceHeard.textContent = typed ? "You typed: " : "Heard: ";
+    var q = document.createElement("q");
+    q.textContent = text;
+    els.voiceHeard.appendChild(q);
+  }
+
+  function suggestions() {
+    var lm = state.landmarks.length ? state.landmarks[state.landmarks.length - 1].label : "desk";
+    if (state.guidance && state.guidance.active) {
+      return ["how far is it?", "I'm at the " + (state.guidance.target_name || lm), "stop route"];
+    }
+    if (state.routePoints.length > 0) {
+      return ["save this spot as the " + (state.landmarks.length ? "kitchen" : "desk"),
+              "where is the " + lm + "?", "take me back to the start", "take me to the " + lm, "stop route"];
+    }
+    return ["start route"];
+  }
+
+  function renderTryChips() {
+    clearChildren(els.tryChips);
+    suggestions().forEach(function (text) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip";
+      b.textContent = "“" + text + "”";
+      b.title = "Say this after tapping Talk — or click to send it as text";
+      b.addEventListener("click", function () { sendCommand(text); });
+      els.tryChips.appendChild(b);
+    });
+  }
+
+  els.talkBtn.addEventListener("click", function () {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      setVoice("starting");
+      socket.send(JSON.stringify({ type: "talk" }));
+    } else {
+      setVoice("error", { text: "Not connected to the app. Start it with python3 main.py --band." });
+    }
+  });
+
   // --- UI Interactions ------------------------------------------------------
   els.cmdForm.addEventListener("submit", function (ev) {
     ev.preventDefault();
@@ -831,6 +964,8 @@
   renderPoseOverlay();
   renderGuidance();
   renderLandmarks();
+  setVoice("ready");
+  renderTryChips();
   drawMap();
   connectWebSocket();
 })();

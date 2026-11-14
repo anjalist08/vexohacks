@@ -183,6 +183,8 @@ def run_band(ws_port=8765, http_port=8000, no_web=False, usb=False):
 
     led.band = band
     voice_loop.band = band
+    if ws is not None:
+        ws.voice_loop = voice_loop       # the page's Talk button and typed text use it
     if getattr(band, "storage", None) is not None:
         app.band_mirror = BandLandmarkMirror(band.storage)
     voice_loop.start_background()

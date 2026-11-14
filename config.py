@@ -40,7 +40,7 @@ DECISION_MIN_CONFIDENCE = 0.75                # below this, ask the user instead
 ELEVENLABS_VOICE_ID = "SAz9YHcvj6GT2YYXdXww"   # River: calm, neutral, informative
 MINIMAX_TTS_MODEL = "speech-2.8-turbo"         # backup voice when ElevenLabs fails (MiniMax T2A)
 MINIMAX_VOICE_ID = "English_Insightful_Speaker"
-LISTEN_SECONDS = 4.0          # how long one tap-to-talk turn records
+LISTEN_SECONDS = 5.0          # how long one tap-to-talk turn records (5 s: room to start speaking)
 
 # --- Files ------------------------------------------------------------------
 DATA_DIR = "data"

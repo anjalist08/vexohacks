@@ -551,3 +551,41 @@ body {
 [data-theme="light"] .chip-danger {
   color: #b91c1c;
 }
+
+
+/* --- Talk to the band ---------------------------------------------------- */
+.voice-card { border-color: var(--accent); }
+.voice-row { display: flex; gap: 14px; align-items: center; }
+.talk-btn {
+  flex: none; width: 84px; height: 84px; border-radius: 50%;
+  border: 2px solid var(--accent); background: var(--accent-strong); color: #fff;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  font: inherit; font-weight: 700; font-size: 15px; cursor: pointer;
+  transition: transform .1s ease, box-shadow .2s ease;
+}
+.talk-btn:hover { transform: scale(1.03); }
+.talk-btn:active { transform: scale(.97); }
+.talk-btn:disabled { opacity: .55; cursor: default; transform: none; }
+.talk-btn .talk-icon { font-size: 26px; line-height: 1; }
+.talk-btn.listening {
+  background: #2563eb; border-color: #93c5fd;
+  animation: talk-pulse 1s ease-in-out infinite;
+}
+@keyframes talk-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, .55); }
+  50% { box-shadow: 0 0 0 12px rgba(59, 130, 246, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .talk-btn.listening { animation: none; } }
+.voice-text { min-width: 0; flex: 1; }
+.voice-status { font-size: 15px; line-height: 1.35; color: var(--text); }
+.voice-status.error { color: var(--danger); }
+.voice-heard { margin-top: 6px; font-size: 13px; color: var(--text-muted); overflow-wrap: anywhere; }
+.voice-heard q { color: var(--text); font-style: italic; }
+.voice-steps { display: flex; gap: 6px; margin: 12px 0 10px; }
+.vstep {
+  flex: 1; text-align: center; font-size: 12px; padding: 4px 0; border-radius: 999px;
+  background: var(--bg-input); color: var(--text-muted); border: 1px solid var(--border);
+}
+.vstep.active { background: var(--accent-strong); color: #fff; border-color: var(--accent); }
+.vstep.done { color: var(--success); border-color: var(--success); }
+.try-label { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-bottom: 6px; }

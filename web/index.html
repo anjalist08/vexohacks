@@ -22,12 +22,12 @@
       <div class="status-strip">
         <span class="badge" title="Band Bluetooth link status">
           <span id="link-dot" class="dot warn"></span>
-          <span>Band:</span>
+          <span title="Band ↔ laptop app (USB or Bluetooth)">Band ↔ app:</span>
           <strong id="link-text">simulated</strong>
         </span>
         <span class="badge" title="Local WebSocket bridge status">
           <span id="ws-dot" class="dot warn"></span>
-          <span>WS:</span>
+          <span title="This page ↔ laptop app (WebSocket). Reconnects by itself after a restart.">Page ↔ app:</span>
           <strong id="ws-text">connecting</strong>
         </span>
         <button id="fit-btn" type="button" class="btn-ghost">Fit Map</button>
@@ -55,6 +55,30 @@
       </section>
 
       <aside class="sidebar">
+        <section class="card voice-card" aria-label="Talk to the band">
+          <div class="card-header">
+            <h2 class="card-title">Talk to the band</h2>
+            <span id="voice-badge" class="mini-tag">ready</span>
+          </div>
+          <div class="voice-row">
+            <button id="talk-btn" type="button" class="talk-btn" aria-describedby="voice-status">
+              <span class="talk-icon" aria-hidden="true">&#127897;</span>
+              <span id="talk-label">Talk</span>
+            </button>
+            <div class="voice-text">
+              <div id="voice-status" class="voice-status" role="status" aria-live="polite">Tap Talk (or double-tap the band), then speak.</div>
+              <div id="voice-heard" class="voice-heard"></div>
+            </div>
+          </div>
+          <div class="voice-steps">
+            <span class="vstep" data-step="listening">1 Listen</span>
+            <span class="vstep" data-step="thinking">2 Understand</span>
+            <span class="vstep" data-step="done">3 Answer</span>
+          </div>
+          <div class="try-label">Try saying</div>
+          <div id="try-chips" class="chip-row"></div>
+        </section>
+
         <section class="card">
           <div class="card-header">
             <h2 class="card-title">Wrist LED Cue</h2>
@@ -99,14 +123,14 @@
 
         <section class="card">
           <div class="card-header">
-            <h2 class="card-title">Typed Command Fallback</h2>
+            <h2 class="card-title">Or type it</h2>
           </div>
           <form id="cmd-form" class="cmd-form" autocomplete="off">
             <input
               id="cmd-input"
               class="cmd-input"
               type="text"
-              placeholder="e.g. remember this as elevator"
+              placeholder="Type anything you'd say, e.g. save this spot as the desk"
               aria-label="Typed spatial command"
             />
             <button type="submit" class="btn-primary">Send</button>

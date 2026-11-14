@@ -187,6 +187,15 @@ class VoiceLoop:
             except Exception as exc:
                 self._log("Voice turn error (%s)." % _safe_error_summary(exc))
 
+    def _status(self, state: str, **fields) -> None:
+        """Tell the map page where the turn is: listening, heard, thinking, done, nothing, error."""
+        emit = getattr(self.app, "_emit", None)
+        if callable(emit):
+            try:
+                emit(dict({"type": "voice", "state": state}, **fields))
+            except Exception:
+                pass
+
     def _log(self, message: str) -> None:
         if self._log_fn is not None:
             self._log_fn(message)
@@ -211,17 +220,26 @@ class VoiceLoop:
         keys.prepare()
         if say_text is not None:
             words = str(say_text).strip()
+            if words:
+                self._status("heard", text=_printable(words), typed=True)
         else:
             ok, heard, partial_fallback = self._listen_once()
             if partial_fallback:
-                return self.app.keyword_command(partial_fallback)
+                self._status("heard", text=_printable(partial_fallback))
+                result = self.app.keyword_command(partial_fallback)
+                self._status("done", say=result.say if result else "")
+                return result
             if not ok:
+                self._status("error", text="I couldn't hear that. Check the band and try again.")
                 self._restore_led()
                 return None
             words = (heard or "").strip()
             self._log('Heard: "%s"' % _printable(words) if words else "Heard nothing (speak while the light is blue).")
+            if words:
+                self._status("heard", text=_printable(words))
 
         if not words:
+            self._status("nothing", text="I didn't hear anything. Tap Talk, then speak right away.")
             self._restore_led()
             return None
 
@@ -230,6 +248,7 @@ class VoiceLoop:
             self.app.store.current and getattr(self.app.store.current, "active", False)
         )
         chooser = self._choose_fn or choose_tool
+        self._status("thinking", text=_printable(words))
 
         try:
             tool_name, tool_args = chooser(
@@ -242,10 +261,14 @@ class VoiceLoop:
                 "Gemini unavailable (%s); falling back to keyword command."
                 % _safe_error_summary(exc)
             )
-            return self.app.keyword_command(words)
+            result = self.app.keyword_command(words)
+            self._status("done", say=result.say if result else "", tool="keyword")
+            return result
 
         self._log("Gemini chose %s %s" % (tool_name, _printable(str(tool_args))))
-        return self.app.call_tool(tool_name, tool_args)
+        result = self.app.call_tool(tool_name, tool_args)
+        self._status("done", say=result.say if result else "", tool=tool_name, ok=bool(result and result.ok))
+        return result
 
     def _listen_once(self) -> Tuple[bool, str, str]:
         """Record one window on `self.band` and guarantee `audio=False` before returning.
@@ -287,7 +310,10 @@ class VoiceLoop:
 
         try:
             speech = _load_kit_speech()
-            transcript = speech.listen(self.band, seconds, on_text=_on_text)
+            self._status("listening", seconds=seconds)
+            # keyterm: Deepgram nova-3 prompt for a word the wrist mic often mishears (the kit
+            # sends one keyterm; it cannot repeat the parameter).
+            transcript = speech.listen(self.band, seconds, on_text=_on_text, keyterm="landmark")
             return True, transcript or "", ""
         except (Exception, SystemExit) as exc:
             _safe_mic_off(self.band)
