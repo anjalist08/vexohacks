@@ -2,6 +2,21 @@ import Foundation
 import SwiftUI
 import UIKit
 
+struct TrailPoint { var x: Double; var y: Double; var jump: Bool }
+struct Place: Identifiable, Equatable {
+    let id: String
+    var label: String
+    var x: Double
+    var y: Double
+    var note: String?
+    var floor: String?
+}
+struct DirectionStep: Identifiable { let id: Int; let turn: String; let steps: Int; let text: String }
+
+/// JSON numbers arrive as NSNumber; read them as Double or Int whatever their form.
+private func num(_ v: Any?) -> Double? { (v as? NSNumber)?.doubleValue }
+private func int(_ v: Any?) -> Int? { (v as? NSNumber)?.intValue }
+
 /// Connects to the laptop app (python3 main.py --band --phone) and turns its guidance into
 /// haptics and on-screen directions. The laptop does the band, tracking, routes and voice.
 @MainActor
@@ -17,6 +32,36 @@ final class Guide: ObservableObject {
     @Published var lastCue = ""
     @Published var buzzing = true
     @Published var bandStatus = ""          // the iPhone's own Bluetooth link to the band (bridge mode)
+
+    // The route and places, as the laptop app records them (same feed as the trail page).
+    @Published var trail: [TrailPoint] = []
+    @Published var backTrail: [TrailPoint] = []
+    @Published var places: [Place] = []
+    @Published var directions: [DirectionStep] = []
+    @Published var directionIndex = 0
+    @Published var guiding = false
+    @Published var guideTarget = ""
+    @Published var waypoints: [CGPoint] = []
+    @Published var position = CGPoint.zero
+    @Published var steps = 0
+    @Published var facing: Double = 0       // live heading, degrees clockwise from the route's start direction
+    @Published var recording = false
+    @Published var calibrated = false
+    @Published var uncertain = false
+    @Published var activity = "–"
+    @Published var gyroBias: Double = 0
+    @Published var stepLength: Double = 0.7
+    @Published var mode = ""                // LIVE, REPLAY, SIMULATION
+    @Published var bandLinkStatus = "not connected"
+    @Published var bandName = BandConfig.name
+    @Published var bandVia = ""
+    @Published var battery: Int?
+    @Published var batteryState = ""
+    @Published var batteryVolts: Double?
+    @Published var chipTemp: Double?
+    @Published var ledState = "idle"
+    @Published var lastReply = ""
+    @Published var bridgeWanted = false     // the laptop runs --bridge and wants this phone to carry the band
 
     private var band: BandLink?             // made only when the laptop asks the phone to carry the band
 
@@ -55,6 +100,7 @@ final class Guide: ObservableObject {
         band?.stop()
         band = nil
         bandStatus = ""
+        bridgeWanted = false
         wanted = nil
         task?.cancel(with: .goingAway, reason: nil)
         task = nil
@@ -104,6 +150,25 @@ final class Guide: ObservableObject {
         task?.send(.string(text)) { _ in }
     }
 
+    /// A typed (or tapped) command, understood by the laptop's Gemini like speech.
+    func command(_ text: String) {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return }
+        send(["type": "command", "text": t])
+        lastReply = "Sent: \(t)"
+    }
+
+    /// The Band tab's button: connect the iPhone to the band over Bluetooth now.
+    func connectBandFromPhone() { carryBand() }
+
+    func disconnectBandFromPhone() {
+        band?.stop()
+        band = nil
+        bandStatus = "Disconnected from the band"
+    }
+
+    var carryingBand: Bool { band != nil }
+
     /// The laptop runs `main.py --bridge`: this phone connects to the band and carries its data.
     private func carryBand() {
         guard band == nil else { return }
@@ -145,9 +210,68 @@ final class Guide: ObservableObject {
         case "say":
             voice = m["text"] as? String ?? ""
         case "band_number":
-            if let n = m["band"] as? Int, n == BandConfig.number { carryBand() }   // only our band
+            if let n = int(m["band"]), n == BandConfig.number {   // only our band
+                bridgeWanted = true
+                carryBand()
+            } else {
+                bridgeWanted = false
+            }
         case "band_cmd":
             band?.run(command: m)
+        case "mode":
+            mode = m["mode"] as? String ?? ""
+        case "link":
+            bandLinkStatus = m["status"] as? String ?? "not connected"
+        case "led":
+            ledState = m["state"] as? String ?? "idle"
+        case "reset":
+            trail = []; backTrail = []; places = []; directions = []; guiding = false; waypoints = []
+        case "point":
+            let p = TrailPoint(x: num(m["x_m"]) ?? 0, y: num(m["y_m"]) ?? 0, jump: m["jump"] as? Bool ?? false)
+            if guiding { backTrail.append(p) } else { trail.append(p) }
+            position = CGPoint(x: p.x, y: p.y)
+            steps = int(m["steps"]) ?? steps
+        case "landmark":
+            let place = Place(id: m["id"] as? String ?? UUID().uuidString, label: m["label"] as? String ?? "place",
+                              x: num(m["x_m"]) ?? position.x, y: num(m["y_m"]) ?? position.y,
+                              note: m["note"] as? String, floor: m["floor"] as? String)
+            if let i = places.firstIndex(where: { $0.id == place.id }) { places[i] = place } else { places.append(place) }
+        case "guidance":
+            let list = m["instructions"] as? [[String: Any]] ?? []
+            directions = list.enumerated().map { i, d in
+                DirectionStep(id: i, turn: d["turn"] as? String ?? "", steps: int(d["steps"]) ?? 0,
+                              text: d["text"] as? String ?? "")
+            }
+            directionIndex = int(m["current_index"]) ?? 0
+            guiding = m["active"] as? Bool ?? false
+            guideTarget = m["target_name"] as? String ?? guideTarget
+            waypoints = (m["waypoints"] as? [[Any]] ?? []).compactMap { w in
+                guard w.count >= 2, let x = num(w[0]), let y = num(w[1]) else { return nil }
+                return CGPoint(x: x, y: y)
+            }
+            if !guiding { backTrail = [] }
+        case "tracker":
+            recording = m["running"] as? Bool ?? recording
+            calibrated = m["calibrated"] as? Bool ?? calibrated
+            facing = num(m["live_heading_deg"]) ?? facing
+            uncertain = m["uncertain"] as? Bool ?? false
+            activity = m["state"] as? String ?? activity
+            gyroBias = num(m["bias_dps"]) ?? gyroBias
+            steps = int(m["steps"]) ?? steps
+        case "band_metric":
+            switch m["kind"] as? String {
+            case "info":
+                bandName = m["name"] as? String ?? bandName
+                bandVia = m["transport"] as? String ?? bandVia
+            case "battery":
+                battery = int(m["percent"])
+                batteryState = m["state"] as? String ?? ""
+                batteryVolts = num(m["millivolts"]).map { $0 / 1000 }
+            case "temperature":
+                chipTemp = num(m["celsius"])
+            default:
+                break
+            }
         default:
             break
         }
