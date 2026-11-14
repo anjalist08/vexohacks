@@ -4,4 +4,5 @@
 
 2. vibration integration for specific tasks that are implemented (such as location awareness or destination reached)
 3. haptics based on braille for sensory and accessibility
-4. vibrations vary amongst "start location", "arrived at location", "travelling", "saved location". 
+4. vibrations vary amongst "start location", "arrived at location", "travelling", "saved location".
+5. 
