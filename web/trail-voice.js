@@ -108,8 +108,8 @@ bridgeBtn.addEventListener('click', async () => {
 });
 
 // --- messages from main.py --------------------------------------------------------
-window.addEventListener('trail-backend', (ev) => {
-  const m = ev.detail || {};
+function onMessage(m) {
+  m = m || {};
   switch (m.type) {
     case 'voice': setVoice(m.state || 'ready', m); return;
     case 'band_number':
@@ -129,7 +129,11 @@ window.addEventListener('trail-backend', (ev) => {
     default: return;
   }
   renderChips();
-});
+}
+window.addEventListener('trail-backend', (ev) => onMessage(ev.detail));
+// catch up on what arrived before this script loaded (not old voice states or band commands)
+(window.trailBackendHistory || []).filter((m) => m.type !== 'voice' && m.type !== 'band_cmd').forEach(onMessage);
+if (window.trailBackendLastPoint) onMessage(window.trailBackendLastPoint);
 
 setVoice('ready', {});
 renderChips();
