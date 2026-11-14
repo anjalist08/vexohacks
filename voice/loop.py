@@ -151,6 +151,29 @@ class VoiceLoop:
         self._tap_event.set()
         return True
 
+    def _live_transcript(self, text: str, final: bool) -> None:
+        """Show what Deepgram hears while you speak, on stderr: one line that updates with
+        the running guess, kept once Deepgram marks the phrase final."""
+        if not getattr(config, "LIVE_TRANSCRIPT", True):
+            return
+        tty = sys.stderr.isatty()
+        if not text:
+            return
+        line = "    [YOU] %s" % _printable(text, limit=160)
+        if final:
+            sys.stderr.write(("\r\033[K" if tty else "") + line + "\n")
+            self._live_open = False
+        elif tty:                            # running guess: rewrite the same line
+            sys.stderr.write("\r\033[K" + line + " ...")
+            self._live_open = True
+        sys.stderr.flush()
+
+    def _end_live_transcript(self) -> None:
+        if getattr(self, "_live_open", False):
+            sys.stderr.write("\n")
+            sys.stderr.flush()
+            self._live_open = False
+
     def _chime(self, name: str) -> None:
         """A short macOS system sound, so listening can be followed without looking at a screen."""
         if not getattr(config, "VOICE_CHIMES", True) or not shutil.which("afplay"):
@@ -197,7 +220,9 @@ class VoiceLoop:
             self._listening = False
             band.off("audio", feed)
         self._chime("Pop")
-        return ears.stop()
+        text = ears.stop()
+        self._end_live_transcript()
+        return text
 
     def start_background(self) -> threading.Thread:
         """Start a daemon worker thread that runs one turn per queued double-tap."""
@@ -363,6 +388,7 @@ class VoiceLoop:
             cleaned = (text or "").strip()
             if cleaned:
                 partials.append(cleaned)
+            self._live_transcript(cleaned, _final)
 
         try:
             speech = _load_kit_speech()
@@ -373,6 +399,7 @@ class VoiceLoop:
                 # keyterm: Deepgram nova-3 prompt for a word the wrist mic often mishears (the
                 # kit sends one keyterm; it cannot repeat the parameter).
                 transcript = speech.listen(self.band, seconds, on_text=_on_text, keyterm="landmark")
+                self._end_live_transcript()
             return True, transcript or "", ""
         except (Exception, SystemExit) as exc:
             _safe_mic_off(self.band)
