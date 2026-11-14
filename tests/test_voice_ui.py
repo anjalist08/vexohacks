@@ -191,5 +191,37 @@ class KeywordFallbackPhrasingTests(unittest.TestCase):
             self.assertEqual(parse_keywords(text, store), ("remember_landmark", {"label": "desk"}), text)
 
 
+class LiveTranscriptTests(unittest.TestCase):
+    def test_final_phrases_are_printed_and_guesses_are_not_in_logs(self):
+        import io
+        from unittest import mock
+        loop = VoiceLoop(make_app())
+        err = io.StringIO()                       # not a terminal: only final phrases appear
+        with mock.patch("sys.stderr", err):
+            loop._live_transcript("save this", False)
+            loop._live_transcript("save this spot as the desk", True)
+            loop._end_live_transcript()
+        self.assertEqual(err.getvalue(), "    [YOU] save this spot as the desk\n")
+
+    def test_control_characters_are_removed(self):
+        import io
+        from unittest import mock
+        loop = VoiceLoop(make_app())
+        err = io.StringIO()
+        with mock.patch("sys.stderr", err):
+            loop._live_transcript("hi\x1b[2J there", True)
+        self.assertNotIn("\x1b", err.getvalue())
+
+    def test_can_be_switched_off(self):
+        import io
+        import config
+        from unittest import mock
+        loop = VoiceLoop(make_app())
+        err = io.StringIO()
+        with mock.patch("sys.stderr", err), mock.patch.object(config, "LIVE_TRANSCRIPT", False):
+            loop._live_transcript("hello", True)
+        self.assertEqual(err.getvalue(), "")
+
+
 if __name__ == "__main__":
     unittest.main()

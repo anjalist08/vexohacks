@@ -46,6 +46,7 @@ LISTEN_SECONDS = 5.0          # fixed-window mode: how long one turn records
 LISTEN_MODE = "toggle"        # "toggle": double-tap = mic on, double-tap again (or pause) = mic off
 LISTEN_MAX_SECONDS = 15.0     # toggle mode: the mic always switches off after this
 LISTEN_PAUSE_STOP_SECONDS = 2.0   # toggle mode: stop this long after the last word heard
+LIVE_TRANSCRIPT = True        # print what you say in the terminal while you speak ([YOU] ...)
 VOICE_CHIMES = True           # short laptop sounds when the mic turns on (Tink) and off (Pop)
 
 # --- Files ------------------------------------------------------------------
