@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>Wayback Phone</title>
+<style>
+  :root {
+    --bg: #0b1020; --phone: #0f172a; --card: #172036; --line: #26324d; --fg: #eef2f8; --muted: #93a1b8;
+    --blue: #3b82f6; --green: #22c55e; --amber: #f59e0b; --red: #ef4444; --purple: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg);
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  /* On a laptop the page looks like a phone; on a phone it fills the screen. */
+  .phone { width: 100%; min-height: 100vh; background: var(--phone); padding: 14px 16px 24px;
+    display: flex; flex-direction: column; gap: 14px; }
+  @media (min-width: 560px) {
+    body { display: grid; place-items: center; padding: 24px 0; }
+    .phone { width: 390px; min-height: 780px; border-radius: 44px; border: 10px solid #1e293b;
+      box-shadow: 0 30px 80px rgba(0,0,0,.5); }
+    .sim-note { display: block !important; }
+  }
+  .phone.buzz { animation: buzz .09s linear infinite; }
+  @keyframes buzz { 0% { transform: translate(0,0); } 25% { transform: translate(-2px,1px); }
+    50% { transform: translate(2px,-1px); } 75% { transform: translate(-1px,-1px); } }
+  @media (prefers-reduced-motion: reduce) { .phone.buzz { animation: none; outline: 3px solid var(--amber); } }
+  header { display: flex; align-items: center; justify-content: space-between; }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: -.01em; }
+  .pill { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--card); color: var(--muted); }
+  .pill.ok { color: var(--green); } .pill.bad { color: var(--red); }
+  .sim-note { display: none; font-size: 12px; color: var(--muted); margin: -6px 0 0; }
+  .dial { position: relative; align-self: center; width: 240px; height: 240px; border-radius: 50%;
+    background: radial-gradient(circle at 50% 50%, #1b2742 0 60%, #121a2e 61% 100%); border: 2px solid var(--line);
+    display: grid; place-items: center; transition: box-shadow .25s; }
+  .dial.on { box-shadow: 0 0 0 6px rgba(34,197,94,.25); border-color: var(--green); }
+  .dial.wrong { box-shadow: 0 0 0 6px rgba(245,158,11,.25); border-color: var(--amber); }
+  .dial.lost { box-shadow: 0 0 0 6px rgba(239,68,68,.3); border-color: var(--red); }
+  .dial.done { box-shadow: 0 0 0 6px rgba(168,85,247,.3); border-color: var(--purple); }
+  .dial .you { position: absolute; top: 8px; font-size: 11px; color: var(--muted); }
+  .arrow { width: 0; height: 0; border-left: 34px solid transparent; border-right: 34px solid transparent;
+    border-bottom: 110px solid var(--fg); transform-origin: 50% 66%; transition: transform .2s ease-out;
+    margin-top: -30px; }
+  .dial.on .arrow { border-bottom-color: var(--green); }
+  .dial.wrong .arrow { border-bottom-color: var(--amber); }
+  .dial.idle .arrow, .dial.lost .arrow, .dial.done .arrow { opacity: .25; }
+  .big { text-align: center; font-size: 26px; font-weight: 700; letter-spacing: -.01em; min-height: 1.3em; }
+  .sub { text-align: center; color: var(--muted); min-height: 1.4em; }
+  button { font: inherit; border-radius: 14px; border: 1px solid var(--line); background: var(--card); color: var(--fg);
+    padding: 12px 14px; cursor: pointer; }
+  button.primary { background: var(--blue); border-color: var(--blue); font-weight: 600; }
+  button.talk { background: #1d4ed8; border-color: #1d4ed8; font-weight: 600; }
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; }
+  .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; }
+  .legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .legend li { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+  .legend .dots { font-family: ui-monospace, Menlo, monospace; color: var(--amber); min-width: 86px; letter-spacing: 1px; }
+  .legend button { padding: 4px 10px; font-size: 12px; border-radius: 999px; margin-left: auto; }
+  .muted { color: var(--muted); font-size: 13px; }
+  #flash { position: fixed; inset: 0; pointer-events: none; background: var(--amber); opacity: 0; transition: opacity .12s; }
+  label.toggle { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 14px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div id="flash"></div>
+<div class="phone" id="phone">
+  <header>
+    <h1>Wayback</h1>
+    <span id="conn" class="pill">connecting…</span>
+  </header>
+  <p class="sim-note">Phone simulation: laptops cannot vibrate, so buzzes shake this screen and beep. Open the --phone link on an Android phone to feel them.</p>
+
+  <div class="dial idle" id="dial" aria-hidden="true">
+    <span class="you">you face ↑</span>
+    <div class="arrow" id="arrow"></div>
+  </div>
+  <div class="big" id="big">Waiting for a route</div>
+  <div class="sub" id="sub">Say "take me to the kitchen" to start guidance.</div>
+
+  <button class="primary" id="enable">Start buzzing</button>
+  <div class="row">
+    <button class="talk" id="talk">Talk</button>
+    <button id="mute" aria-pressed="false">Sound on</button>
+  </div>
+  <div class="sub" id="voice"></div>
+
+  <section class="card">
+    <h2>Buzz patterns</h2>
+    <ul class="legend" id="legend"></ul>
+  </section>
+  <p class="muted" id="support"></p>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const PATTERNS = {
+    wrong_left: [120, 120, 120], wrong_right: [120, 120, 120, 120, 120], on_track: [600], tick: [50],
+    turn_soon: [80], turn_left: [500, 150, 150], turn_right: [500, 150, 150, 150, 150],
+    turn_around: [500, 150, 500], arrived: [700, 200, 700, 200, 700],
+    lost: [100, 60, 100, 60, 100, 60, 100, 60, 100],
+  };
+  const LEGEND = [
+    ["wrong_left", "Wrong way: turn left", "• •"],
+    ["wrong_right", "Wrong way: turn right", "• • •"],
+    ["on_track", "On track (locked on)", "━━━"],
+    ["turn_soon", "Turn coming (speeds up)", "· · · ·"],
+    ["turn_left", "Turn left now", "━ •"],
+    ["turn_right", "Turn right now", "━ • •"],
+    ["turn_around", "Turn around", "━ ━"],
+    ["arrived", "Stop: arrived", "━ ━ ━"],
+    ["lost", "Stop: lost, say where you are", "•••••"],
+  ];
+  const TONE = { wrong_left: 330, wrong_right: 660, turn_left: 330, turn_right: 660 };
+  // Desktop Chrome has navigator.vibrate but no motor: only trust it on a touch phone.
+  const isPhone = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent) || matchMedia("(pointer: coarse)").matches;
+  const canVibrate = typeof navigator.vibrate === "function" && isPhone;
+  let enabled = false, sound = !canVibrate, audio = null, wakeLock = null, ws = null;
+
+  // --- feeling a cue --------------------------------------------------------------
+  function beep(pattern, freq) {
+    if (!audio) return;
+    let t = audio.currentTime + 0.02;
+    pattern.forEach((ms, i) => {
+      if (i % 2 === 0) {
+        const o = audio.createOscillator(), g = audio.createGain();
+        o.frequency.value = freq; o.type = "sine";
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.25, t + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
+        o.connect(g).connect(audio.destination); o.start(t); o.stop(t + ms / 1000 + 0.02);
+      }
+      t += ms / 1000;
+    });
+  }
+  function buzz(cue) {
+    const pattern = PATTERNS[cue];
+    if (!pattern || !enabled) return;
+    const total = pattern.reduce((a, b) => a + b, 0);
+    if (canVibrate) navigator.vibrate(pattern);
+    if (sound) beep(pattern, TONE[cue] || 520);
+    $("phone").classList.add("buzz");
+    $("flash").style.opacity = cue === "tick" ? "0.05" : "0.18";
+    setTimeout(() => { $("phone").classList.remove("buzz"); $("flash").style.opacity = "0"; }, total);
+  }
+
+  // --- showing where to go -----------------------------------------------------------
+  function steps(n) { return n + " step" + (n === 1 ? "" : "s"); }
+  let arrowAngle = 0;     // continuous, so +180 / -180 does not spin the arrow
+  function showHint(h) {
+    const dial = $("dial");
+    if (h.arrived) { dial.className = "dial done"; $("big").textContent = "Arrived"; $("sub").textContent = "You reached the " + (h.target || "place") + "."; return; }
+    if (!h.active) { dial.className = "dial idle"; $("big").textContent = "Waiting for a route"; $("sub").textContent = 'Say "take me to the kitchen" to start guidance.'; return; }
+    if (h.lost) { dial.className = "dial lost"; $("big").textContent = "Not sure where you are"; $("sub").textContent = 'Say "I\'m at the …" to re-anchor.'; return; }
+    const err = Number(h.error_deg) || 0;
+    arrowAngle += ((err - arrowAngle) % 360 + 540) % 360 - 180;
+    $("arrow").style.transform = "rotate(" + arrowAngle + "deg)";
+    const to = "to the " + (h.target || "place");
+    if (h.state === "wrong_left" || h.state === "wrong_right") {
+      dial.className = "dial wrong";
+      $("big").textContent = Math.abs(err) >= 150 ? "Turn around" : h.state === "wrong_left" ? "Turn left" : "Turn right";
+      $("sub").textContent = Math.round(Math.abs(err)) + "° off, " + to;
+    } else {
+      dial.className = "dial on";
+      if (h.state === "turn_soon" && h.next_turn) {
+        $("big").textContent = "Turn " + h.next_turn + " in " + steps(h.steps_left);
+      } else {
+        $("big").textContent = "Straight ahead";
+      }
+      $("sub").textContent = (h.steps_left != null ? steps(h.steps_left) + " on this stretch, " : "") + to;
+    }
+  }
+
+  // --- connection ---------------------------------------------------------------------
+  function connect() {
+    const q = new URLSearchParams(location.search);
+    const port = q.get("ws_port") || "8765";
+    const token = q.get("token");
+    const url = "ws://" + location.hostname + ":" + port + "/" + (token ? "?token=" + encodeURIComponent(token) : "");
+    ws = new WebSocket(url);
+    ws.onopen = () => { $("conn").textContent = "connected"; $("conn").className = "pill ok"; };
+    ws.onclose = () => { $("conn").textContent = "reconnecting…"; $("conn").className = "pill bad"; setTimeout(connect, 1500); };
+    ws.onmessage = (ev) => {
+      let m; try { m = JSON.parse(ev.data); } catch { return; }
+      if (m.type === "haptic_hint") showHint(m);
+      else if (m.type === "haptic") buzz(m.cue);
+      else if (m.type === "voice") {
+        const words = { listening: "Listening… speak now", heard: "Heard: " + (m.text || ""), thinking: "Understanding…",
+                        done: m.say || "", nothing: m.text || "", error: m.text || "" };
+        $("voice").textContent = words[m.state] || "";
+      } else if (m.type === "say") $("voice").textContent = m.text || "";
+    };
+  }
+
+  // --- controls -----------------------------------------------------------------------
+  $("enable").onclick = async () => {
+    enabled = !enabled;
+    $("enable").textContent = enabled ? "Buzzing on — tap to pause" : "Start buzzing";
+    if (enabled) {
+      try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); await audio.resume(); } catch (e) { audio = null; }
+      try { if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); } catch (e) { wakeLock = null; }
+      buzz("on_track");
+    } else if (wakeLock) { wakeLock.release(); wakeLock = null; }
+  };
+  $("mute").onclick = () => { sound = !sound; $("mute").textContent = sound ? "Sound on" : "Sound off"; $("mute").setAttribute("aria-pressed", String(!sound)); };
+  $("mute").textContent = sound ? "Sound on" : "Sound off";
+  $("talk").onclick = () => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "talk" })); };
+
+  const legend = $("legend");
+  LEGEND.forEach(([cue, text, dots]) => {
+    const li = document.createElement("li");
+    const d = document.createElement("span"); d.className = "dots"; d.textContent = dots;
+    const t = document.createElement("span"); t.textContent = text;
+    const b = document.createElement("button"); b.type = "button"; b.textContent = "Try";
+    b.onclick = () => { const was = enabled; enabled = true; if (!audio) { try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } buzz(cue); enabled = was; };
+    li.append(d, t, b); legend.append(li);
+  });
+  $("support").textContent = canVibrate
+    ? "This device can vibrate. Keep this page open with the screen on; tap Start buzzing first."
+    : "This device cannot vibrate from a web page (laptops and iPhones). Buzzes play as beeps and screen shakes instead.";
+  connect();
+})();
+</script>
+</body>
+</html>

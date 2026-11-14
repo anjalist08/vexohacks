@@ -25,7 +25,22 @@ from store.band_mirror import BandLandmarkMirror  # noqa: E402
 from store.route_store import RouteStore  # noqa: E402
 from tracker.events import SampleLogger, feed, read_log, synthetic_walk  # noqa: E402
 from tracker.wrist import make_tracker  # noqa: E402
-from web.ws_server import MapWebSocketServer, _start_static_http, start_status_pump  # noqa: E402
+from web.ws_server import MapWebSocketServer, _start_static_http, start_haptic_pump, start_status_pump  # noqa: E402
+
+PHONE = {"token": None}     # set by --phone: other devices on the Wi-Fi may open the phone page with it
+
+
+def _lan_ip() -> str:
+    """This laptop's address on the Wi-Fi (no packet is sent)."""
+    import socket as _socket
+    s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+    try:
+        s.connect(("10.255.255.255", 1))
+        return s.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
+    finally:
+        s.close()
 
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 
@@ -50,22 +65,35 @@ def say(text):
 def _start_web_servers(app, mode, host="127.0.0.1", ws_port=8765, http_port=8000, enable_ws=True, enable_http=True):
     ws = None
     httpd = None
+    token = PHONE["token"]
+    if token:
+        host = "0.0.0.0"          # reachable from the phone; other devices need the token (ws_server)
     if enable_ws:
         try:
             ws = MapWebSocketServer(app, host=host, port=ws_port, mode=mode).start()
+            ws.phone_token = token
             print("WebSocket: ws://%s:%d" % (ws.host, ws.port))
+            ws._haptic_stop = threading.Event()
+            start_haptic_pump(ws, app, ws._haptic_stop)       # phone buzz cues
         except OSError as exc:
             print("WebSocket port %d busy (%s); continuing without map feed." % (ws_port, exc))
     if enable_http:
         try:
-            httpd = _start_static_http(host, http_port, REPO_ROOT)
+            httpd = _start_static_http(host, http_port, REPO_ROOT, phone_token=token)
             print("Map page:  http://localhost:%d/web/" % http_port)
         except OSError:
             print("Map page:  http://localhost:%d/web/ (using existing server on port %d)" % (http_port, http_port))
+    print("Phone (simulation on this laptop): http://localhost:%d/web/phone.html?ws_port=%d" % (http_port, ws_port))
+    if token:
+        print("Phone (on the same Wi-Fi):  http://%s:%d/web/phone.html?ws_port=%d&token=%s"
+              % (_lan_ip(), http_port, ws_port, token))
+        print("  Anyone with this link can steer the app: share it only with your own phone.")
     return ws, httpd
 
 
 def _stop_web_servers(ws, httpd):
+    if ws is not None and getattr(ws, "_haptic_stop", None) is not None:
+        ws._haptic_stop.set()
     if ws is not None:
         ws.stop()
     if httpd is not None:
@@ -312,8 +340,13 @@ def main(argv=None):
     p.add_argument("--ws-port", type=int, default=8765, help="WebSocket port for the map page (default: 8765)")
     p.add_argument("--http-port", type=int, default=8000, help="HTTP port for the map page (default: 8000)")
     p.add_argument("--usb", action="store_true", help="with --band: use the USB cable instead of Bluetooth")
+    p.add_argument("--phone", action="store_true",
+                   help="let your phone on the same Wi-Fi open the phone page (vibration); prints a link with a secret token")
     p.add_argument("--no-web", action="store_true", help="disable local HTTP/WebSocket servers on --band/--replay")
     a = p.parse_args(argv)
+    if a.phone:
+        import secrets
+        PHONE["token"] = secrets.token_urlsafe(9)
     if a.sim:
         return run_sim()
     if a.replay:
