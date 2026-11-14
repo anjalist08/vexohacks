@@ -39,7 +39,7 @@ LINES = [
     ("vo4b", 25.0, 27.4, "Can't hear? It glows, and it buzzes."),
     ("vo4c", 27.4, 30.8, "Can't speak? Just tap, and type."),
     ("vo5", 31.5, 35.8, "In the crowd."),
-    ("vo6", 36.6, 41.8, "In places you've never been."),
+    ("vo6", 36.6, 41.0, "Whoever you are: blind, Deaf, or non-speaking."),
     ("vo7", 42.6, 47.8, "And places no one else is."),
     ("vo8", 48.6, 54.8, "Across the country. Around the world. The way back is always with you."),
     ("vo9", 56.0, 59.6, "This is the Wayback Trail."),

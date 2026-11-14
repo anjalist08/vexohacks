@@ -109,7 +109,7 @@ let VO = [
   { id: "vo4b", t: 25.0, d: 2.2, text: "Can’t hear? It glows, and it buzzes." },
   { id: "vo4c", t: 27.4, d: 2.0, text: "Can’t speak? Just tap and type." },
   { id: "vo5", t: 31.5, d: 1.2, text: "In the crowd." },
-  { id: "vo6", t: 36.6, d: 1.8, text: "In places you’ve never been." },
+  { id: "vo6", t: 36.6, d: 2.8, text: "Whoever you are: blind, Deaf, or non-speaking." },
   { id: "vo7", t: 42.6, d: 1.8, text: "And places no one else is." },
   { id: "vo8", t: 48.6, d: 5.0, text: "Across the country. Around the world. The way back is always with you." },
   { id: "vo9", t: 56.0, d: 2.0, text: "This is the Wayback Trail." },
@@ -564,51 +564,151 @@ function sCrowd(c, lt) {
   sceneTitle(c, lt, "Crowded.", "Retrace your steps when the crowd hides every landmark.");
 }
 
-// 5  Unfamiliar: desert | Antarctica split
-function dunes(c, x, y, w, h, lt, cols, seed) {
-  cols.forEach((col, n) => {
-    c.beginPath(); c.moveTo(x, y + h);
-    for (let px = 0; px <= w; px += 20) {
-      const yy = y + h * (.45 + n * .14) + Math.sin(px / (260 - n * 40) + seed + n + lt * .05) * (60 - n * 10) + Math.sin(px / 90 + n * 3) * 8;
-      c.lineTo(x + px, yy);
-    }
-    c.lineTo(x + w, y + h); c.closePath(); c.fillStyle = col; c.fill();
-  });
-}
+// 5  Everyone: a blind, a Deaf and a non-speaking person, each using the band their own way
 function footTrail(c, pts, k, col) {
   c.save(); c.setLineDash([4, 22]); c.lineCap = "round"; c.lineWidth = 9; c.strokeStyle = col; c.shadowColor = col; c.shadowBlur = 18; c.beginPath();
   const n = Math.max(1, Math.floor(k * 60));
   for (let s = 0; s <= n; s++) { const t = s / 60, f = t * (pts.length - 1), i = Math.min(pts.length - 2, Math.floor(f)), u = f - i; const p = [lerp(pts[i][0], pts[i + 1][0], u), lerp(pts[i][1], pts[i + 1][1], u)]; s ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]); }
   c.stroke(); c.restore();
 }
-function sUnfamiliar(c, lt) {
-  const split = lerp(W, W / 2, eio(seg(lt, .4, 1.4)));
-  // desert
-  c.save(); c.beginPath(); c.rect(0, 0, split, H); c.clip();
-  let g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#ff9f6b"); g.addColorStop(.45, "#ffcf8a"); g.addColorStop(1, "#e7a35e");
-  c.fillStyle = g; c.fillRect(0, 0, W, H);
-  c.save(); c.globalCompositeOperation = "lighter"; glowBlob(c, 760, 330, 320, "#FFF4D6", 1); c.restore();
-  c.beginPath(); c.arc(760, 330, 70, 0, 7); c.fillStyle = "#fff7e0"; c.fill();
-  dunes(c, 0, 0, W, H, lt, ["#f0b46c", "#e39a52", "#c97c3c", "#a9612b"], 1);
-  footTrail(c, [[820, 1000], [700, 880], [560, 840], [460, 720], [300, 690]], eio(seg(lt, .8, 5.2)), "#ffffff");
-  walker(c, lerp(820, 300, eio(seg(lt, .8, 5.2))) , lerp(1000, 690, eio(seg(lt, .8, 5.2))) - 4, .5, lt * 6, { color: "#3b2414", flip: true });
-  pill(c, "Camp", 820, 1030, { align: "center", dot: C.purple, size: 22, fill: "rgba(28,28,30,.7)" });
+// head centre of walker() in canvas coordinates (local head is at (8, -205), bobbing with the gait)
+function headAt(fx, fy, s, phase) { return [fx + 8 * s, fy - (205 + Math.abs(Math.cos(phase)) * 3) * s]; }
+function wristGlow(c, wr, col, a) { c.save(); c.globalCompositeOperation = "lighter"; glowBlob(c, wr[0], wr[1], 70, col, a); c.restore(); }
+function buzzBars(c, x, y, l, a) {   // turn_left from store/haptics.py, lit as it plays
+  const tt = (l * 1000) % 1600; let bx = x, acc = 0;
+  PATTERNS.turn_left.forEach((ms, n) => {
+    const w = ms / 7;
+    if (n % 2 === 0) { const live = tt >= acc && tt < acc + ms; rrect(c, bx, y - 8, w, 16, 8); c.fillStyle = live ? C.white : "rgba(255,255,255,.3)"; c.save(); c.globalAlpha *= a; c.fill(); c.restore(); }
+    bx += w + 8; acc += ms;
+  });
+}
+
+// Blind: walking with a white cane; the turn is spoken into the ear.
+function personBlind(c, fx, fy, s, l, col, wx, wy) {
+  const ph = l * 5.2;
+  const wr = walker(c, fx, fy, s, ph, { band: true, color: "#ececf1" });
+  const hd = headAt(fx, fy, s, ph);
+  c.save(); c.fillStyle = "#0b0b0c"; rrect(c, hd[0] + 3 * s, hd[1] - 8 * s, 20 * s, 8 * s, 3 * s); c.fill(); c.restore();   // dark glasses
+  // white cane, sweeping ahead, red tip
+  const tip = [fx + (120 + 26 * Math.sin(l * 2.6)) * s, fy + 2 * s];
+  const red = [lerp(wr[0], tip[0], .82), lerp(wr[1], tip[1], .82)];
+  c.save(); c.lineCap = "round"; c.lineWidth = 4.5 * s;
+  c.strokeStyle = "#ffffff"; c.beginPath(); c.moveTo(wr[0], wr[1]); c.lineTo(red[0], red[1]); c.stroke();
+  c.strokeStyle = C.red; c.beginPath(); c.moveTo(red[0], red[1]); c.lineTo(tip[0], tip[1]); c.stroke(); c.restore();
+  wristGlow(c, wr, col, .8);
+  // sound arcs from the ear
+  const ka = seg(l, .5, .9);
+  for (let n = 0; n < 3; n++) {
+    const k = ((l * 1.4) + n / 3) % 1;
+    c.beginPath(); c.arc(hd[0] + 18 * s, hd[1], 14 + k * 46, -.7, .7); c.lineWidth = 3; c.strokeStyle = hexA(col, (1 - k) * .9 * ka); c.stroke();
+  }
+  // spoken instruction
+  const kb = espring(seg(l, .6, 1.4));
+  if (kb > 0) {
+    c.save(); c.translate(wx + 115, wy + 80); c.scale(kb, kb); c.translate(-(wx + 115), -(wy + 80));
+    glass(c, wx, wy, 230, 160, 30, { fill: "rgba(10,132,255,.16)", stroke: hexA(col, .5) });
+    for (let n = 0; n < 7; n++) { const h = 8 + 26 * Math.abs(Math.sin(l * 7 + n * 1.1)); rrect(c, wx + 26 + n * 18, wy + 38 - h / 2, 10, h, 5); c.fillStyle = col; c.fill(); }
+    text(c, "“" + RETURN_STEPS[0] + ",", wx + 24, wy + 100, { size: 24, w: 700 });
+    text(c, "then " + RETURN_STEPS[1].toLowerCase() + ".”", wx + 24, wy + 132, { size: 24, w: 700 });
+    c.restore();
+  }
+  pill(c, "Spoken turn-by-turn", wx + 115, wy + 210, { align: "center", size: 17, a: seg(l, 1.2, 1.6) });
+}
+
+// Deaf: the light on the wrist and the buzz carry the turn; big text on the phone.
+function personDeaf(c, fx, fy, s, l, col, wx, wy) {
+  const ph = .12 * Math.sin(l * 1.6);
+  const wr = walker(c, fx, fy, s, ph, { band: true, color: "#ececf1" });
+  const hd = headAt(fx, fy, s, ph);
+  c.save(); rrect(c, hd[0] - 14 * s, hd[1] - 13 * s, 8 * s, 20 * s, 4 * s); c.fillStyle = "#636366"; c.fill();   // hearing aid behind the ear
+  c.lineCap = "round"; c.lineWidth = 2.5 * s; c.strokeStyle = "#636366"; c.beginPath(); c.moveTo(hd[0] - 10 * s, hd[1] - 12 * s); c.quadraticCurveTo(hd[0] - 2 * s, hd[1] - 16 * s, hd[0] - 1 * s, hd[1] - 4 * s); c.stroke(); c.restore();
+  const cue = l > .9;
+  const pulse = cue ? .6 + .4 * Math.sin(l * 9) : .5;
+  wristGlow(c, wr, cue ? C.white : col, pulse);
+  c.beginPath(); c.arc(wr[0], wr[1], 7, 0, 7); c.fillStyle = cue ? C.white : col; c.fill();
+  if (cue) {
+    const tt = ((l - .9) * 1000) % 1600;
+    if (tt < 800) for (let r = 0; r < 3; r++) { const k = clamp(tt / 800 - r * .2); c.beginPath(); c.arc(wr[0], wr[1], 16 + k * 90, 0, 7); c.strokeStyle = hexA(C.white, (1 - k) * .7); c.lineWidth = 3; c.stroke(); }
+  }
+  const kb = espring(seg(l, .7, 1.5));
+  if (kb > 0) {
+    c.save(); c.translate(wx + 115, wy + 80); c.scale(kb, kb); c.translate(-(wx + 115), -(wy + 80));
+    glass(c, wx, wy, 230, 160, 30, { fill: "rgba(48,209,88,.14)", stroke: hexA(col, .5) });
+    // left arrow
+    c.save(); c.translate(wx + 52, wy + 62); c.strokeStyle = C.white; c.lineWidth = 7; c.lineCap = "round"; c.lineJoin = "round";
+    c.beginPath(); c.moveTo(22, 0); c.lineTo(-18, 0); c.moveTo(-4, -16); c.lineTo(-20, 0); c.lineTo(-4, 16); c.stroke(); c.restore();
+    text(c, RETURN_STEPS[1], wx + 92, wy + 74, { size: 30, w: 800 });
+    text(c, "Buzz", wx + 24, wy + 128, { size: 18, w: 600, color: C.gray });
+    buzzBars(c, wx + 78, wy + 122, Math.max(0, l - .9), 1);
+    c.restore();
+  }
+  pill(c, "Light + iPhone/Watch buzz", wx + 115, wy + 210, { align: "center", size: 17, a: seg(l, 1.3, 1.7) });
+}
+
+// Non-speaking: types the request; the answer comes back as text.
+function personNonSpeaking(c, fx, fy, s, l, col, wx, wy) {
+  const ph = .1 * Math.sin(l * 1.3 + 1);
+  const wr = walker(c, fx, fy, s, ph, { band: true, color: "#ececf1" });
+  wristGlow(c, wr, col, .7);
+  c.save(); c.translate(wr[0] + 8, wr[1] + 6); c.rotate(-.35); rrect(c, -14, -26, 28, 48, 6); c.fillStyle = "#1c1c1e"; c.fill();
+  c.lineWidth = 2; c.strokeStyle = "rgba(255,255,255,.5)"; c.stroke();
+  c.save(); c.globalCompositeOperation = "lighter"; glowBlob(c, 0, 0, 40, col, .8); c.restore(); c.restore();
+  const kb = espring(seg(l, .4, 1.2));
+  if (kb <= 0) return;
+  c.save(); c.translate(wx + 115, wy + 130); c.scale(kb, kb); c.translate(-(wx + 115), -(wy + 130));
+  glass(c, wx, wy - 40, 230, 300, 36, { fill: "rgba(14,14,16,.92)" });
+  const typed = "take me back";
+  const sent = l > 1.9;
+  // reply
+  if (l > 2.4) {
+    const kr = espring(seg(l, 2.4, 3.0));
+    c.save(); c.globalAlpha *= clamp(kr); rrect(c, wx + 16, wy + 64, 176, 86, 20); c.fillStyle = "#2c2c2e"; c.fill();
+    text(c, RETURN_STEPS[0] + ",", wx + 32, wy + 100, { size: 19, w: 600 });
+    text(c, "then " + RETURN_STEPS[1].toLowerCase() + ".", wx + 32, wy + 130, { size: 19, w: 600 });
+    c.restore();
+  }
+  if (sent) {
+    const kk = eout(seg(l, 1.9, 2.3));
+    const by = lerp(wy + 196, wy + 2, kk);
+    rrect(c, wx + 214 - 150, by, 150, 44, 22); c.fillStyle = col; c.fill();
+    text(c, typed, wx + 214 - 75, by + 29, { size: 19, w: 600, align: "center" });
+  }
+  // input box with Talk / Stop buttons that exist in the app
+  rrect(c, wx + 16, wy + 196, 198, 44, 22); c.fillStyle = "rgba(255,255,255,.08)"; c.fill();
+  const nch = sent ? 0 : Math.floor(clamp((l - .6) / 1.1) * typed.length);
+  text(c, typed.slice(0, nch) + (Math.floor(l * 3) % 2 && !sent ? "|" : ""), wx + 34, wy + 225, { size: 19, w: 500, color: nch || sent ? C.white : C.gray });
   c.restore();
-  // Antarctica
-  c.save(); c.beginPath(); c.rect(split, 0, W - split, H); c.clip();
-  g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#9fc9ee"); g.addColorStop(.5, "#e3f1fb"); g.addColorStop(1, "#ffffff");
-  c.fillStyle = g; c.fillRect(0, 0, W, H);
-  dunes(c, 0, 0, W, H, lt, ["#d6e9f7", "#c3dcef", "#e9f4fb", "#ffffff"], 4);
-  const r = rng(9); for (let n = 0; n < 160; n++) { const x = r() * W, y = (r() * H + lt * (60 + r() * 80)) % H; c.beginPath(); c.arc(x + Math.sin(lt + n) * 10, y, 2 + r() * 3, 0, 7); c.fillStyle = "rgba(255,255,255,.9)"; c.fill(); }
-  footTrail(c, [[1500, 1010], [1380, 900], [1480, 800], [1330, 720], [1220, 660]], eio(seg(lt, .8, 5.2)), C.blue);
-  walker(c, lerp(1500, 1220, eio(seg(lt, .8, 5.2))), lerp(1010, 660, eio(seg(lt, .8, 5.2))) - 4, .5, lt * 6, { color: "#1c2a3a", flip: true });
-  pill(c, "Research hut", 1500, 1040, { align: "center", dot: C.purple, size: 22, fill: "rgba(28,28,30,.7)" });
+  pill(c, "Typed commands, no voice", wx + 115, wy + 300, { align: "center", size: 17, a: seg(l, 1.3, 1.7) });
+}
+
+function sEveryone(c, lt) {
+  c.fillStyle = "#000"; c.fillRect(0, 0, W, H);
+  c.save(); c.globalCompositeOperation = "lighter";
+  glowBlob(c, 330, 680, 640, C.blue, .3); glowBlob(c, W / 2, 740, 640, C.green, .22); glowBlob(c, W - 330, 680, 640, C.purple, .3);
   c.restore();
-  // divider
-  c.fillStyle = "rgba(255,255,255,.9)"; c.fillRect(split - 2, 0, 4, H);
-  text(c, "Desert", 110, H - 70, { size: 30, w: 700, color: "#3b2414", a: seg(lt, 1.2, 1.6), ls: 4 });
-  text(c, "Antarctica", W - 110, H - 70, { size: 30, w: 700, align: "right", color: "#1c2a3a", a: seg(lt, 1.2, 1.6), ls: 4 });
-  sceneTitle(c, lt, "Unfamiliar.", "No map of the place needed. It remembers the way you came.", null, true);
+  const people = [
+    { who: "Blind", how: "Hears every turn.", col: C.blue, at: .3, draw: personBlind },
+    { who: "Deaf", how: "Sees and feels every turn.", col: C.green, at: 1.1, draw: personDeaf },
+    { who: "Non-speaking", how: "Types, and it answers.", col: C.purple, at: 1.9, draw: personNonSpeaking },
+  ];
+  const cw = 540, ch = 590, gap = 50, x0 = (W - (cw * 3 + gap * 2)) / 2, y0 = 330;
+  people.forEach((p, i) => {
+    const k = espring(seg(lt, p.at, p.at + 1.0));
+    if (k <= 0) return;
+    const x = x0 + i * (cw + gap), y = y0 + (1 - k) * 100;
+    c.save(); c.globalAlpha = seg(lt, p.at, p.at + .45);
+    glass(c, x, y, cw, ch, 44);
+    c.save(); rrect(c, x, y, cw, ch, 44); c.clip();
+    const fl = c.createLinearGradient(0, y + ch * .5, 0, y + ch); fl.addColorStop(0, hexA(p.col, 0)); fl.addColorStop(1, hexA(p.col, .2));
+    c.fillStyle = fl; c.fillRect(x, y, cw, ch);
+    c.fillStyle = hexA(p.col, .35); c.fillRect(x + 40, y + ch - 48, 210, 3);   // ground line
+    p.draw(c, x + 140, y + ch - 50, 1.4, lt - p.at, p.col, x + 280, y + 190);
+    c.restore();
+    text(c, p.who, x + 40, y + 78, { size: 46, w: 800 });
+    text(c, p.how, x + 40, y + 120, { size: 26, w: 600, color: p.col });
+    c.restore();
+  });
+  sceneTitle(c, lt, "Everyone.", "Blind, Deaf or non-speaking: the way back works for you.");
 }
 
 // 6  Isolated: out of the cave, down the mountain
@@ -739,7 +839,7 @@ const SCENES = [
   { a: 13, b: 22, draw: sWalk, enter: "push" },           // slide over, parallax
   { a: 22, b: 31, draw: sSenses, enter: "card" },         // scene shrinks into a card and falls away
   { a: 31, b: 36, draw: sCrowd, enter: "iris" },          // circular reveal
-  { a: 36, b: 42, draw: sUnfamiliar, enter: "blur" },     // blur dissolve
+  { a: 36, b: 42, draw: sEveryone, enter: "blur" },      // blur dissolve
   { a: 42, b: 48, draw: sIsolated, enter: "push" },
   { a: 48, b: 55, draw: sGlobe, enter: "zoom" },
   { a: 55, b: 60, draw: sEnd, enter: "blur" },
