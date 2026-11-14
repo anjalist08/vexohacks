@@ -31,6 +31,8 @@ class Dashboard:
         self.link = "connected" if label == "LIVE" else "none"
         self.last_say = ""
         self.last_result = None
+        self.band = {}                      # latest band readings by kind, from set_metric
+        self.events = []                    # last few tap/gesture events
         self._clients: List[queue.Queue] = []
         self._lock = threading.Lock()
         self._pending = False
@@ -47,6 +49,14 @@ class Dashboard:
 
     def set_link(self, status: str):
         self.link = status
+        self.changed()
+
+    def set_metric(self, kind: str, fields: dict):
+        """A band reading (info, activity, battery, temperature, event) for the Band card."""
+        if kind == "event":
+            self.events = ([dict(fields, time=time.time())] + self.events)[:5]
+        else:
+            self.band[kind] = dict(fields, time=time.time())
         self.changed()
 
     # --- state -------------------------------------------------------------------
@@ -68,7 +78,11 @@ class Dashboard:
                 "notes": route.notes},
             "pose": {"x": pose.x_m, "y": pose.y_m, "heading": pose.heading_deg, "steps": pose.steps},
             "tracking": {"running": app.tracker.running, "calibrated": app.tracker.calibrated,
-                         "state": app.tracker.state, "step_length_m": app.tracker.step_length_m},
+                         "state": app.tracker.state, "step_length_m": app.tracker.step_length_m,
+                         "yaw_rate": round(getattr(app.tracker, "yaw_rate", 0.0), 1),
+                         "bias": round(app.tracker.bias, 2)},
+            "band": self.band,
+            "events": self.events,
             "landmarks": [dict(l.to_dict(), x=route.points[l.point_index].x_m, y=route.points[l.point_index].y_m)
                           for l in (route.landmarks if route else [])],
             "guidance": [i.to_dict() for i in app.guidance],

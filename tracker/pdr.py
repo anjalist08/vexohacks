@@ -45,6 +45,7 @@ class PathTracker:
         self.heading = 0.0        # heading used for moves (snapped when snap_turns)
         self.raw_heading = 0.0    # integrated gyro heading
         self.bias = 0.0
+        self.yaw_rate = 0.0
         self.calibrated = False
         self._calib: List[float] = []
         self._calib_until = t + config.CALIBRATION_S
@@ -110,6 +111,7 @@ class PathTracker:
                 self.bias += config.BIAS_UPDATE_ALPHA * (yaw - self.bias)
                 rate = yaw - self.bias
 
+            self.yaw_rate = rate      # degrees/second, + = turning left
             self.raw_heading = wrap_deg(self.raw_heading - rate * dt)
             self._track_turn(t, rate)
 

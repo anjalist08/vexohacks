@@ -170,7 +170,7 @@ def run_band(usb=False, web_port=None):
     band = band_source.connect(
         tracker, logger,
         on_double_tap=lambda: print("\n    (double-tap: the voice loop is not built yet, type instead)"),
-        on_link=link, usb=usb)
+        on_link=link, usb=usb, on_metric=dash.set_metric if dash else None)
     led.band = band
     print("Connected to %s over %s. Logging every sample to %s" % (band.name, "USB" if usb else "Bluetooth", logger.path))
     try:

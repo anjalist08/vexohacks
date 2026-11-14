@@ -81,6 +81,9 @@
   @media (prefers-reduced-motion: reduce) { .led { animation: none !important; } }
   .led-name { font-weight: 600; font-size: 16px; }
   .sub { color: var(--muted); font-size: 13px; }
+  .battery { height: 10px; border-radius: 999px; background: var(--chip); overflow: hidden; }
+  .battery .fill { height: 100%; width: 0; background: var(--live); transition: width .4s; }
+  .battery .fill.low { background: var(--bad); }
   .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .stat .v { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
   .stat .k { font-size: 12px; color: var(--muted); }
@@ -147,6 +150,21 @@
         <div class="led off" id="led" aria-hidden="true"></div>
         <div><div class="led-name" id="ledName">Off</div><div class="sub" id="ledSub">—</div></div>
       </div>
+    </div></div>
+
+    <div class="card" id="bandCard" hidden><div class="body">
+      <h2>Band <span class="sub" id="bandInfo" style="text-transform:none;letter-spacing:0;font-weight:400"></span></h2>
+      <div class="battery"><div class="fill" id="batFill"></div></div>
+      <div class="sub" id="batText" style="margin:6px 0 12px">—</div>
+      <div class="stats">
+        <div class="stat"><div class="v" id="activity">—</div><div class="k">activity</div></div>
+        <div class="stat"><div class="v" id="cadence">—</div><div class="k">steps / min</div></div>
+        <div class="stat"><div class="v" id="yaw">—</div><div class="k">turning °/s</div></div>
+        <div class="stat"><div class="v" id="motionG">—</div><div class="k">motion (g)</div></div>
+        <div class="stat"><div class="v" id="temp">—</div><div class="k">chip °C</div></div>
+        <div class="stat"><div class="v" id="bias">—</div><div class="k">gyro bias °/s</div></div>
+      </div>
+      <div class="sub" id="lastEvent" style="margin-top:10px">No taps yet.</div>
     </div></div>
 
     <div class="card"><div class="body">
@@ -296,6 +314,7 @@
     $("ledName").textContent = LED_NAMES[s.led.state] || s.led.state;
     $("ledSub").textContent = s.led.pattern === "off" ? "light off" : `${s.led.color || "multicolour"}, ${s.led.pattern}`;
 
+    renderBand(s);
     $("steps").textContent = s.pose.steps;
     $("dist").textContent = ((s.pose.steps || 0) * s.tracking.step_length_m).toFixed(1);
     $("heading").textContent = Math.round(s.pose.heading) + "°";
@@ -340,6 +359,37 @@
       }));
     }
     drawMap(s);
+  }
+
+  function ago(t) {
+    const s = Math.max(0, Math.round(Date.now() / 1000 - t));
+    return s < 2 ? "just now" : s < 60 ? `${s} s ago` : `${Math.round(s / 60)} min ago`;
+  }
+
+  function renderBand(s) {
+    const b = s.band || {};
+    const has = Object.keys(b).length > 0 || (s.events || []).length > 0;
+    $("bandCard").hidden = !has;
+    if (!has) return;
+    if (b.info) $("bandInfo").textContent = `· ${b.info.name} · ${b.info.transport} · firmware ${b.info.firmware}`;
+    if (b.battery) {
+      const p = b.battery.percent;
+      const fill = $("batFill");
+      fill.style.width = Math.max(2, p) + "%";
+      fill.classList.toggle("low", p <= 15);
+      $("batText").textContent = `Battery ${p}% · ${(b.battery.millivolts / 1000).toFixed(2)} V · ${b.battery.state}`
+        + (p <= 15 && b.battery.state !== "charging" ? " · charge it before the demo" : "");
+    }
+    if (b.activity) {
+      $("activity").textContent = b.activity.state;
+      $("cadence").textContent = Math.round(b.activity.cadence || 0);
+      $("motionG").textContent = (b.activity.motion || 0).toFixed(2);
+    }
+    if (b.temperature) $("temp").textContent = b.temperature.celsius.toFixed(0);
+    $("yaw").textContent = s.tracking.running ? s.tracking.yaw_rate.toFixed(0) : "—";
+    $("bias").textContent = s.tracking.calibrated ? s.tracking.bias.toFixed(1) : "—";
+    const ev = (s.events || [])[0];
+    $("lastEvent").textContent = ev ? `Last gesture: ${ev.kind} (${ago(ev.time)})` : "No taps yet.";
   }
 
   async function send(text) {
