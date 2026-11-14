@@ -109,7 +109,7 @@ let VO = [
   { id: "vo4b", t: 25.0, d: 2.2, text: "Can’t hear? It glows, and it buzzes." },
   { id: "vo4c", t: 27.4, d: 2.0, text: "Can’t speak? Just tap and type." },
   { id: "vo5", t: 31.5, d: 1.2, text: "In the crowd." },
-  { id: "vo6", t: 36.6, d: 1.8, text: "In places you’ve never been." },
+  { id: "vo6", bottom: 120, t: 36.6, d: 1.8, text: "In places you’ve never been." },
   { id: "vo7", t: 42.6, d: 1.8, text: "And places no one else is." },
   { id: "vo8", t: 48.6, d: 5.0, text: "Across the country. Around the world. The way back is always with you." },
   { id: "vo9", t: 56.0, d: 2.0, text: "This is the Wayback Trail." },
@@ -564,17 +564,7 @@ function sCrowd(c, lt) {
   sceneTitle(c, lt, "Crowded.", "Retrace your steps when the crowd hides every landmark.");
 }
 
-// 5  Unfamiliar: desert | Antarctica split
-function dunes(c, x, y, w, h, lt, cols, seed) {
-  cols.forEach((col, n) => {
-    c.beginPath(); c.moveTo(x, y + h);
-    for (let px = 0; px <= w; px += 20) {
-      const yy = y + h * (.45 + n * .14) + Math.sin(px / (260 - n * 40) + seed + n + lt * .05) * (60 - n * 10) + Math.sin(px / 90 + n * 3) * 8;
-      c.lineTo(x + px, yy);
-    }
-    c.lineTo(x + w, y + h); c.closePath(); c.fillStyle = col; c.fill();
-  });
-}
+// 5  Unfamiliar: three slots, a blind, a Deaf and a non-speaking walker
 function footTrail(c, pts, k, col) {
   c.save(); c.setLineDash([4, 22]); c.lineCap = "round"; c.lineWidth = 9; c.strokeStyle = col; c.shadowColor = col; c.shadowBlur = 18; c.beginPath();
   const n = Math.max(1, Math.floor(k * 60));
@@ -582,33 +572,77 @@ function footTrail(c, pts, k, col) {
   c.stroke(); c.restore();
 }
 function sUnfamiliar(c, lt) {
-  const split = lerp(W, W / 2, eio(seg(lt, .4, 1.4)));
-  // desert
-  c.save(); c.beginPath(); c.rect(0, 0, split, H); c.clip();
-  let g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#ff9f6b"); g.addColorStop(.45, "#ffcf8a"); g.addColorStop(1, "#e7a35e");
-  c.fillStyle = g; c.fillRect(0, 0, W, H);
-  c.save(); c.globalCompositeOperation = "lighter"; glowBlob(c, 760, 330, 320, "#FFF4D6", 1); c.restore();
-  c.beginPath(); c.arc(760, 330, 70, 0, 7); c.fillStyle = "#fff7e0"; c.fill();
-  dunes(c, 0, 0, W, H, lt, ["#f0b46c", "#e39a52", "#c97c3c", "#a9612b"], 1);
-  footTrail(c, [[820, 1000], [700, 880], [560, 840], [460, 720], [300, 690]], eio(seg(lt, .8, 5.2)), "#ffffff");
-  walker(c, lerp(820, 300, eio(seg(lt, .8, 5.2))) , lerp(1000, 690, eio(seg(lt, .8, 5.2))) - 4, .5, lt * 6, { color: "#3b2414", flip: true });
-  pill(c, "Camp", 820, 1030, { align: "center", dot: C.purple, size: 22, fill: "rgba(28,28,30,.7)" });
-  c.restore();
-  // Antarctica
-  c.save(); c.beginPath(); c.rect(split, 0, W - split, H); c.clip();
-  g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#9fc9ee"); g.addColorStop(.5, "#e3f1fb"); g.addColorStop(1, "#ffffff");
-  c.fillStyle = g; c.fillRect(0, 0, W, H);
-  dunes(c, 0, 0, W, H, lt, ["#d6e9f7", "#c3dcef", "#e9f4fb", "#ffffff"], 4);
-  const r = rng(9); for (let n = 0; n < 160; n++) { const x = r() * W, y = (r() * H + lt * (60 + r() * 80)) % H; c.beginPath(); c.arc(x + Math.sin(lt + n) * 10, y, 2 + r() * 3, 0, 7); c.fillStyle = "rgba(255,255,255,.9)"; c.fill(); }
-  footTrail(c, [[1500, 1010], [1380, 900], [1480, 800], [1330, 720], [1220, 660]], eio(seg(lt, .8, 5.2)), C.blue);
-  walker(c, lerp(1500, 1220, eio(seg(lt, .8, 5.2))), lerp(1010, 660, eio(seg(lt, .8, 5.2))) - 4, .5, lt * 6, { color: "#1c2a3a", flip: true });
-  pill(c, "Research hut", 1500, 1040, { align: "center", dot: C.purple, size: 22, fill: "rgba(28,28,30,.7)" });
-  c.restore();
-  // divider
-  c.fillStyle = "rgba(255,255,255,.9)"; c.fillRect(split - 2, 0, 4, H);
-  text(c, "Desert", 110, H - 70, { size: 30, w: 700, color: "#3b2414", a: seg(lt, 1.2, 1.6), ls: 4 });
-  text(c, "Antarctica", W - 110, H - 70, { size: 30, w: 700, align: "right", color: "#1c2a3a", a: seg(lt, 1.2, 1.6), ls: 4 });
-  sceneTitle(c, lt, "Unfamiliar.", "No map of the place needed. It remembers the way you came.", null, true);
+  // Three slots: a blind walker, a Deaf walker and a non-speaking walker, each wearing the band
+  // in a place they don't know, each guided back a different way.
+  c.fillStyle = "#000"; c.fillRect(0, 0, W, H);
+  const slots = [
+    { label: "Blind", emoji: "🙈", col: C.blue, bg: ["#0b1a33", "#04070d"], at: .15 },
+    { label: "Deaf", emoji: "🙉", col: C.green, bg: ["#0b2a1a", "#030a06"], at: .45 },
+    { label: "Non-speaking", emoji: "🙊", col: C.purple, bg: ["#24103a", "#07030c"], at: .75 },
+  ];
+  const sw = W / 3;
+  slots.forEach((s, n) => {
+    const k = eio(seg(lt, s.at, s.at + .9));
+    if (k <= 0) return;
+    const x0 = n * sw, cx = x0 + sw / 2;
+    c.save();
+    c.beginPath(); c.rect(x0, H * (1 - k), sw, H * k); c.clip();
+    c.translate(0, (1 - k) * 160);
+    // backdrop: a street at night, receding floor lines
+    const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, s.bg[0]); g.addColorStop(1, s.bg[1]);
+    c.fillStyle = g; c.fillRect(x0, -200, sw, H + 400);
+    c.save(); c.globalCompositeOperation = "lighter"; glowBlob(c, cx, 420, 380, s.col, .35); c.restore();
+    const hz = 560; c.strokeStyle = "rgba(255,255,255,.07)"; c.lineWidth = 2;
+    for (let i = -6; i <= 6; i++) { c.beginPath(); c.moveTo(cx, hz); c.lineTo(cx + i * 150, H); c.stroke(); }
+    const off = (lt * .9) % 1;
+    for (let j = 0; j < 10; j++) { const z = (j + off) / 10, y = hz + Math.pow(z, 2.2) * (H - hz); c.globalAlpha = z * .8; c.beginPath(); c.moveTo(x0, y); c.lineTo(x0 + sw, y); c.stroke(); }
+    c.globalAlpha = 1;
+    // the remembered trail on the floor, leading back
+    c.save(); c.setLineDash([4, 20]); c.lineCap = "round"; c.lineWidth = 8; c.strokeStyle = s.col; c.shadowColor = s.col; c.shadowBlur = 16;
+    c.beginPath(); c.moveTo(cx - 20, H + 20); c.quadraticCurveTo(cx + 120, 860, cx + 30, 740); c.quadraticCurveTo(cx - 40, 640, cx + 10, hz + 10); c.stroke(); c.restore();
+    // the walker
+    const ph = lt * 6 + n * 1.1;
+    const wx = cx - 40, wy = 930;
+    const hand = walker(c, wx, wy, 1.75, ph, { band: true, color: "#ececf1" });
+    const head = [wx + 8 * 1.75, wy - 205 * 1.75];
+    if (n === 0) {
+      // white cane from the hand to the ground ahead
+      c.save(); c.lineCap = "round"; c.lineWidth = 7; c.strokeStyle = "#fff";
+      const tip = [hand[0] + 120 + Math.sin(ph) * 20, wy + 4];
+      c.beginPath(); c.moveTo(hand[0], hand[1]); c.lineTo(tip[0], tip[1]); c.stroke();
+      c.strokeStyle = C.red; c.beginPath(); c.moveTo(lerp(hand[0], tip[0], .85), lerp(hand[1], tip[1], .85)); c.lineTo(tip[0], tip[1]); c.stroke(); c.restore();
+      // earbud + sound cue from the side of the turn
+      c.beginPath(); c.arc(head[0] + 14, head[1] + 6, 8, 0, 7); c.fillStyle = "#fff"; c.fill();
+      for (let r = 0; r < 3; r++) { const kk = ((lt * 1.2) + r / 3) % 1; c.beginPath(); c.arc(head[0] + 14, head[1] + 6, 30 + kk * 110, -.9, .9); c.strokeStyle = hexA(C.blue, 1 - kk); c.lineWidth = 4; c.stroke(); }
+      pill(c, "“Turn left in 4 steps.”", cx, 380, { align: "center", dot: C.blue, size: 24 });
+      pill(c, "Spoken + left-ear cue", cx, 450, { align: "center", size: 20, color: "#d1d1d6", fill: "rgba(44,44,46,.6)" });
+    } else if (n === 1) {
+      // band LED blinking white for "turn now", phone buzzing in the pocket
+      const blink = Math.floor(lt * 3) % 2 === 0;
+      if (blink) { c.save(); c.globalCompositeOperation = "lighter"; glowBlob(c, hand[0], hand[1], 90, C.white, 1); c.restore(); }
+      const pk = [wx + 14, wy - 100 * 1.75];
+      const tt = (lt * 1000) % 1400;
+      if (tt < 800) for (let r = 0; r < 3; r++) { const kk = clamp(tt / 800 - r * .2); c.beginPath(); c.arc(pk[0], pk[1], 16 + kk * 80, 0, 7); c.strokeStyle = hexA(C.green, (1 - kk) * .8); c.lineWidth = 3; c.stroke(); }
+      pill(c, "Light + buzz: turn left", cx, 380, { align: "center", dot: C.white, size: 24 });
+      pill(c, "No sound needed", cx, 450, { align: "center", size: 20, color: "#d1d1d6", fill: "rgba(44,44,46,.6)" });
+    } else {
+      // phone in hand, typing the command
+      c.save(); c.translate(hand[0] + 6, hand[1] - 40); c.rotate(-.15);
+      rrect(c, -22, -40, 44, 80, 9); c.fillStyle = "#1c1c1e"; c.fill(); c.strokeStyle = "rgba(255,255,255,.5)"; c.lineWidth = 2; c.stroke();
+      rrect(c, -16, -32, 32, 56, 5); c.fillStyle = hexA(C.purple, .8); c.fill(); c.restore();
+      const typed = "take me back"; const nch = Math.floor(clamp((lt - 1.2) / 1.6) * typed.length);
+      glass(c, cx - 210, 345, 420, 70, 35);
+      text(c, typed.slice(0, nch) + (Math.floor(lt * 3) % 2 ? "|" : ""), cx - 180, 390, { size: 26, w: 500 });
+      pill(c, "Typed, no voice needed", cx, 450, { align: "center", size: 20, color: "#d1d1d6", fill: "rgba(44,44,46,.6)" });
+    }
+    // label
+    text(c, s.emoji + "  " + s.label, cx, H - 60, { size: 34, w: 700, align: "center", a: seg(lt, s.at + .5, s.at + 1) });
+    c.restore();
+  });
+  // dividers
+  c.fillStyle = "rgba(255,255,255,.85)";
+  [1, 2].forEach(i => { const k = eio(seg(lt, .4 + i * .2, 1.2 + i * .2)); c.fillRect(i * sw - 1.5, 0, 3, H * k); });
+  sceneTitle(c, lt, "Unfamiliar.", "Blind, Deaf or non-speaking: it finds the way you came.");
 }
 
 // 6  Isolated: out of the cave, down the mountain
@@ -803,7 +837,7 @@ function drawCaption(t) {
   words.forEach(w => { const tryL = line ? line + " " + w : w; if (ctx.measureText(tryL).width > (v.maxw || 1300) && line) { lines.push(line); line = w; } else line = tryL; });
   lines.push(line);
   const lh = 48, bw = Math.max(...lines.map(l => ctx.measureText(l).width)) + 56, bh = lines.length * lh + 26;
-  const y = H - 72 - bh;
+  const y = H - (v.bottom || 72) - bh;
   const cx = v.cx || W / 2;
   ctx.globalAlpha = a;
   rrect(ctx, cx - bw / 2, y, bw, bh, 22); ctx.fillStyle = "rgba(0,0,0,.62)"; ctx.fill();

@@ -19,7 +19,7 @@ renders frame-for-frame to video (`render.mjs`, using the pre-installed Playwrig
 | 0:13 | Walker, plus the app overlay drawing the path as they move, then guidance back with the turn-left buzz | push |
 | 0:22 | 🙈 can't see: it speaks · 🙉 can't hear: it glows and buzzes · 🙊 can't speak: tap and type | card fall-away |
 | 0:31 | Crowded: a plaza from above | iris |
-| 0:36 | Unfamiliar: desert / Antarctica split screen | blur dissolve |
+| 0:36 | Unfamiliar: three slots, a blind walker (cane, spoken + left-ear cue), a Deaf walker (light + buzz) and a non-speaking walker (typed command) | blur dissolve |
 | 0:42 | Isolated: out of a cave, down a mountain | push |
 | 0:48 | Across the nation (US dot map), then around the globe (WHO figures) | zoom |
 | 0:55 | Narrator: "This is the Wayback Trail." | blur dissolve |
@@ -36,7 +36,7 @@ renders frame-for-frame to video (`render.mjs`, using the pre-installed Playwrig
 - The band has no vibration motor. Haptics come from the paired iPhone or Apple Watch, and
   the end card says so. The 🙊 card shows the typed command box and the Talk/Stop buttons that
   really exist; it does not claim tap-coded commands.
-- The crowd, desert, Antarctica, cave and mountain scenes are illustrations. The end card
+- The crowd, three-walker, cave and mountain scenes are illustrations. The end card
   carries a dramatisation and "not a safety-critical system" line.
 - The global figures come from the WHO World Report on Vision (2019: 2.2 billion people with
   a vision impairment) and the World Report on Hearing (2021: 1.5 billion with hearing loss).
