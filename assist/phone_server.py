@@ -10,8 +10,12 @@ The phone's compass only works on an https:// page. Give the server a certificat
     python3 -m assist.phone_server --demo --cert cert.pem --key key.pem
 (see assist/README.md). Vibration works on Android Chrome over plain http too.
 
-The server listens on the local network, so it serves nothing but this one page, and the
-page and websocket need the random token in the printed address. Stdlib only.
+    python3 -m assist.phone_server --demo --webpush --cert cert.pem --key key.pem
+                                               notifications on iPhone / Apple Watch, no app
+
+The server listens on the local network, so it serves nothing but this one page (and its
+service worker and manifest), and every address needs the random token in the printed
+address. Stdlib only, except --webpush, which needs the cryptography package.
 """
 import argparse
 import http.server
@@ -85,17 +89,74 @@ class PhoneHub:
                 pass
 
 
-def make_handler(hub: PhoneHub, token: str):
+SERVICE_WORKER = """// Shows Web Push notifications from the laptop (assist/webpush.py).
+self.addEventListener('push', (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (e) { data = {}; }
+  const title = typeof data.title === 'string' ? data.title : 'Vexo';
+  const body = typeof data.body === 'string' ? data.body : '';
+  event.waitUntil(self.registration.showNotification(title, { body: body, tag: 'vexo', renotify: true }));
+});
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(self.clients.matchAll({ type: 'window' }).then((list) =>
+    list.length ? list[0].focus() : self.clients.openWindow(self.registration.scope)));
+});
+"""
+
+MAX_BODY = 4096
+
+
+def make_handler(hub: PhoneHub, token: str, push=None):
+    """push: an assist.webpush.WebPushSender, or None for no notifications."""
     class Handler(http.server.BaseHTTPRequestHandler):
         def log_message(self, *args):
             pass
 
-        def do_GET(self):
+        def _authorised(self):
             parts = urlsplit(self.path)
             if parse_qs(parts.query).get("k", [""])[0] != token:
                 self.send_error(403)
+                return None
+            return parts.path
+
+        def _reply(self, status, body=b"", kind="application/json"):
+            self.send_response(status)
+            self.send_header("Content-Type", kind)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_POST(self):
+            path = self._authorised()
+            if path is None:
                 return
-            if parts.path == "/ws" and self.headers.get("Upgrade", "").lower() == "websocket":
+            if path != "/push/subscribe" or push is None:
+                self.send_error(404)
+                return
+            try:
+                size = int(self.headers.get("Content-Length", "0"))
+            except ValueError:
+                size = -1
+            if not 0 < size <= MAX_BODY:
+                self.send_error(400)
+                return
+            try:
+                sub = json.loads(self.rfile.read(size).decode("utf-8"))
+            except ValueError:
+                sub = None
+            if not isinstance(sub, dict) or not push.subscribe(sub):
+                self.send_error(400)
+                return
+            print("    [PUSH] a phone subscribed to notifications.")
+            self._reply(204)
+
+        def do_GET(self):
+            path = self._authorised()
+            if path is None:
+                return
+            if path == "/ws" and self.headers.get("Upgrade", "").lower() == "websocket":
                 key = self.headers.get("Sec-WebSocket-Key", "")
                 self.send_response(101)
                 self.send_header("Upgrade", "websocket")
@@ -106,25 +167,35 @@ def make_handler(hub: PhoneHub, token: str):
                 self.close_connection = True
                 hub.serve_client(self.connection)
                 return
-            if parts.path not in ("/", "/phone.html"):
+            if path == "/push/key":
+                if push is None:
+                    self.send_error(404)
+                    return
+                self._reply(200, json.dumps({"key": push.vapid.public_key}).encode())
+                return
+            if path == "/sw.js":
+                self._reply(200, SERVICE_WORKER.encode(), "text/javascript; charset=utf-8")
+                return
+            if path == "/manifest.json":
+                manifest = {"name": "Vexo guidance", "short_name": "Vexo", "display": "standalone",
+                            "start_url": "/?k=" + token, "scope": "/",
+                            "background_color": "#000000", "theme_color": "#000000"}
+                self._reply(200, json.dumps(manifest).encode(), "application/manifest+json")
+                return
+            if path not in ("/", "/phone.html"):
                 self.send_error(404)
                 return
             with open(PAGE, "rb") as f:
-                body = f.read()
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
-            self.end_headers()
-            self.wfile.write(body)
+                body = f.read().replace(b"__TOKEN__", token.encode())
+            self._reply(200, body, "text/html; charset=utf-8")
 
     return Handler
 
 
-def start(hub: PhoneHub, host="0.0.0.0", port=8766, cert=None, key=None):
+def start(hub: PhoneHub, host="0.0.0.0", port=8766, cert=None, key=None, push=None, token=None):
     """Start the server on a background thread. Returns (server, address to open)."""
-    token = secrets.token_urlsafe(8)
-    server = http.server.ThreadingHTTPServer((host, port), make_handler(hub, token))
+    token = token or secrets.token_urlsafe(8)
+    server = http.server.ThreadingHTTPServer((host, port), make_handler(hub, token, push))
     server.daemon_threads = True
     scheme = "http"
     if cert and key:
@@ -135,6 +206,21 @@ def start(hub: PhoneHub, host="0.0.0.0", port=8766, cert=None, key=None):
     threading.Thread(target=server.serve_forever, daemon=True).start()
     shown = lan_address() if host in ("0.0.0.0", "") else host
     return server, "%s://%s:%d/?k=%s" % (scheme, shown, server.server_address[1], token)
+
+
+def saved_token(path: str) -> str:
+    """The page token kept across restarts, so a Home Screen icon keeps working."""
+    if os.path.exists(path):
+        with open(path) as f:
+            text = f.read().strip()
+        if len(text) >= 8:
+            return text
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    text = secrets.token_urlsafe(8)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(text)
+    return text
 
 
 def lan_address() -> str:
@@ -158,28 +244,42 @@ def main(argv=None):
     p.add_argument("--host", default="0.0.0.0", help="0.0.0.0 so the phone can reach it")
     p.add_argument("--cert", help="certificate file, for https (needed for the compass)")
     p.add_argument("--key", help="its private key file")
+    p.add_argument("--webpush", action="store_true",
+                   help="notifications to the page itself (iPhone: add it to the Home Screen); needs https")
+    p.add_argument("--push-contact", default=None,
+                   help="contact the push services may use, mailto: or https: (default %s)" % "a placeholder")
     p.add_argument("--ntfy", metavar="TOPIC",
-                   help="also notify an iPhone / Apple Watch through the ntfy app; 'new' makes a topic")
+                   help="also notify through the ntfy app; 'new' makes a topic")
     p.add_argument("--ntfy-server", default=None, help="your own ntfy server (default https://ntfy.sh)")
     a = p.parse_args(argv)
 
     from assist import notify
-    ntfy = None
+    ntfy = push = None
     if a.ntfy:
         topic = notify.new_topic() if a.ntfy == "new" else a.ntfy
         ntfy = notify.NtfySender(topic, a.ntfy_server or notify.DEFAULT_SERVER)
-        print("ntfy: in the ntfy app on the iPhone, subscribe to this topic (keep it private):\n\n"
+        print("ntfy: in the ntfy app, subscribe to this topic (keep it private):\n\n"
               "    %s\n\nOnly generic words are sent (see assist/notify.py).\n" % topic)
+    token = None
+    if a.webpush:
+        if not (a.cert and a.key):
+            p.error("--webpush needs --cert and --key: phones only allow notifications on https pages")
+        from assist import webpush
+        push = webpush.default_sender(a.push_contact or webpush.DEFAULT_CONTACT)
+        token = saved_token(os.path.join(webpush.PUSH_DIR, "page_token"))
 
     hub = PhoneHub()
-    server, url = start(hub, a.host, a.port, a.cert, a.key)
-    print("On an Android phone (same Wi-Fi), open:\n\n    %s\n\nthen tap Start. Ctrl-C to stop." % url)
-    if ntfy is None:
+    server, url = start(hub, a.host, a.port, a.cert, a.key, push=push, token=token)
+    print("On the phone (same Wi-Fi), open:\n\n    %s\n\nthen tap Start. Ctrl-C to stop." % url)
+    if push is not None:
+        print("iPhone: in Safari tap Share, then Add to Home Screen, open it from the Home Screen,\n"
+              "and tap Start to allow notifications. %d phone(s) subscribed so far." % len(push.subscriptions))
+    if ntfy is None and push is None:
         hub.connected.wait()
     else:
-        input("\nPress Enter to begin (no need to open the page on an iPhone). ")
+        input("\nPress Enter to begin, once the phone is set up. ")
     time.sleep(1.5)
-    send_all = notify.fan_out(hub.broadcast, ntfy)
+    send_all = notify.fan_out(hub.broadcast, ntfy, push)
     try:
         if a.learn:
             from assist.haptics import HAPTIC_PATTERNS, haptic_message

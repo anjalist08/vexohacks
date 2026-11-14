@@ -248,5 +248,124 @@ class NtfyTests(unittest.TestCase):
                           "Are you at a saved place? Double-tap for yes.", "You have arrived."])
 
 
+def phone_keys():
+    """A pretend phone's subscription keys, and a decrypt() that reads what it is sent (RFC 8291)."""
+    import hashlib as hl
+    import hmac as hm
+    import os as o
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    from assist.webpush import b64u
+    priv = ec.generate_private_key(ec.SECP256R1())
+    pub = priv.public_key().public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+    auth = o.urandom(16)
+
+    def hkdf(salt, ikm, info, n):
+        prk = hm.new(salt, ikm, hl.sha256).digest()
+        return hm.new(prk, info + b"\x01", hl.sha256).digest()[:n]
+
+    def decrypt(body):
+        salt, idlen = body[:16], body[20]
+        as_pub, data = body[21:21 + idlen], body[21 + idlen:]
+        shared = priv.exchange(ec.ECDH(), ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), as_pub))
+        ikm = hkdf(auth, shared, b"WebPush: info\x00" + pub + as_pub, 32)
+        cek = hkdf(salt, ikm, b"Content-Encoding: aes128gcm\x00", 16)
+        nonce = hkdf(salt, ikm, b"Content-Encoding: nonce\x00", 12)
+        plain = AESGCM(cek).decrypt(nonce, data, None)
+        assert plain.endswith(b"\x02")
+        return plain[:-1]
+
+    sub = {"endpoint": "https://web.push.apple.com/QGuQyavXut", "keys": {"p256dh": b64u(pub), "auth": b64u(auth)}}
+    return sub, decrypt
+
+
+class WebPushTests(unittest.TestCase):
+    def setUp(self):
+        try:
+            import cryptography  # noqa: F401
+        except ImportError:
+            self.skipTest("cryptography is not installed")
+
+    def test_phone_can_decrypt_the_message(self):
+        from assist.webpush import encrypt
+        sub, decrypt = phone_keys()
+        body = encrypt(b'{"title": "Arrived"}', **sub["keys"])
+        self.assertEqual(int.from_bytes(body[16:20], "big"), 4096)
+        self.assertEqual(decrypt(body), b'{"title": "Arrived"}')
+
+    def test_vapid_signature_checks_out(self):
+        import base64
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
+        from assist.webpush import Vapid, unb64u
+        v = Vapid(contact="mailto:noreply@example.com")
+        header = v.header("https://web.push.apple.com/abc", now=1000.0)
+        token, k = header[len("vapid t="):].split(", k=")
+        head, claims, sig = token.split(".")
+        self.assertEqual(json.loads(unb64u(claims)),
+                         {"aud": "https://web.push.apple.com", "exp": 1000 + 12 * 3600, "sub": "mailto:noreply@example.com"})
+        pub = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), unb64u(k))
+        raw = unb64u(sig)
+        pub.verify(encode_dss_signature(int.from_bytes(raw[:32], "big"), int.from_bytes(raw[32:], "big")),
+                   (head + "." + claims).encode(), ec.ECDSA(hashes.SHA256()))   # raises if wrong
+
+    def test_sender_sends_generic_words_and_drops_gone_phones(self):
+        import tempfile
+        from assist.haptics import haptic_message
+        from assist.webpush import Vapid, WebPushSender
+        sub, decrypt = phone_keys()
+        calls, status = [], [201]
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "subs.json")
+            send = WebPushSender(Vapid(), path, post=lambda u, b, h: calls.append((u, b, h)) or status[0],
+                                 background=False)
+            self.assertFalse(send.subscribe({"endpoint": "http://not-https", "keys": sub["keys"]}))
+            self.assertTrue(send.subscribe(sub))
+            self.assertEqual(oct(os.stat(path).st_mode & 0o777), "0o600")
+            self.assertFalse(send(haptic_message("turn_left", "Turn left")))
+            self.assertTrue(send(haptic_message("confirm_prompt", "Are you at the elevator?")))
+            url, body, headers = calls[0]
+            self.assertEqual(url, sub["endpoint"])
+            self.assertEqual(headers["Content-Encoding"], "aes128gcm")
+            message = json.loads(decrypt(body))
+            self.assertEqual(message["title"], "Check")
+            self.assertNotIn("elevator", json.dumps(message))
+            status[0] = 410
+            send(haptic_message("arrived"))
+            self.assertEqual(send.subscriptions, [])
+
+    def test_server_push_routes(self):
+        from urllib.error import HTTPError
+        from urllib.request import Request, urlopen
+        from assist.phone_server import PhoneHub, start
+        from assist.webpush import Vapid, WebPushSender
+        sub, _ = phone_keys()
+        push = WebPushSender(Vapid(), None, post=lambda *a: 201, background=False)
+        server, url = start(PhoneHub(), "127.0.0.1", 0, push=push, token="test-token-1")
+        base = "http://127.0.0.1:%d" % server.server_address[1]
+        try:
+            page = urlopen(base + "/?k=test-token-1", timeout=5).read()
+            self.assertIn(b"/manifest.json?k=test-token-1", page)
+            manifest = json.loads(urlopen(base + "/manifest.json?k=test-token-1", timeout=5).read())
+            self.assertEqual((manifest["display"], manifest["start_url"]), ("standalone", "/?k=test-token-1"))
+            self.assertIn(b"showNotification", urlopen(base + "/sw.js?k=test-token-1", timeout=5).read())
+            key = json.loads(urlopen(base + "/push/key?k=test-token-1", timeout=5).read())["key"]
+            self.assertEqual(key, push.vapid.public_key)
+
+            def post(data, k="test-token-1"):
+                return urlopen(Request(base + "/push/subscribe?k=" + k, data=data,
+                                       headers={"Content-Type": "application/json"}), timeout=5).status
+            self.assertEqual(post(json.dumps(sub).encode()), 204)
+            self.assertEqual(len(push.subscriptions), 1)
+            for bad, k in ((b"{}", "test-token-1"), (b"x" * 5000, "test-token-1"), (json.dumps(sub).encode(), "no")):
+                with self.assertRaises(HTTPError):
+                    post(bad, k)
+        finally:
+            server.shutdown()
+            server.server_close()
+
+
 if __name__ == "__main__":
     unittest.main()

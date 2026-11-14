@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vexo guidance</title>
+<link rel="manifest" href="/manifest.json?k=__TOKEN__">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Vexo">
 <style>
   :root { --bg: #ffffff; --fg: #111111; --muted: #555555; --btn: #111111; --btn-fg: #ffffff; --ok: #0a7d32; --warn: #a33a00; }
   @media (prefers-color-scheme: dark) {
@@ -36,11 +39,16 @@
   const statusEl = document.getElementById('status');
   const token = new URLSearchParams(location.search).get('k') || '';
   const canVibrate = typeof navigator.vibrate === 'function';
-  const state = { link: 'not connected', compass: 'off', vibrate: canVibrate ? 'on' : 'not on this phone' };
+  const state = { link: 'not connected', compass: 'off', vibrate: canVibrate ? 'on' : 'not on this phone',
+                  notify: 'off' };
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = window.navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
   let ws = null, started = false, lastSent = 0, retry = 1000;
 
   function showStatus() {
-    statusEl.textContent = 'Link: ' + state.link + ' · Vibration: ' + state.vibrate + ' · Compass: ' + state.compass;
+    statusEl.textContent = 'Link: ' + state.link + ' · Vibration: ' + state.vibrate + ' · Compass: ' +
+      state.compass + ' · Notifications: ' + state.notify;
   }
 
   function connect() {
@@ -88,15 +96,44 @@
     }
   }
 
+  // Notifications (Web Push): the only way an iPhone web page can buzz the phone and the Watch.
+  async function startNotifications() {
+    if (!window.isSecureContext) { state.notify = 'needs an https page'; return; }
+    if (isIOS && !standalone) { state.notify = 'add this page to the Home Screen first'; return; }
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+      state.notify = 'not on this phone'; return;
+    }
+    try {
+      const keyRes = await fetch('/push/key?k=' + encodeURIComponent(token));
+      if (!keyRes.ok) { state.notify = 'off on the laptop'; return; }
+      if (await Notification.requestPermission() !== 'granted') { state.notify = 'not allowed'; return; }
+      const reg = await navigator.serviceWorker.register('/sw.js?k=' + encodeURIComponent(token));
+      await navigator.serviceWorker.ready;
+      const key = (await keyRes.json()).key;
+      const raw = atob(key.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - key.length % 4) % 4));
+      const appKey = Uint8Array.from(raw, (c) => c.charCodeAt(0));
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: appKey });
+      const res = await fetch('/push/subscribe?k=' + encodeURIComponent(token), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sub) });
+      state.notify = res.ok ? 'on' : 'refused by the laptop';
+    } catch (err) {
+      state.notify = 'could not start';
+    }
+  }
+
   big.addEventListener('click', async () => {
     if (!started) {
       started = true;
       if (canVibrate) navigator.vibrate(80);        // the first tap also unlocks vibration
+      await startNotifications();             // first: iOS asks for permission only right after a tap
       await startCompass();
       connect();
       big.textContent = 'Yes';
       big.setAttribute('aria-label', 'Yes, I am there');
       sayEl.textContent = canVibrate ? 'Ready. Keep this page open.'
+        : state.notify === 'on' ? 'Ready. Key moments arrive as notifications, even with the screen off.'
+        : isIOS && !standalone ? 'To get notifications on this iPhone: tap Share, then Add to Home Screen, and open it from there.'
         : 'Ready. This phone cannot vibrate from a web page, so cues are spoken and shown here.';
       showStatus();
       return;

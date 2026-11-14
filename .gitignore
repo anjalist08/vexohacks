@@ -11,3 +11,6 @@ __pycache__/
 
 # Certificates for the phone page (assist/)
 *.pem
+
+# Web Push keys, subscriptions and page token (assist/webpush.py)
+data/push/

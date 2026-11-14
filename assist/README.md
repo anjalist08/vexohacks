@@ -28,10 +28,40 @@ announce. Light-only mode sends no vibration.
 **Android Chrome only.** iPhone browsers do not let a web page vibrate; there the page
 still shows and announces every cue, and the spoken audio carries the guidance.
 
-### iPhone and Apple Watch: notifications through ntfy
+### iPhone and Apple Watch: notifications, no app needed (Web Push)
 
-No app of our own is needed. A notification buzzes the iPhone, or taps the Apple Watch
-when the phone is locked. Install the free **ntfy** app on the iPhone, then:
+iPhone web pages cannot vibrate, but since iOS 16.4 a web page on the Home Screen may
+send notifications. A notification buzzes the iPhone and, when the phone is locked,
+should tap a paired Apple Watch like other iPhone notifications. Android Chrome takes the
+same notifications without the Home Screen step, even with the screen off.
+
+1. Laptop, once: `python3 -m pip install cryptography`.
+2. The phone must **trust** the page's certificate (a "Not secure" page cannot ask for
+   notifications). With [mkcert](https://github.com/FiloSottile/mkcert) on the laptop:
+
+       mkcert -install
+       mkcert -cert-file cert.pem -key-file key.pem <the laptop's Wi-Fi address>
+
+   Send `rootCA.pem` (in the folder `mkcert -CAROOT` prints) to the iPhone, install it in
+   Settings, General, VPN & Device Management, then switch it on in Settings, General,
+   About, Certificate Trust Settings. Remove it after the event.
+3. Run:
+
+       python3 -m assist.phone_server --demo --webpush --cert cert.pem --key key.pem
+
+4. iPhone: open the printed address in Safari, tap Share, **Add to Home Screen**, open it
+   from the Home Screen and tap **Start**, then **Allow** notifications. Press Enter on the
+   laptop.
+
+The page address and keys stay the same across restarts (in `data/push/`, kept out of
+git), so the Home Screen icon keeps working while the laptop's Wi-Fi address stays the
+same. The push service (Apple's or Google's) carries each message encrypted and cannot
+read it, and only the generic words below are sent. `--push-contact` sets the contact
+address the push services see; the default is a placeholder.
+
+### Or: the ntfy app
+
+Simpler setup (no certificate), but it needs the free **ntfy** app on the iPhone:
 
     python3 -m assist.phone_server --demo --ntfy new     # prints a random topic to subscribe to
 
