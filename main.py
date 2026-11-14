@@ -5,6 +5,8 @@
     python3 main.py --band            live band (set BAND in config.py first) + voice loop + live map page
     python3 main.py --band --usb      the same over the USB cable
     python3 main.py --bridge          the band connects through Chrome (click "Connect band" on the map page)
+                                      or through the iPhone app (add --phone)
+    Add --phone to let a phone on the same Wi-Fi open the phone page or the iPhone app (secret-token link).
 
 Typed commands use the keyword fallback, e.g. "start route", "remember this as the elevator",
 "where was the elevator", "take me back to the start", "I'm at the elevator", "quit".
@@ -339,7 +341,7 @@ def main(argv=None):
     g.add_argument("--replay", metavar="FILE", help="replay a logged walk CSV")
     g.add_argument("--band", action="store_true", help="use the team's band (config.BAND)")
     g.add_argument("--bridge", action="store_true",
-                   help="the band connects through Chrome's Bluetooth (click Connect band on the map page)")
+                   help="the band connects through Chrome's or the iPhone app's Bluetooth, not this laptop's")
     p.add_argument("--ws-port", type=int, default=8765, help="WebSocket port for the map page (default: 8765)")
     p.add_argument("--http-port", type=int, default=8000, help="HTTP port for the map page (default: 8000)")
     p.add_argument("--usb", action="store_true", help="with --band: use the USB cable instead of Bluetooth")

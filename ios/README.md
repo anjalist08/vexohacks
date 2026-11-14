@@ -1,5 +1,17 @@
 # Wayback for iPhone
 
+**Two ways to use it:**
+- **iPhone only (no laptop):** tap **Use this iPhone only** on the Guide tab. The phone connects to
+  Vexo-HACK-80 over Bluetooth and does everything itself:
+  - tracking (a Swift port of the team's wrist tracker)
+  - places and the route graph
+  - guidance, buzzing, and the band's light
+  - voice: double-tap → band mic → Deepgram → Gemini 4 → ElevenLabs, or the iPhone's own voice
+  Add your keys once in **Band → Keys**. They are kept in the iOS Keychain. Without keys, the
+  buttons, typing and keyword commands still work, and the iPhone speaks with its own voice.
+- **With the laptop:** paste the `--phone` link (below). The laptop app does the work, and the
+  phone shows it and buzzes.
+
 Native iPhone app that turns the laptop app's guidance into **real iPhone haptics** (Core Haptics).
 Web pages cannot vibrate on iPhone, so this app does it. The laptop app still runs the band,
 tracking, routes and voice; the phone receives buzz cues over Wi-Fi.
