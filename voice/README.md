@@ -1,25 +1,26 @@
 # voice/ — owner: @voice
 
-Implemented modules on the baseline branch:
+Implemented modules on branch `voice-pipecat`:
 
 - `led_states.py`: LED vocabulary (`STATES`, `LedCue`, `turn_now_period`) and `LedController`.
-- `gemini_client.py`: Pure-stdlib HTTPS Gemini 4 tool-calling client (`choose_tool`, `build_function_declarations`, `GEMINI_4_MODELS`, `RECOMMENDED_GEMINI_4_MODEL`). Sends `VEXO_GEMINI_API_KEY` via `x-goog-api-key` header (never in URL query strings), blocks HTTP redirects, declares native `functionDeclarations` with `toolConfig.functionCallingConfig.mode = "ANY"`, and omits `temperature`, `topP` / `top_p`, `topK` / `top_k`, and legacy `thinkingBudget` per the Gemini 4 builder guide.
-- `elevenlabs_tts.py`: Pure-stdlib HTTPS ElevenLabs TTS client (`ElevenLabsSpeaker`, `speak`, `synthesize_mp3`). Sends `VEXO_ELEVENLABS_API_KEY` via `xi-api-key` header to `config.ELEVENLABS_VOICE_ID` (`SAz9YHcvj6GT2YYXdXww`), plays audio on the laptop speaker (`afplay` on macOS), cleans up temporary MP3 files in `finally:`, and falls back to macOS `say` and terminal `[SAY]` output.
-- `loop.py`: Baseline tap-to-talk controller (`VoiceLoop`).
+- `gemini_client.py`: Pure-stdlib HTTPS Gemini 4 tool-calling client (`choose_tool`, `build_function_declarations`, `GEMINI_4_MODELS`, `RECOMMENDED_GEMINI_4_MODEL`).
+- `elevenlabs_tts.py`: Pure-stdlib HTTPS ElevenLabs TTS client (`ElevenLabsSpeaker`, `speak`, `synthesize_mp3`).
+- `loop.py`: Baseline tap-to-talk controller (`VoiceLoop`, zero third-party packages required).
+- `pipecat_loop.py`: Pipecat pipeline port (`PipecatVoiceLoop`, `BandOpusFeeder`, `PipecatToolBridge`) for the **Deepgram on Pipecat** sponsor track.
 
 ## Gemini 4 model configuration
 
-`config.GEMINI_MODEL` is left `None` in `config.py` for the team to set. Verified Gemini 4 model IDs (`voice.GEMINI_4_MODELS`):
+`config.GEMINI_MODEL` stays `None` in `config.py` for the team to set. Verified Gemini 4 model IDs (`voice.GEMINI_4_MODELS`):
 
 - `GEMINI_MODEL = "gemini-4-hydrogen"` — **recommended** fast interactive workhorse for tap-to-talk tool calls
 - `GEMINI_MODEL = "gemini-4-argon"` — balanced Gemini 4 model
 - `GEMINI_MODEL = "gemini-4-carbon"` — frontier reasoning Gemini 4 model
 
-Per Gemini 4 API rules, requests never include custom `temperature`, `top_p`, `top_k`, or legacy `thinking_budget` (and `"minimal"` thinking level is rejected).
+Per Gemini 4 API rules, neither `gemini_client.py` nor `pipecat_loop.py` ever passes `temperature`, `top_p`, `top_k`, or legacy `thinking_budget` (and `"minimal"` thinking level is rejected). Both declare native function tools from `interfaces.TOOLS`.
 
-## 1. Baseline loop
+## 1. Baseline loop (`voice/loop.py`)
 
-Wiring with `SpatialMemoryApp` and `tracker.band_source`:
+Runs with Python 3.9+ stdlib only (plus the kit's `speech.py` for live band transcription):
 
 ```python
 from voice import LedController, VoiceLoop
@@ -33,16 +34,29 @@ led.band = band
 voice_loop.start_background()
 ```
 
-One turn (`VoiceLoop.run_turn`):
+## 2. Pipecat port (`voice/pipecat_loop.py`)
 
-1. `on_double_tap()` sets an internal `threading.Event` and returns immediately so it never blocks the band's event-dispatch thread (`vexo-open-kit/AGENTS.md`). Extra taps while a turn is running are ignored.
-2. The worker thread records `config.LISTEN_SECONDS` on the band via Deepgram (`speech.listen`). While `audio=True`, the band locks its LED solid blue.
-3. `audio=False` is guaranteed before any tool or LED call runs.
-4. `choose_tool` sends the transcript, native `interfaces.TOOLS` `functionDeclarations`, and `app.landmark_summary()` to `config.GEMINI_MODEL`. If Gemini is unconfigured or unavailable, `VoiceLoop` falls back to `app.keyword_command(words)`.
-5. `app.call_tool(name, args)` validates arguments and calls `app.output(result)`: `ElevenLabsSpeaker` speaks `result.say` (with `say` / `print` fallback) and `LedController` shows `result.led` now that the microphone is off.
+Optional install (isolated in `requirements-pipecat.txt` so `main` stays dependency-free):
 
-Keys: `keys.prepare()` runs at start-up before any SDK or kit `speech` import, stripping generic environment variables (`GEMINI_API_KEY`, `GOOGLE_API_KEY`, `OPENAI_API_KEY`, `ELEVENLABS_API_KEY`) and passing explicit `VEXO_*` keys only. Tap-to-talk only: never always-on listening.
+```bash
+python3 -m pip install -r requirements-pipecat.txt
+```
 
-## 2. Pipecat port (separate `voice-pipecat` branch)
+Pipeline stages:
 
-For the Deepgram sponsor track (`DeepgramSTTService` -> `GoogleLLMService` with `interfaces.TOOLS` -> `ElevenLabsTTSService` -> local audio out, supporting both laptop microphone input and Vexo band Opus decoded via `vexo_open.audio.PcmDecoder`), see branch `voice-pipecat`.
+```text
+BandOpusFeeder (Opus -> PcmDecoder -> 16 kHz mono InputAudioRawFrame)
+  OR LocalAudioTransport.input() (laptop mic, 16 kHz mono)
+  -> DeepgramSTTService(api_key=keys.get("deepgram"))
+  -> GoogleLLMService(api_key=keys.get("gemini"), model=config.GEMINI_MODEL, tools=interfaces.TOOLS)
+  -> PipecatToolBridge (stops band mic first -> app.call_tool -> LED + TextFrame)
+  -> ElevenLabsTTSService(api_key=keys.get("elevenlabs"), voice_id=config.ELEVENLABS_VOICE_ID)
+  -> LocalAudioTransport.output() (laptop speaker)
+```
+
+Input modes:
+
+1. **`input_source="laptop_mic"`**: Uses `LocalAudioTransportParams(audio_in_enabled=True, audio_out_enabled=True, audio_in_sample_rate=16000)`.
+2. **`input_source="band"`**: Pre-loads `vexo_open.audio.PcmDecoder()` *before* switching `band.configure(audio=True)` (`vexo-open-kit/docs/speech.md`), decodes incoming 20 ms Opus packets to 16 kHz 16-bit mono PCM `InputAudioRawFrame`s during each double-tap window (`config.LISTEN_SECONDS`), and guarantees `band.configure(audio=False)` before any tool call updates the band LED.
+
+Keys: `keys.prepare()` runs before any SDK import; only `VEXO_GEMINI_API_KEY`, `VEXO_DEEPGRAM_API_KEY`, and `VEXO_ELEVENLABS_API_KEY` are read and passed explicitly.

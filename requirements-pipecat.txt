@@ -1,0 +1,4 @@
+# Optional dependencies for the `voice-pipecat` branch (Deepgram on Pipecat sponsor track).
+# The `main` / `worker/voice` baseline requires zero pip packages for unit tests and `--sim`.
+pipecat-ai[deepgram,google,elevenlabs,local]>=0.0.50
+av
