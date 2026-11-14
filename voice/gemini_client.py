@@ -23,6 +23,27 @@ from interfaces import TOOLS
 API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 DEFAULT_TIMEOUT = 30.0
 
+# Verified Gemini 4 model IDs from the official hackathon builder guide.
+# `config.GEMINI_MODEL` stays `None` in `config.py` for the team to set explicitly.
+GEMINI_4_MODELS = {
+    "gemini-4-hydrogen": "Fast interactive workhorse recommended for tap-to-talk tool calling",
+    "gemini-4-argon": "Balanced Gemini 4 model",
+    "gemini-4-carbon": "Frontier reasoning Gemini 4 model",
+}
+RECOMMENDED_GEMINI_4_MODEL = "gemini-4-hydrogen"
+
+# Gemini 4 prohibits custom sampling controls and legacy thinking budgets.
+FORBIDDEN_GENERATION_KEYS = (
+    "temperature",
+    "topP",
+    "top_p",
+    "topK",
+    "top_k",
+    "thinkingBudget",
+    "thinking_budget",
+)
+VALID_THINKING_LEVELS = ("low", "medium", "high")
+
 
 class GeminiError(Exception):
     """Raised when Gemini configuration, transport, or tool selection fails safely."""
@@ -103,9 +124,16 @@ def build_request_payload(
     landmark_summary: str,
     route_active: bool = False,
     tools: Optional[List[dict]] = None,
+    thinking_level: Optional[str] = None,
 ) -> dict:
-    """Construct the JSON body for Gemini `generateContent`."""
-    return {
+    """Construct the JSON body for Gemini 4 `generateContent`.
+
+    Never sends `temperature`, `topP`/`top_p`, `topK`/`top_k`, or `thinkingBudget`:
+    Gemini 4 models prohibit custom sampling parameters and legacy thinking budgets,
+    and `gemini-4-hydrogen` rejects `'minimal'` thinking level. Omits `generationConfig`
+    by default so Gemini 4 defaults apply cleanly.
+    """
+    payload: Dict[str, object] = {
         "systemInstruction": {
             "parts": [{"text": build_system_instruction(landmark_summary, route_active=route_active)}],
         },
@@ -119,12 +147,26 @@ def build_request_payload(
             "functionCallingConfig": {"mode": "ANY"},
         },
     }
+    if thinking_level is not None:
+        level = str(thinking_level).strip().lower()
+        if level not in VALID_THINKING_LEVELS:
+            raise GeminiError(
+                "Invalid Gemini 4 thinking_level %r; allowed values are %s."
+                % (thinking_level, ", ".join(VALID_THINKING_LEVELS))
+            )
+        payload["generationConfig"] = {
+            "thinkingConfig": {"thinkingLevel": level},
+        }
+    return payload
 
 
 def _resolve_model(model: Optional[str]) -> str:
     chosen = model if model is not None else config.GEMINI_MODEL
     if not chosen or not str(chosen).strip():
-        raise GeminiError("GEMINI_MODEL is not set in config.py.")
+        raise GeminiError(
+            "GEMINI_MODEL is not set in config.py (recommended Gemini 4 model: '%s')."
+            % RECOMMENDED_GEMINI_4_MODEL
+        )
     cleaned = str(chosen).strip()
     if cleaned.startswith("models/"):
         cleaned = cleaned[len("models/"):]

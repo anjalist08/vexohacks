@@ -25,10 +25,13 @@ from tracker.pdr import PathTracker  # noqa: E402
 from voice import (  # noqa: E402
     ElevenLabsError,
     ElevenLabsSpeaker,
+    GEMINI_4_MODELS,
     GeminiError,
     LedController,
+    RECOMMENDED_GEMINI_4_MODEL,
     VoiceLoop,
     build_function_declarations,
+    build_request_payload,
     choose_tool,
     synthesize_mp3,
 )
@@ -158,7 +161,7 @@ class GeminiClientTests(unittest.TestCase):
                 "remember this as the elevator near the blue sign",
                 landmark_summary="lm1=entrance",
                 route_active=True,
-                model="gemini-4-flash-preview",
+                model="gemini-4-hydrogen",
                 opener=opener,
             )
 
@@ -168,19 +171,55 @@ class GeminiClientTests(unittest.TestCase):
         req, _ = opener.requests[0]
         self.assertEqual(
             req.full_url,
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-4-flash-preview:generateContent",
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-4-hydrogen:generateContent",
         )
         self.assertNotIn(secret, req.full_url)
         self.assertNotIn("key=", req.full_url)
         self.assertEqual(_header_ci(req, "x-goog-api-key"), secret)
 
-        sent = json.loads(req.data.decode("utf-8"))
+        sent_raw = req.data.decode("utf-8")
+        sent = json.loads(sent_raw)
         self.assertEqual(sent["toolConfig"]["functionCallingConfig"]["mode"], "ANY")
         self.assertIn("lm1=entrance", sent["systemInstruction"]["parts"][0]["text"])
         self.assertEqual(
             len(sent["tools"][0]["functionDeclarations"]),
             len(TOOLS),
         )
+        for forbidden in (
+            "temperature",
+            "topP",
+            "top_p",
+            "topK",
+            "top_k",
+            "thinkingBudget",
+            "thinking_budget",
+        ):
+            self.assertNotIn(forbidden, sent)
+            self.assertNotIn(forbidden, sent_raw)
+
+    def test_gemini_4_models_and_thinking_level_rules(self):
+        self.assertEqual(RECOMMENDED_GEMINI_4_MODEL, "gemini-4-hydrogen")
+        self.assertEqual(
+            set(GEMINI_4_MODELS),
+            {"gemini-4-hydrogen", "gemini-4-argon", "gemini-4-carbon"},
+        )
+        default_payload = build_request_payload("start route", landmark_summary="none")
+        self.assertNotIn("generationConfig", default_payload)
+        for forbidden in (
+            "temperature",
+            "topP",
+            "top_p",
+            "topK",
+            "top_k",
+            "thinkingBudget",
+            "thinking_budget",
+        ):
+            self.assertNotIn(forbidden, json.dumps(default_payload))
+        # "minimal" is prohibited on gemini-4-hydrogen
+        with self.assertRaises(GeminiError):
+            build_request_payload("start route", landmark_summary="none", thinking_level="minimal")
+        low_payload = build_request_payload("start route", landmark_summary="none", thinking_level="low")
+        self.assertEqual(low_payload["generationConfig"]["thinkingConfig"]["thinkingLevel"], "low")
 
     def test_choose_tool_fails_when_model_unset(self):
         self.assertIsNone(config.GEMINI_MODEL)
@@ -203,7 +242,7 @@ class GeminiClientTests(unittest.TestCase):
             choose_tool(
                 "where is the entrance",
                 landmark_summary="lm1=entrance",
-                model="gemini-4-flash-preview",
+                model="gemini-4-hydrogen",
                 api_key=secret,
                 opener=opener,
             )
@@ -225,7 +264,7 @@ class GeminiClientTests(unittest.TestCase):
         with mock.patch.dict(os.environ, env, clear=True), \
                 mock.patch.object(keys, "ENV_FILE", "/nonexistent/.env"):
             with self.assertRaises(GeminiError):
-                choose_tool("start route", landmark_summary="none", model="gemini-4-flash-preview")
+                choose_tool("start route", landmark_summary="none", model="gemini-4-hydrogen")
             self.assertNotIn("GEMINI_API_KEY", os.environ)
             self.assertNotIn("GOOGLE_API_KEY", os.environ)
             self.assertNotIn("OPENAI_API_KEY", os.environ)
@@ -432,7 +471,7 @@ class VoiceLoopTests(unittest.TestCase):
                 text,
                 landmark_summary=landmark_summary,
                 route_active=route_active,
-                model="gemini-4-flash-preview",
+                model="gemini-4-hydrogen",
                 api_key="test-vexo-gm",
                 opener=gemini_opener,
             ),
@@ -561,7 +600,7 @@ class VoiceLoopTests(unittest.TestCase):
         self.assertIn("entrance", r1.say)
 
         # Case 2: GEMINI_MODEL set, VEXO_GEMINI_API_KEY missing -> keyword fallback
-        with mock.patch.object(config, "GEMINI_MODEL", "gemini-4-flash-preview"), \
+        with mock.patch.object(config, "GEMINI_MODEL", "gemini-4-hydrogen"), \
                 mock.patch.dict(os.environ, {}, clear=True), \
                 mock.patch.object(keys, "ENV_FILE", "/nonexistent/.env"):
             r2 = voice_loop.run_turn(say_text="remember this as the stairs")
@@ -580,7 +619,7 @@ class VoiceLoopTests(unittest.TestCase):
                 text,
                 landmark_summary=landmark_summary,
                 route_active=route_active,
-                model="gemini-4-flash-preview",
+                model="gemini-4-hydrogen",
                 api_key="test-vexo-gm",
                 opener=CapturingOpener(fail_500),
             ),
