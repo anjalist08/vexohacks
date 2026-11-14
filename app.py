@@ -38,8 +38,13 @@ class SpatialMemoryApp:
         self.navigator: Optional[GuidanceSession] = None
         self.band_mirror = band_mirror
         self.led_state = "idle"
+        self._last_pose: Optional[PoseSample] = None
         self._event_listeners: List[Callable[[dict], None]] = []
         tracker.on_sample(self.on_pose)
+
+    @property
+    def current_pose(self) -> PoseSample:
+        return self._last_pose if self._last_pose is not None else self.tracker.pose
 
     # --- event bus for live UI / WebSocket ---------------------------------------
     def on_event(self, fn: Callable[[dict], None]) -> None:
@@ -98,12 +103,12 @@ class SpatialMemoryApp:
     # --- live pose handling & step-by-step guidance ------------------------------
     def on_pose(self, sample: PoseSample) -> None:
         """Handle each PoseSample emitted by the tracker."""
-        navigating_active = self.navigator is not None and self.navigator.active
-        if not navigating_active:
+        self._last_pose = sample
+        if self.navigator is None:
             self.store.add_point(sample)
         self._emit({"type": "point", **sample.to_dict()})
 
-        if navigating_active and self.navigator is not None:
+        if self.navigator is not None and self.navigator.active:
             upd = self.navigator.update(sample)
             if upd.say:
                 self._say_text(upd.say)
@@ -140,6 +145,7 @@ class SpatialMemoryApp:
         self.guidance = []
         self.navigator = None
         first = self.tracker.start(self.clock())
+        self._last_pose = first
         route = self.store.start_route(title, first)
         self._emit({"type": "reset", "route": route.id, "title": route.title})
         self._emit({"type": "point", **first.to_dict()})
@@ -206,13 +212,14 @@ class SpatialMemoryApp:
                 return ToolResult(False, "The %s is on an earlier route, so I can't guide you there." % lm.label,
                                   "uncertain")
             index, name = lm.point_index, lm.label
+        pose = self.current_pose
         self._cancel_guidance(emit_event=False)
         self.navigator = self.store.plan_return_session(
             index,
             name,
-            self.tracker.pose.heading_deg,
+            pose.heading_deg,
             self.tracker.step_length_m,
-            from_pose=self.tracker.pose,
+            from_pose=pose,
         )
         self.guidance = self.navigator.instructions
         self._emit({"type": "guidance", **self.navigator.to_dict()})
@@ -225,6 +232,7 @@ class SpatialMemoryApp:
         if lm is None or self.store.route_of(lm) is not self.store.current:
             return ToolResult(False, "I don't know that place on this route.", "uncertain")
         self._cancel_guidance()
+        self.navigator = None
         p = self.store.current.points[lm.point_index]
         self.tracker.reanchor(p.x_m, p.y_m, p.heading_deg, self.clock())
         return ToolResult(True, "Got it, you're at the %s." % lm.label, "recording")
@@ -245,6 +253,7 @@ class SpatialMemoryApp:
         self._cancel_guidance(emit_event=False)
         self.guidance = []
         self.navigator = None
+        self._last_pose = None
         self.tracker.stop()
         self.store.delete_all()
         if self.band_mirror is not None:

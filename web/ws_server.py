@@ -276,26 +276,30 @@ class MapWebSocketServer:
         self.broadcast(event)
 
     # --- connection lifecycle ----------------------------------------------------
+    def attach_socket(self, conn: socket.socket) -> None:
+        """Spawn a client handler thread for an already-accepted stream socket."""
+        if not self._running:
+            try:
+                conn.close()
+            except OSError:
+                pass
+            return
+        t = threading.Thread(
+            target=self._handle_client,
+            args=(conn,),
+            name="map-ws-client",
+            daemon=True,
+        )
+        self._client_threads = [th for th in self._client_threads if th.is_alive()] + [t]
+        t.start()
+
     def _accept_loop(self) -> None:
         while self._running and self._server_sock is not None:
             try:
                 conn, _ = self._server_sock.accept()
             except OSError:
                 break
-            if not self._running:
-                try:
-                    conn.close()
-                except OSError:
-                    pass
-                break
-            t = threading.Thread(
-                target=self._handle_client,
-                args=(conn,),
-                name="map-ws-client",
-                daemon=True,
-            )
-            self._client_threads = [th for th in self._client_threads if th.is_alive()] + [t]
-            t.start()
+            self.attach_socket(conn)
 
     def _perform_handshake(self, sock: socket.socket) -> bool:
         sock.settimeout(5.0)
@@ -391,7 +395,7 @@ class MapWebSocketServer:
                 })
 
             if self.app.navigator is not None and self.app.navigator.active and self.app.tracker.points:
-                msgs.append({"type": "point", **self.app.tracker.pose.to_dict()})
+                msgs.append({"type": "point", **self.app.current_pose.to_dict()})
 
         return msgs
 
