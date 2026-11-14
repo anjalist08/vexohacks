@@ -16,6 +16,9 @@ struct BandView: View {
         ("lost", "Stop: lost", "•••••"),
     ]
 
+    @State private var keyText: [String: String] = [:]
+    @State private var savedNote = ""
+
     private var linkUp: Bool { guide.bandLinkStatus == "connected" || guide.bandLinkStatus == "reconnected" }
 
     var body: some View {
@@ -37,15 +40,20 @@ struct BandView: View {
                         .font(.footnote)
                     Button("Disconnect the band from this iPhone", role: .destructive) { guide.disconnectBandFromPhone() }
                         .font(.footnote)
+                    Text("Bluetooth stays connected when you unplug a charging cable, and reconnects by itself if the link drops.")
+                        .font(.footnote).foregroundStyle(.secondary)
                 } else {
                     Button { guide.connectBandFromPhone() } label: {
                         Label("Connect band (iPhone Bluetooth)", systemImage: "antenna.radiowaves.left.and.right")
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(guide.link != .on)
-                    Text(guide.bridgeWanted
+                    Text(guide.phoneOnly ? "iPhone-only mode: tap Connect band, then double-tap the band." : guide.bridgeWanted
                          ? "The laptop is waiting for this iPhone to carry the band. Double-tap the band, then connect."
                          : "To let this iPhone carry the band, run the laptop with: python3 main.py --bridge --phone")
+                        .font(.footnote).foregroundStyle(.secondary)
+                    Label("Tip: plug the band into this iPhone (USB-C) to charge it while you connect. Plugging in can wake it so it's findable for 60 s. Then unplug: the Bluetooth link stays. (iPhones can't use the band's USB data link, so the connection itself is Bluetooth.)",
+                          systemImage: "cable.connector")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             } header: { Text("Connection") }
@@ -101,7 +109,27 @@ struct BandView: View {
             } header: { Text("Buzz patterns") }
 
             Section {
-                Button("Disconnect from the laptop", role: .destructive) { guide.disconnect() }
+                ForEach(KeyStore.names, id: \.self) { name in
+                    HStack {
+                        Text(name.capitalized).frame(width: 90, alignment: .leading)
+                        SecureField(KeyStore.get(name) == nil ? "paste key" : "saved ••••", text: Binding(
+                            get: { keyText[name] ?? "" }, set: { keyText[name] = $0 }))
+                            .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    }
+                }
+                Button("Save keys") {
+                    for (name, v) in keyText where !v.isEmpty { KeyStore.set(name, v) }
+                    keyText = [:]
+                    savedNote = "Saved in this iPhone's Keychain."
+                }
+                Text(savedNote.isEmpty
+                     ? "For iPhone-only mode: Deepgram (speech to text), Gemini (understanding), ElevenLabs (voice; optional, else the iPhone's voice). Kept in the Keychain, never shown or sent anywhere else."
+                     : savedNote)
+                    .font(.footnote).foregroundStyle(.secondary)
+            } header: { Text("Keys (iPhone only)") }
+
+            Section {
+                Button(guide.phoneOnly ? "Stop iPhone-only mode" : "Disconnect from the laptop", role: .destructive) { guide.disconnect() }
             }
         }
     }

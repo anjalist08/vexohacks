@@ -17,6 +17,9 @@
 		397A0AF0EEB95BC9C812013F /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 314BFE7A6DD5109288CB5C30 /* MapView.swift */; };
 		AE58C59F32C6E85FD411A366 /* PlacesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DA13F547FFE6F85CD104376 /* PlacesView.swift */; };
 		BFDEF167C6F405E63C01E420 /* BandView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38AC5E76CA6A09EBA4BE9488 /* BandView.swift */; };
+		7E0C922EFEA8805AF3C07E06 /* PhoneTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCA5491E161A0C07586E31CB /* PhoneTracker.swift */; };
+		34BF756129940AE90E3581BB /* PhoneBrain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CFDF69B1B150710BB10FE8E /* PhoneBrain.swift */; };
+		723D1538883BD22DD5A59DD7 /* PhoneVoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = C55B6F043A7106569636D887 /* PhoneVoice.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -32,6 +35,9 @@
 		314BFE7A6DD5109288CB5C30 /* MapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapView.swift; sourceTree = "<group>"; };
 		0DA13F547FFE6F85CD104376 /* PlacesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacesView.swift; sourceTree = "<group>"; };
 		38AC5E76CA6A09EBA4BE9488 /* BandView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BandView.swift; sourceTree = "<group>"; };
+		DCA5491E161A0C07586E31CB /* PhoneTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Standalone/PhoneTracker.swift; sourceTree = "<group>"; };
+		6CFDF69B1B150710BB10FE8E /* PhoneBrain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Standalone/PhoneBrain.swift; sourceTree = "<group>"; };
+		C55B6F043A7106569636D887 /* PhoneVoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Standalone/PhoneVoice.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -53,6 +59,9 @@
 				EB8E280B369C429FAC49C1F7 /* Guide.swift */,
 				66E34AA2AD0A62AA3E9B748B /* Haptics.swift */,
 				CA16490661EC2385FA081002 /* BandLink.swift */,
+				C55B6F043A7106569636D887 /* PhoneVoice.swift */,
+				6CFDF69B1B150710BB10FE8E /* PhoneBrain.swift */,
+				DCA5491E161A0C07586E31CB /* PhoneTracker.swift */,
 				38AC5E76CA6A09EBA4BE9488 /* BandView.swift */,
 				0DA13F547FFE6F85CD104376 /* PlacesView.swift */,
 				314BFE7A6DD5109288CB5C30 /* MapView.swift */,
@@ -148,6 +157,9 @@
 				1D1BE4C0C81582670FC7B6F4 /* Guide.swift in Sources */,
 				D0503919F3E1E595D73B8A24 /* Haptics.swift in Sources */,
 				CE16679CCB45DE9163C9EF4E /* BandLink.swift in Sources */,
+				723D1538883BD22DD5A59DD7 /* PhoneVoice.swift in Sources */,
+				34BF756129940AE90E3581BB /* PhoneBrain.swift in Sources */,
+				7E0C922EFEA8805AF3C07E06 /* PhoneTracker.swift in Sources */,
 				BFDEF167C6F405E63C01E420 /* BandView.swift in Sources */,
 				AE58C59F32C6E85FD411A366 /* PlacesView.swift in Sources */,
 				397A0AF0EEB95BC9C812013F /* MapView.swift in Sources */,

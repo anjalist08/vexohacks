@@ -33,6 +33,7 @@ struct GuideView: View {
     }
 
     private var linkText: String {
+        if guide.phoneOnly { return "iPhone only" }
         switch guide.link {
         case .off: return "not connected"
         case .connecting: return "connecting…"
@@ -59,6 +60,14 @@ struct GuideView: View {
                 }
 
                 if guide.link != .on {
+                    Button { guide.startPhoneOnly() } label: {
+                        Label("Use this iPhone only (no laptop)", systemImage: "iphone.radiowaves.left.and.right")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    Text("The iPhone connects to \(BandConfig.name), tracks, guides, listens and speaks. Add your keys in the Band tab for voice.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                    Text("Or use the laptop:").font(.footnote.bold()).frame(maxWidth: .infinity, alignment: .leading)
                     VStack(alignment: .leading, spacing: 8) {
                         Text("1. On the laptop: python3 main.py --band --phone  (or --bridge --phone to let this iPhone carry the band)")
                             .font(.footnote).foregroundStyle(.secondary)

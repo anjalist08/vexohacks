@@ -62,6 +62,10 @@ final class Guide: ObservableObject {
     @Published var ledState = "idle"
     @Published var lastReply = ""
     @Published var bridgeWanted = false     // the laptop runs --bridge and wants this phone to carry the band
+    @Published var phoneOnly = false        // iPhone only: no laptop; the phone tracks, guides, listens and speaks
+
+    lazy var brain: PhoneBrain = { let b = PhoneBrain(); b.guide = self; return b }()
+    lazy var voiceEngine: PhoneVoice = PhoneVoice(guide: self)
 
     private var band: BandLink?             // made only when the laptop asks the phone to carry the band
 
@@ -96,7 +100,21 @@ final class Guide: ObservableObject {
         UIApplication.shared.isIdleTimerDisabled = true      // haptics only play while the app is on screen
     }
 
+    /// Run everything on this iPhone: connect the band over Bluetooth, track, guide, listen and speak here.
+    func startPhoneOnly() {
+        phoneOnly = true
+        _ = brain
+        link = .on
+        big = "Ready"
+        sub = "Double-tap the band and say \"start route\"."
+        UIApplication.shared.isIdleTimerDisabled = true      // haptics only play while the app is on screen
+        carryBand()
+    }
+
+    func runOnBand(_ cmd: [String: Any]) { band?.run(command: cmd) }
+
     func disconnect() {
+        phoneOnly = false
         band?.stop()
         band = nil
         bandStatus = ""
@@ -140,6 +158,7 @@ final class Guide: ObservableObject {
     }
 
     func talk() {
+        if phoneOnly { voiceEngine.doubleTap(); return }
         task?.send(.string(#"{"type":"talk"}"#)) { _ in }
     }
 
@@ -154,6 +173,11 @@ final class Guide: ObservableObject {
     func command(_ text: String) {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty else { return }
+        if phoneOnly {
+            lastReply = "You typed: \(t)"
+            Task { await voiceEngine.understand(t) }
+            return
+        }
         send(["type": "command", "text": t])
         lastReply = "Sent: \(t)"
     }
@@ -174,7 +198,12 @@ final class Guide: ObservableObject {
         guard band == nil else { return }
         let link = BandLink()
         link.onStatus = { [weak self] text in Task { @MainActor in self?.bandStatus = text } }
-        link.onMessage = { [weak self] msg in Task { @MainActor in self?.send(msg) } }
+        link.onMessage = { [weak self] msg in
+            Task { @MainActor in
+                guard let self else { return }
+                if self.phoneOnly { self.brain.band(msg) } else { self.send(msg) }   // phone brain, or the laptop
+            }
+        }
         band = link
         link.start()
     }
@@ -197,7 +226,7 @@ final class Guide: ObservableObject {
                 if buzzing { haptics.play(cue) }
             }
         case "haptic_hint":
-            show(hint: m)
+            showHint(m)
         case "voice":
             let s = m["state"] as? String ?? ""
             switch s {
@@ -277,7 +306,7 @@ final class Guide: ObservableObject {
         }
     }
 
-    private func show(hint m: [String: Any]) {
+    func showHint(_ m: [String: Any]) {
         let target = (m["target"] as? String).map { "the " + $0 } ?? "the place"
         if m["arrived"] as? Bool == true {
             state = "done"; big = "Arrived"; sub = "You reached \(target)."; return
