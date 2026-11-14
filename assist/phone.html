@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vexo guidance</title>
+<style>
+  :root { --bg: #ffffff; --fg: #111111; --muted: #555555; --btn: #111111; --btn-fg: #ffffff; --ok: #0a7d32; --warn: #a33a00; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #000000; --fg: #f2f2f2; --muted: #b0b0b0; --btn: #f2f2f2; --btn-fg: #000000; --ok: #4cd37a; --warn: #ff9a5c; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+    font: 20px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { display: flex; flex-direction: column; gap: 16px; min-height: 100%; padding: 16px; }
+  #say { font-size: 30px; font-weight: 700; min-height: 3.2em; }
+  #big { flex: 1; min-height: 45vh; width: 100%; border: 0; border-radius: 20px;
+    background: var(--btn); color: var(--btn-fg); font-size: 40px; font-weight: 800; }
+  #big:focus-visible { outline: 6px solid var(--ok); outline-offset: 4px; }
+  #status { color: var(--muted); font-size: 16px; }
+  .ok { color: var(--ok); } .warn { color: var(--warn); }
+</style>
+</head>
+<body>
+<main>
+  <div id="say" role="status" aria-live="assertive">Tap Start to begin.</div>
+  <button id="big" type="button">Start</button>
+  <div id="status" aria-live="polite"></div>
+</main>
+<script>
+  // Guidance cues from the laptop arrive as {"type":"haptic","cue","pattern","say"}.
+  // The phone vibrates the pattern and shows the line (screen readers announce it).
+  // It sends back {"type":"compass","heading","t"} and {"type":"confirm"}.
+  const sayEl = document.getElementById('say');
+  const big = document.getElementById('big');
+  const statusEl = document.getElementById('status');
+  const token = new URLSearchParams(location.search).get('k') || '';
+  const canVibrate = typeof navigator.vibrate === 'function';
+  const state = { link: 'not connected', compass: 'off', vibrate: canVibrate ? 'on' : 'not on this phone' };
+  let ws = null, started = false, lastSent = 0, retry = 1000;
+
+  function showStatus() {
+    statusEl.textContent = 'Link: ' + state.link + ' · Vibration: ' + state.vibrate + ' · Compass: ' + state.compass;
+  }
+
+  function connect() {
+    const scheme = location.protocol === 'https:' ? 'wss://' : 'ws://';
+    ws = new WebSocket(scheme + location.host + '/ws?k=' + encodeURIComponent(token));
+    ws.onopen = () => { state.link = 'connected'; retry = 1000; showStatus(); };
+    ws.onclose = () => { state.link = 'reconnecting'; showStatus(); setTimeout(connect, retry); retry = Math.min(retry * 2, 10000); };
+    ws.onmessage = (e) => {
+      let msg;
+      try { msg = JSON.parse(e.data); } catch (err) { return; }
+      if (msg.type !== 'haptic') return;
+      if (canVibrate && Array.isArray(msg.pattern)) navigator.vibrate(msg.pattern.map(Number));
+      if (msg.say) sayEl.textContent = msg.say;       // textContent only, never innerHTML
+    };
+  }
+
+  function sendHeading(heading) {
+    const now = Date.now();
+    if (heading == null || isNaN(heading) || now - lastSent < 200) return;   // 5 readings a second
+    lastSent = now;
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'compass', heading: heading, t: now }));
+    if (state.compass !== 'on') { state.compass = 'on'; showStatus(); }
+  }
+
+  async function startCompass() {
+    if (!window.isSecureContext) { state.compass = 'needs an https page'; return; }
+    if ('ondeviceorientationabsolute' in window) {                // Android Chrome
+      window.addEventListener('deviceorientationabsolute', (e) => {
+        if (e.alpha != null) sendHeading((360 - e.alpha) % 360);
+      });
+      state.compass = 'waiting';
+    } else if (typeof DeviceOrientationEvent !== 'undefined') {    // iPhone Safari
+      try {
+        if (typeof DeviceOrientationEvent.requestPermission === 'function' &&
+            await DeviceOrientationEvent.requestPermission() !== 'granted') {
+          state.compass = 'permission refused'; return;
+        }
+      } catch (err) { state.compass = 'permission refused'; return; }
+      window.addEventListener('deviceorientation', (e) => {
+        if (typeof e.webkitCompassHeading === 'number') sendHeading(e.webkitCompassHeading);
+      });
+      state.compass = 'waiting';
+    } else {
+      state.compass = 'not on this phone';
+    }
+  }
+
+  big.addEventListener('click', async () => {
+    if (!started) {
+      started = true;
+      if (canVibrate) navigator.vibrate(80);        // the first tap also unlocks vibration
+      await startCompass();
+      connect();
+      big.textContent = 'Yes';
+      big.setAttribute('aria-label', 'Yes, I am there');
+      sayEl.textContent = canVibrate ? 'Ready. Keep this page open.'
+        : 'Ready. This phone cannot vibrate from a web page, so cues are spoken and shown here.';
+      showStatus();
+      return;
+    }
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'confirm' }));
+    if (canVibrate) navigator.vibrate(60);
+  });
+  showStatus();
+</script>
+</body>
+</html>

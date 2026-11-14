@@ -8,3 +8,6 @@ __pycache__/
 .pytest_cache/
 .DS_Store
 .venv/
+
+# Certificates for the phone page (assist/)
+*.pem

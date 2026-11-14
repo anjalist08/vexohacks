@@ -47,8 +47,9 @@ can connect at a time. Copy `.env.example` to `.env` for the API keys. `.env` is
   in the same orientation, on every run.
 - **Drift.** There is no compass on the band, so the gyro heading drifts. Turn snapping and
   re-anchoring at landmarks limit it. Short routes work best.
-- **No haptics.** The band has no vibration motor and no speaker. Guidance is audio from the
-  laptop plus LED colours. Blind and low-vision users rely on the audio.
+- **No haptics on the band.** The band has no vibration motor and no speaker. Guidance is audio from the
+  laptop plus LED colours. Blind and low-vision users rely on the audio. An Android phone can add
+  vibration cues ([assist/](assist/README.md)); iPhone browsers cannot vibrate.
 - **Carry assumption.** The laptop travels with the walker, since Bluetooth reaches about 10 m.
 - **Placeholder tuning.** Step length and the turn thresholds in [config.py](config.py) are not
   calibrated until a measured walk. We quote no accuracy numbers that we did not measure.
@@ -60,6 +61,7 @@ can connect at a time. Copy `.env.example` to `.env` for the API keys. `.env` is
     config.py, interfaces.py   shared settings and data shapes
     app.py, main.py            the tools and the entry point
     tracker/  store/  voice/  web/
+    assist/                    phone vibration, phone compass, arrival prompts (see assist/README.md)
     vexo-open-kit/             the band's kit (MIT), unchanged
     docs/                      earlier ideas and the original iPhone plan
     AGENTS.md                  rules for AI coding agents
