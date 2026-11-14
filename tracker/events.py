@@ -16,7 +16,8 @@ import random
 import time
 from typing import Iterable, List, Optional, Sequence, Tuple, Union
 
-COLUMNS = ["kind", "t", "ax", "ay", "az", "gx", "gy", "gz", "steps", "state"]
+COLUMNS = ["kind", "t", "ax", "ay", "az", "gx", "gy", "gz", "steps", "state", "heading_deg", "distance_m"]
+# kind "phone": the iPhone app's phone_motion (heading_deg, and steps + distance_m when known)
 Event = Tuple[str, float, dict]
 
 
@@ -27,6 +28,8 @@ def feed(tracker, events: Iterable[Event]):
             tracker.on_motion(t, f["ax"], f["ay"], f["az"], f["gx"], f["gy"], f["gz"])
         elif kind == "activity":
             tracker.on_activity(t, f["steps"], f["state"])
+        elif kind == "phone" and hasattr(tracker, "on_phone"):
+            tracker.on_phone(dict(f, type="phone_motion"))
 
 
 class SampleLogger:
@@ -65,6 +68,11 @@ def read_log(path: str) -> List[Event]:
                 events.append(("motion", t, {k: float(row[k]) for k in ("ax", "ay", "az", "gx", "gy", "gz")}))
             elif row["kind"] == "activity":
                 events.append(("activity", t, {"steps": int(row["steps"]), "state": row["state"]}))
+            elif row["kind"] == "phone" and row.get("heading_deg"):
+                f = {"heading_deg": float(row["heading_deg"])}
+                if row.get("steps") and row.get("distance_m"):
+                    f["steps"], f["distance_m"] = int(row["steps"]), float(row["distance_m"])
+                events.append(("phone", t, f))
     return events
 
 
