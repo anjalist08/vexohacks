@@ -27,10 +27,20 @@ final class BandLink: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     /// This iPhone's identifier for the team's band, saved after its number was checked, so the
     /// app can reconnect to it directly (no scan, no double-tap while it can be found).
     private static let savedKey = "waybackBandIdentifier"
-    private static let reconnect: [String: Any] = {
-        if #available(iOS 17.0, *) { return [CBConnectPeripheralOptionEnableAutoReconnect: true] }
+
+    /// iOS 17 can keep the link by itself (auto-reconnect). iOS refuses that option ("One or more
+    /// parameters were invalid") unless the delegate also has the isReconnecting disconnect callback,
+    /// which is below. If iOS still refuses it, we drop the option and connect the plain way.
+    private var useAutoReconnect = true
+    private var connectOptions: [String: Any] {
+        if useAutoReconnect, #available(iOS 17.0, *) { return [CBConnectPeripheralOptionEnableAutoReconnect: true] }
         return [:]
-    }()
+    }
+
+    /// A connect found by scanning must reach "verified" (GET_INFO answered) in this many seconds,
+    /// or we let go and scan again, like the kit's connectSeconds.
+    private static let connectSeconds = 12.0
+    private var attempt = 0
 
     func start() {
         wantConnected = true
@@ -40,25 +50,31 @@ final class BandLink: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
 
     /// Ask iOS to connect to the remembered band. The request never times out: it completes as
     /// soon as the band can be found (after a double-tap, a restart, or for 2 min after a drop).
+    /// We scan at the same time, so a band found by scanning takes over if this one stays silent.
     private func connectRemembered() {
         guard wantConnected, central.state == .poweredOn, peripheral == nil,
               let s = UserDefaults.standard.string(forKey: BandLink.savedKey), let id = UUID(uuidString: s),
               let p = central.retrievePeripherals(withIdentifiers: [id]).first else { return }
         peripheral = p
         p.delegate = self
-        onStatus?("Reconnecting to \(BandConfig.name)…")
-        central.connect(p, options: BandLink.reconnect)
+        onStatus?("Waiting for \(BandConfig.name)… double-tap the band")
+        central.connect(p, options: connectOptions)
     }
 
     func stop() {
         wantConnected = false
+        attempt += 1
         central.stopScan()
         if let p = peripheral { central.cancelPeripheralConnection(p) }
     }
 
+    /// Scan unless a link is up or being set up. A pending remembered connect does not stop the scan.
     private func scanIfReady() {
-        guard wantConnected, central.state == .poweredOn, peripheral == nil else { return }
-        onStatus?("Looking for \(BandConfig.name)… double-tap the band")
+        guard wantConnected, central.state == .poweredOn, !verified,
+              peripheral == nil || peripheral?.state == .disconnected || peripheral?.state == .connecting
+                && UserDefaults.standard.string(forKey: BandLink.savedKey) == peripheral?.identifier.uuidString
+        else { return }
+        if peripheral == nil { onStatus?("Looking for \(BandConfig.name)… double-tap the band") }
         central.scanForPeripherals(withServices: [CBUUID(string: BandProtocol.service)], options: nil)
     }
 
@@ -80,36 +96,81 @@ final class BandLink: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         // Exact name, or the number in the advertising packet. Never any other band.
         guard name == BandConfig.name || numberInAdvert == BandConfig.number else { return }
         c.stopScan()
+        if let old = peripheral, old !== p { c.cancelPeripheralConnection(old) }   // a stale remembered request
         peripheral = p
         p.delegate = self
-        onStatus?("Connecting to \(BandConfig.name)…")
-        c.connect(p, options: BandLink.reconnect)
+        onStatus?("Found \(BandConfig.name), connecting…")
+        c.connect(p, options: connectOptions)
+        watchdog(p)
+    }
+
+    /// If the link is not verified in time, let the band go and look again (it is still findable).
+    private func watchdog(_ p: CBPeripheral) {
+        attempt += 1
+        let mine = attempt
+        DispatchQueue.main.asyncAfter(deadline: .now() + BandLink.connectSeconds) { [weak self] in
+            guard let self, self.attempt == mine, self.wantConnected, !self.verified, self.peripheral === p else { return }
+            self.onStatus?("\(BandConfig.name) did not answer. Trying again… (double-tap the band if its light is off)")
+            self.central.cancelPeripheralConnection(p)
+            self.reset()
+            self.scanIfReady()
+        }
     }
 
     func centralManager(_ c: CBCentralManager, didConnect p: CBPeripheral) {
+        c.stopScan()
+        peripheral = p
+        p.delegate = self
+        onStatus?("Connected, checking it is band \(BandConfig.number)…")
         p.discoverServices([CBUUID(string: BandProtocol.service)])
+        if attempt == 0 || !verified { watchdog(p) }
     }
 
     func centralManager(_ c: CBCentralManager, didFailToConnect p: CBPeripheral, error: Error?) {
-        reset(); onStatus?("Could not connect. Double-tap the band and try again."); scanIfReady()
+        let why = error?.localizedDescription ?? "no reason given"
+        if useAutoReconnect, (error as? CBError)?.code == .invalidParameters || why.lowercased().contains("invalid") {
+            useAutoReconnect = false                       // this iOS refuses auto-reconnect: connect plainly
+            onStatus?("Connecting to \(BandConfig.name)…")
+            c.connect(p, options: connectOptions)
+            return
+        }
+        reset()
+        onStatus?("Could not connect (\(why)). Double-tap the band and try again.")
+        scanIfReady()
+    }
+
+    /// iOS 17 and later call this one (it must exist for auto-reconnect to be allowed).
+    func centralManager(_ c: CBCentralManager, didDisconnectPeripheral p: CBPeripheral, timestamp: CFAbsoluteTime,
+                        isReconnecting: Bool, error: Error?) {
+        if isReconnecting && wantConnected {
+            let was = verified
+            reset()
+            peripheral = p                                 // iOS is reconnecting to it by itself
+            if was { onMessage?(["type": "band_status", "status": "reconnecting"]) }
+            onStatus?("Link lost, reconnecting to \(BandConfig.name)…")
+            return
+        }
+        lostLink(c, p)
     }
 
     func centralManager(_ c: CBCentralManager, didDisconnectPeripheral p: CBPeripheral, error: Error?) {
+        lostLink(c, p)
+    }
+
+    private func lostLink(_ c: CBCentralManager, _ p: CBPeripheral) {
         let was = verified
         reset()
         if was { onMessage?(["type": "band_status", "status": "reconnecting"]) }
-        guard wantConnected else { onStatus?("Disconnected"); return }
+        guard wantConnected else { return }               // stopped on purpose, or refused: keep that message
         // Keep the link: the band can be found again for 2 minutes after a drop. Reconnect to the
         // same band directly; it is checked again (GET_INFO) and set up again when it answers.
         if was {
             peripheral = p
             p.delegate = self
             onStatus?("Link lost, reconnecting to \(BandConfig.name)…")
-            c.connect(p, options: BandLink.reconnect)
-        } else {
-            onStatus?("Disconnected")
-            scanIfReady()
+            c.connect(p, options: connectOptions)
         }
+        scanIfReady()
     }
 
     private func reset() {
@@ -118,21 +179,36 @@ final class BandLink: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
 
     // MARK: services
 
+    private func failed(_ step: String, _ error: Error?, _ p: CBPeripheral) {
+        onStatus?("\(step) failed: \(error?.localizedDescription ?? "not found"). Trying again…")
+        central.cancelPeripheralConnection(p)              // the disconnect callback scans again
+    }
+
     func peripheral(_ p: CBPeripheral, didDiscoverServices error: Error?) {
-        guard let s = p.services?.first(where: { $0.uuid == CBUUID(string: BandProtocol.service) }) else { return }
+        guard error == nil, let s = p.services?.first(where: { $0.uuid == CBUUID(string: BandProtocol.service) }) else {
+            return failed("Finding the band's service", error, p)
+        }
         p.discoverCharacteristics([CBUUID(string: BandProtocol.rx), CBUUID(string: BandProtocol.tx)], for: s)
     }
 
     func peripheral(_ p: CBPeripheral, didDiscoverCharacteristicsFor s: CBService, error: Error?) {
-        for ch in s.characteristics ?? [] {
-            if ch.uuid == CBUUID(string: BandProtocol.rx) { rxChar = ch }
-            if ch.uuid == CBUUID(string: BandProtocol.tx) { p.setNotifyValue(true, for: ch) }   // before any command
+        let chars = s.characteristics ?? []
+        guard error == nil, let rx = chars.first(where: { $0.uuid == CBUUID(string: BandProtocol.rx) }),
+              let tx = chars.first(where: { $0.uuid == CBUUID(string: BandProtocol.tx) }) else {
+            return failed("Reading the band's channels", error, p)
         }
+        rxChar = rx
+        p.setNotifyValue(true, for: tx)                    // listen before the first command
     }
 
     func peripheral(_ p: CBPeripheral, didUpdateNotificationStateFor ch: CBCharacteristic, error: Error?) {
-        guard ch.uuid == CBUUID(string: BandProtocol.tx), ch.isNotifying else { return }
+        guard ch.uuid == CBUUID(string: BandProtocol.tx) else { return }
+        guard error == nil, ch.isNotifying else { return failed("Listening to the band", error, p) }
         send(BandProtocol.Op.getInfo)            // first: is this really our band?
+    }
+
+    func peripheral(_ p: CBPeripheral, didWriteValueFor ch: CBCharacteristic, error: Error?) {
+        if let error, !verified { onStatus?("Sending to the band failed: \(error.localizedDescription)") }
     }
 
     // MARK: commands, one at a time (contract: wait for each response, 2 s timeout)
