@@ -85,7 +85,7 @@ def synthetic_walk(legs: Sequence[Tuple[int, str]] = ((20, "left"), (15, None)),
     rng = random.Random(seed)
     phases = [("still", still_s, 0.0)]
     for steps, turn in legs:
-        phases.append(("walk", steps / (cadence / 60.0), 0.0))
+        phases.append(("walk", steps / (cadence / 60.0), steps))
         if turn:
             deg = {"left": 90.0, "right": -90.0, "around": 180.0}[turn]   # +yaw = counter-clockwise
             phases.append(("turn", turn_s, deg))
@@ -97,8 +97,11 @@ def synthetic_walk(legs: Sequence[Tuple[int, str]] = ((20, "left"), (15, None)),
     next_activity = t0
     dt = 1.0 / motion_hz
     step_hz = cadence / 60.0
+    target_steps = 0
     for kind, length, deg in phases:
         n = max(1, int(round(length * motion_hz)))
+        if kind == "walk":
+            target_steps += deg       # for walk phases, the third value is the step count
         for i in range(n):
             s = i * dt
             walking = kind == "walk"
@@ -113,7 +116,9 @@ def synthetic_walk(legs: Sequence[Tuple[int, str]] = ((20, "left"), (15, None)),
                 "gx": 20.0 * swing + rng.gauss(0, noise_dps), "gy": 15.0 * swing + rng.gauss(0, noise_dps),
                 "gz": gz}))
             if walking:
-                cum_steps += step_hz * dt
+                cum_steps = min(cum_steps + step_hz * dt, target_steps)
+                if i == n - 1:
+                    cum_steps = target_steps     # every step of the leg is counted
             if t >= next_activity:
                 events.append(("activity", t, {"steps": start_steps + int(cum_steps),
                                                "state": "walk" if walking else "still"}))
