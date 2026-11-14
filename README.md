@@ -24,7 +24,7 @@ Built at VexoHacks, 14 Nov 2026. Plan: [VexoHacks_Plan_Wearable_Spatial_Memory.m
 | **Voice, eyes-free** | **Double-tap the band**: the mic turns on (solid blue light, "tink" on the laptop). **Double-tap again or pause**: the mic turns off ("pop"). Deepgram turns speech into text, **Gemini 4** picks the action, and **ElevenLabs** speaks the answer, with **MiniMax** as the backup voice ([voice/loop.py](voice/loop.py)) |
 | **Live transcript** | The terminal shows `[YOU] …` while you speak, then `Heard: …` and `Gemini chose …` |
 | **Phone haptics** | A haptic coach compares where you face with the route's next leg, 5 times a second, and buzzes the phone ([store/haptics.py](store/haptics.py)). Patterns are listed below |
-| **iPhone app** | Native SwiftUI app with real iPhone haptics (Core Haptics). It can **connect to the band itself over Bluetooth** and relay it to the laptop ([ios/](ios/)) |
+| **iPhone app** | Native SwiftUI app with real iPhone haptics (Core Haptics). It can run **on the iPhone alone, with no laptop**: it connects to the band over Bluetooth and does tracking, places, guidance, buzzing and voice itself. It can also work with the laptop app ([ios/](ios/)) |
 | **Web pages** | The trail page (main UI), the team map, and a phone page that vibrates on Android and acts as a phone simulation on a laptop ([web/](web/)) |
 | **Band status** | Connected or not, how it's linked, battery with a low warning, chip temperature |
 | **Band light** | Green blink = route started, amber breathe = recording, purple = saved, white breathe = guiding, white blink speeding up = turn coming, green then rainbow = arrived, red blink = lost |
@@ -121,6 +121,11 @@ Source: [ios/Wayback](ios/Wayback). Full steps: [ios/README.md](ios/README.md).
   - battery and chip temperature
   - steps, distance, facing and calibration
   - every buzz pattern with a **Try** button
+
+**iPhone only (no laptop):** on the Guide tab, tap **Use this iPhone only**. Then go to Band → Keys,
+add your Deepgram, Gemini and (optionally) ElevenLabs keys, and tap **Connect band**. Double-tap the band
+and talk. Tracking is a Swift port of the team's wrist tracker, and it reproduces the same results on
+the logged walks (walk 3 ends 1.0 m from its start).
 
 **Install (developer mode)**
 1. Turn on Developer Mode on the iPhone, plug it in, and tap Trust.
