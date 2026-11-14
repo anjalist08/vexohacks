@@ -4,7 +4,8 @@ Implemented modules on the baseline branch:
 
 - `led_states.py`: LED vocabulary (`STATES`, `LedCue`, `turn_now_period`) and `LedController`.
 - `gemini_client.py`: Pure-stdlib HTTPS Gemini 4 tool-calling client (`choose_tool`, `build_function_declarations`, `GEMINI_4_MODELS`, `RECOMMENDED_GEMINI_4_MODEL`). Sends `VEXO_GEMINI_API_KEY` via `x-goog-api-key` header (never in URL query strings), blocks HTTP redirects, declares native `functionDeclarations` with `toolConfig.functionCallingConfig.mode = "ANY"`, and omits `temperature`, `topP` / `top_p`, `topK` / `top_k`, and legacy `thinkingBudget` per the Gemini 4 builder guide.
-- `elevenlabs_tts.py`: Pure-stdlib HTTPS ElevenLabs TTS client (`ElevenLabsSpeaker`, `speak`, `synthesize_mp3`). Sends `VEXO_ELEVENLABS_API_KEY` via `xi-api-key` header to `config.ELEVENLABS_VOICE_ID` (`SAz9YHcvj6GT2YYXdXww`), plays audio on the laptop speaker (`afplay` on macOS), cleans up temporary MP3 files in `finally:`, and falls back to macOS `say` and terminal `[SAY]` output.
+- `elevenlabs_tts.py`: Pure-stdlib HTTPS ElevenLabs TTS client (`ElevenLabsSpeaker`, `speak`, `synthesize_mp3`). Sends `VEXO_ELEVENLABS_API_KEY` via `xi-api-key` header to `config.ELEVENLABS_VOICE_ID` (`SAz9YHcvj6GT2YYXdXww`), plays audio on the laptop speaker (`afplay` on macOS), cleans up temporary MP3 files in `finally:`, and falls back to MiniMax, then macOS `say`, then terminal `[SAY]` output.
+- `minimax_tts.py`: backup voice (MiniMax T2A, `config.MINIMAX_TTS_MODEL` / `MINIMAX_VOICE_ID`). Used only when ElevenLabs has no key or fails, and only if `VEXO_MINIMAX_API_KEY` is set. Key in the `Authorization: Bearer` header, redirects refused, errors report status numbers only. ElevenLabs stays the main voice for its sponsor track.
 - `loop.py`: Baseline tap-to-talk controller (`VoiceLoop`).
 
 ## Gemini 4 model configuration
@@ -39,7 +40,7 @@ One turn (`VoiceLoop.run_turn`):
 2. The worker thread records `config.LISTEN_SECONDS` on the band via Deepgram (`speech.listen`). While `audio=True`, the band locks its LED solid blue.
 3. `audio=False` is guaranteed before any tool or LED call runs.
 4. `choose_tool` sends the transcript, native `interfaces.TOOLS` `functionDeclarations`, and `app.landmark_summary()` to `config.GEMINI_MODEL`. If Gemini is unconfigured or unavailable, `VoiceLoop` falls back to `app.keyword_command(words)`.
-5. `app.call_tool(name, args)` validates arguments and calls `app.output(result)`: `ElevenLabsSpeaker` speaks `result.say` (with `say` / `print` fallback) and `LedController` shows `result.led` now that the microphone is off.
+5. `app.call_tool(name, args)` validates arguments and calls `app.output(result)`: `ElevenLabsSpeaker` speaks `result.say` (with MiniMax / `say` / `print` fallback) and `LedController` shows `result.led` now that the microphone is off.
 
 Keys: `keys.prepare()` runs at start-up before any SDK or kit `speech` import, stripping generic environment variables (`GEMINI_API_KEY`, `GOOGLE_API_KEY`, `OPENAI_API_KEY`, `ELEVENLABS_API_KEY`) and passing explicit `VEXO_*` keys only. Tap-to-talk only: never always-on listening.
 

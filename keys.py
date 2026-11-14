@@ -17,11 +17,12 @@ NAMES = {
     "gemini": "VEXO_GEMINI_API_KEY",
     "deepgram": "VEXO_DEEPGRAM_API_KEY",
     "elevenlabs": "VEXO_ELEVENLABS_API_KEY",
+    "minimax": "VEXO_MINIMAX_API_KEY",        # backup voice only
 }
 
 # Generic names that libraries read by themselves. Removed from this process only.
 GENERIC = ("GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY",
-           "DEEPGRAM_API_KEY", "ELEVENLABS_API_KEY", "ELEVEN_API_KEY")
+           "DEEPGRAM_API_KEY", "ELEVENLABS_API_KEY", "ELEVEN_API_KEY", "MINIMAX_API_KEY")
 
 ENV_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
 
