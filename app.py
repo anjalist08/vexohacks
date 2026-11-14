@@ -6,10 +6,12 @@ stored route, and returns a ToolResult: what to say, and which LED state to show
 """
 import re
 import time
-from typing import Callable, Optional
+from typing import Callable, List, Optional
 
 import config
-from interfaces import OUTPUT_MODES, TOOLS, ToolResult
+from interfaces import OUTPUT_MODES, TOOLS, Instruction, Landmark, PoseSample, ToolResult
+from store.band_mirror import BandLandmarkMirror
+from store.guidance import GuidanceSession
 from store.route_store import RouteStore
 from tracker.pdr import PathTracker
 
@@ -17,16 +19,103 @@ TOOL_NAMES = {t["name"]: t for t in TOOLS}
 
 
 class SpatialMemoryApp:
-    def __init__(self, tracker: PathTracker, store: RouteStore,
-                 speak: Callable[[str], None] = print, led=None, clock: Callable[[], float] = time.time):
+    def __init__(
+        self,
+        tracker: PathTracker,
+        store: RouteStore,
+        speak: Callable[[str], None] = print,
+        led=None,
+        clock: Callable[[], float] = time.time,
+        band_mirror: Optional[BandLandmarkMirror] = None,
+    ):
         self.tracker = tracker
         self.store = store
         self.speak = speak
         self.led = led                    # voice.led_states.LedController, or None
         self.clock = clock
         self.mode = config.OUTPUT_MODE
-        self.guidance = []                # Instructions of the current return trip
-        tracker.on_sample(store.add_point)
+        self.guidance: List[Instruction] = []   # Instructions of the current return trip
+        self.navigator: Optional[GuidanceSession] = None
+        self.band_mirror = band_mirror
+        self.led_state = "idle"
+        self._last_pose: Optional[PoseSample] = None
+        self._event_listeners: List[Callable[[dict], None]] = []
+        tracker.on_sample(self.on_pose)
+
+    @property
+    def current_pose(self) -> PoseSample:
+        return self._last_pose if self._last_pose is not None else self.tracker.pose
+
+    # --- event bus for live UI / WebSocket ---------------------------------------
+    def on_event(self, fn: Callable[[dict], None]) -> None:
+        """Subscribe to app events ('point', 'landmark', 'guidance', 'led', 'say', 'reset')."""
+        if fn not in self._event_listeners:
+            self._event_listeners.append(fn)
+
+    def remove_event_listener(self, fn: Callable[[dict], None]) -> None:
+        if fn in self._event_listeners:
+            self._event_listeners.remove(fn)
+
+    def _emit(self, event: dict) -> None:
+        for fn in list(self._event_listeners):
+            fn(event)
+
+    def _say_text(self, text: str) -> None:
+        if self.mode != "light-only" and text:
+            self.speak(text)
+            self._emit({"type": "say", "text": text})
+
+    def _show_led(self, state: str, period: Optional[int] = None) -> None:
+        self.led_state = state
+        if self.mode != "voice-only":
+            if self.led is not None:
+                if period is not None:
+                    try:
+                        self.led.show(state, period=period)
+                    except TypeError:
+                        self.led.show(state)
+                else:
+                    self.led.show(state)
+            payload = {"type": "led", "state": state}
+            if period is not None:
+                payload["period"] = period
+            self._emit(payload)
+
+    def _cancel_guidance(self, emit_event: bool = True) -> None:
+        was_active = self.navigator is not None and self.navigator.active
+        if self.navigator is not None:
+            self.navigator.cancel()
+        if was_active and emit_event and self.navigator is not None:
+            self._emit({"type": "guidance", **self.navigator.to_dict()})
+
+    def _landmark_payload(self, lm: Landmark) -> dict:
+        payload = lm.to_dict()
+        try:
+            route = self.store.route_of(lm)
+            if 0 <= lm.point_index < len(route.points):
+                pt = route.points[lm.point_index]
+                payload["x_m"] = pt.x_m
+                payload["y_m"] = pt.y_m
+        except KeyError:
+            pass
+        return payload
+
+    # --- live pose handling & step-by-step guidance ------------------------------
+    def on_pose(self, sample: PoseSample) -> None:
+        """Handle each PoseSample emitted by the tracker."""
+        self._last_pose = sample
+        if self.navigator is None:
+            self.store.add_point(sample)
+        self._emit({"type": "point", **sample.to_dict()})
+
+        if self.navigator is not None and self.navigator.active:
+            upd = self.navigator.update(sample)
+            if upd.say:
+                self._say_text(upd.say)
+            if upd.led:
+                self._show_led(upd.led, period=upd.led_period)
+            if upd.advanced or upd.arrived:
+                self._emit({"type": "guidance", **self.navigator.to_dict()})
 
     # --- dispatch ----------------------------------------------------------------
     def call_tool(self, name: str, args: Optional[dict] = None) -> ToolResult:
@@ -44,19 +133,27 @@ class SpatialMemoryApp:
         return self.output(getattr(self, name)(**args))
 
     def output(self, result: ToolResult) -> ToolResult:
-        if self.mode != "light-only" and result.say:
-            self.speak(result.say)
-        if self.mode != "voice-only" and result.led and self.led is not None:
-            self.led.show(result.led)
+        if result.say:
+            self._say_text(result.say)
+        if result.led:
+            self._show_led(result.led)
         return result
 
     # --- tools ---------------------------------------------------------------------
     def start_route(self, title: str = None) -> ToolResult:
+        self._cancel_guidance(emit_event=False)
+        self.guidance = []
+        self.navigator = None
         first = self.tracker.start(self.clock())
+        self._last_pose = first
         route = self.store.start_route(title, first)
+        self._emit({"type": "reset", "route": route.id, "title": route.title})
+        self._emit({"type": "point", **first.to_dict()})
+        self._emit({"type": "guidance", "instructions": [], "current_index": 0, "active": False, "waypoints": []})
         return ToolResult(True, "Route started. Stand still for a moment.", "route_started", {"route": route.id})
 
     def stop_route(self) -> ToolResult:
+        self._cancel_guidance()
         self.tracker.stop()
         self.store.stop_route()
         return ToolResult(True, "Route saved.", "idle")
@@ -65,6 +162,9 @@ class SpatialMemoryApp:
         if self.store.current is None:
             return ToolResult(False, "Start a route first.", "uncertain")
         lm = self.store.remember_landmark(label, floor, note)
+        if self.band_mirror is not None:
+            self.band_mirror.mirror(lm)
+        self._emit({"type": "landmark", **self._landmark_payload(lm)})
         return ToolResult(True, "Saved: %s." % lm.label, "landmark_saved", {"landmark": lm.to_dict()})
 
     def save_note(self, text: str, landmark_id: str = None) -> ToolResult:
@@ -72,7 +172,11 @@ class SpatialMemoryApp:
             return ToolResult(False, "I don't know that place. Which one did you mean?", "uncertain")
         if self.store.current is None and not landmark_id:
             return ToolResult(False, "Start a route first.", "uncertain")
-        self.store.save_note(text, landmark_id)
+        updated_lm = self.store.save_note(text, landmark_id)
+        if updated_lm is not None:
+            if self.band_mirror is not None:
+                self.band_mirror.mirror(updated_lm)
+            self._emit({"type": "landmark", **self._landmark_payload(updated_lm)})
         return ToolResult(True, "Note saved.", None)
 
     def find_landmark(self, query: str) -> ToolResult:
@@ -108,7 +212,17 @@ class SpatialMemoryApp:
                 return ToolResult(False, "The %s is on an earlier route, so I can't guide you there." % lm.label,
                                   "uncertain")
             index, name = lm.point_index, lm.label
-        self.guidance = self.store.plan_return(index, name, self.tracker.pose.heading_deg, self.tracker.step_length_m)
+        pose = self.current_pose
+        self._cancel_guidance(emit_event=False)
+        self.navigator = self.store.plan_return_session(
+            index,
+            name,
+            pose.heading_deg,
+            self.tracker.step_length_m,
+            from_pose=pose,
+        )
+        self.guidance = self.navigator.instructions
+        self._emit({"type": "guidance", **self.navigator.to_dict()})
         steps = [i.text for i in self.guidance]
         say = steps[0] if len(steps) == 1 else " Then ".join([steps[0]] + [s[0].lower() + s[1:] for s in steps[1:]])
         return ToolResult(True, say, "navigating", {"instructions": [i.to_dict() for i in self.guidance]})
@@ -117,6 +231,8 @@ class SpatialMemoryApp:
         lm = self.store.get_landmark(landmark_id)
         if lm is None or self.store.route_of(lm) is not self.store.current:
             return ToolResult(False, "I don't know that place on this route.", "uncertain")
+        self._cancel_guidance()
+        self.navigator = None
         p = self.store.current.points[lm.point_index]
         self.tracker.reanchor(p.x_m, p.y_m, p.heading_deg, self.clock())
         return ToolResult(True, "Got it, you're at the %s." % lm.label, "recording")
@@ -131,6 +247,19 @@ class SpatialMemoryApp:
         if self.led is not None:
             self.led.brightness = 0.3 if mode == "light-only" else 1.0
         return ToolResult(True, "Output mode: %s." % mode.replace("-", " "), None)
+
+    def delete_all(self) -> None:
+        """Forget every route and landmark, cancel active guidance, and notify UI."""
+        self._cancel_guidance(emit_event=False)
+        self.guidance = []
+        self.navigator = None
+        self._last_pose = None
+        self.tracker.stop()
+        self.store.delete_all()
+        if self.band_mirror is not None:
+            self.band_mirror.clear()
+        self._show_led("idle")
+        self._emit({"type": "reset"})
 
     # --- typed fallback ------------------------------------------------------------
     def keyword_command(self, text: str) -> ToolResult:

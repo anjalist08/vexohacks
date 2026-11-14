@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vexo Wearable Spatial Memory — Live Trace &amp; Return Guidance</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <div id="file-warning" class="file-warning hidden" role="alert"></div>
+
+    <div id="mode-banner" class="mode-banner" role="status">
+      SIMULATION — Synthetic Walk (Not Live Sensing)
+    </div>
+
+    <header class="topbar">
+      <div class="brand">
+        <h1>Wearable Spatial Memory</h1>
+        <span class="brand-sub">Vexo remembers what you said — and where you said it</span>
+      </div>
+      <div class="status-strip">
+        <span class="badge" title="Band Bluetooth link status">
+          <span id="link-dot" class="dot warn"></span>
+          <span>Band:</span>
+          <strong id="link-text">simulated</strong>
+        </span>
+        <span class="badge" title="Local WebSocket bridge status">
+          <span id="ws-dot" class="dot warn"></span>
+          <span>WS:</span>
+          <strong id="ws-text">connecting</strong>
+        </span>
+        <button id="fit-btn" type="button" class="btn-ghost">Fit Map</button>
+        <button id="theme-btn" type="button" class="btn-ghost">Light Theme</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="map-stage" aria-label="2D Metric Route Map">
+        <canvas id="map-canvas"></canvas>
+
+        <div class="telemetry-overlay">
+          <span id="pose-x">x: 0.0 m</span>
+          <span id="pose-y">y: 0.0 m</span>
+          <span id="pose-heading">hdg: 0°</span>
+          <span id="pose-steps">steps: 0</span>
+        </div>
+
+        <div class="map-legend">
+          <span class="legend-item"><span class="swatch" style="background:#22c55e"></span>Start (0,0)</span>
+          <span class="legend-item"><span class="swatch" style="background:#f59e0b"></span>Recorded Walk</span>
+          <span class="legend-item"><span class="swatch" style="background:#a855f7"></span>Landmark</span>
+          <span class="legend-item"><span class="swatch" style="background:#38bdf8"></span>Return Path</span>
+        </div>
+      </section>
+
+      <aside class="sidebar">
+        <section class="card">
+          <div class="card-header">
+            <h2 class="card-title">Wrist LED Cue</h2>
+          </div>
+          <div class="led-row">
+            <div id="led-orb" class="led-orb" aria-hidden="true"></div>
+            <div class="led-meta">
+              <span id="led-state-name" class="led-state-name">idle</span>
+              <span id="led-detail" class="led-detail">LED off</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <h2 class="card-title">Spoken Output</h2>
+          </div>
+          <div id="say-box" class="say-box">Waiting for route or command…</div>
+          <label class="tts-toggle">
+            <input id="tts-checkbox" type="checkbox" />
+            <span>Browser TTS fallback (Silver mode)</span>
+          </label>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <h2 class="card-title">Return Guidance</h2>
+            <span id="guidance-badge" class="mini-tag">inactive</span>
+          </div>
+          <p id="guidance-empty" class="empty-hint">Ask “take me back to start” to compute return steps.</p>
+          <ol id="guidance-list" class="guidance-list"></ol>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <h2 class="card-title">Saved Landmarks</h2>
+            <span id="landmark-count" class="mini-tag">0</span>
+          </div>
+          <p id="landmark-empty" class="empty-hint">No landmarks saved on this route yet.</p>
+          <ul id="landmark-list" class="landmark-list"></ul>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <h2 class="card-title">Typed Command Fallback</h2>
+          </div>
+          <form id="cmd-form" class="cmd-form" autocomplete="off">
+            <input
+              id="cmd-input"
+              class="cmd-input"
+              type="text"
+              placeholder="e.g. remember this as elevator"
+              aria-label="Typed spatial command"
+            />
+            <button type="submit" class="btn-primary">Send</button>
+          </form>
+          <div class="chip-row">
+            <button type="button" class="chip" data-cmd="start route">start route</button>
+            <button type="button" class="chip" data-cmd="remember this as entrance">remember entrance</button>
+            <button type="button" class="chip" data-cmd="take me back to start">back to start</button>
+            <button type="button" class="chip" data-cmd="stop route">stop route</button>
+            <button type="button" class="chip chip-danger" data-cmd="delete all">delete all</button>
+          </div>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
