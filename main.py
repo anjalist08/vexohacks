@@ -219,6 +219,8 @@ def run_band(ws_port=8765, http_port=8000, no_web=False, usb=False):
         app, mode="LIVE", ws_port=ws_port, http_port=http_port,
         enable_ws=not no_web, enable_http=not no_web,
     )
+    if ws is not None:
+        ws.phone_logger = logger         # the iPhone's heading/pedometer go into the walk log too
 
     def on_link(status):
         print("\n    [LINK] %s" % status)

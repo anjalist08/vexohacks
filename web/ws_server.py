@@ -511,6 +511,17 @@ class MapWebSocketServer:
                 if bridge is not None:
                     bridge.receive(parsed)
                 return
+            if mtype == "phone_motion":          # the iPhone app's own heading and pedometer
+                tracker = getattr(self.app, "tracker", None)
+                if tracker is not None and hasattr(tracker, "on_phone"):
+                    tracker.on_phone(parsed)
+                logger = getattr(self, "phone_logger", None)        # main.py --band: into the walk log
+                if logger is not None and isinstance(parsed.get("heading_deg"), (int, float)):
+                    fields = {"heading_deg": parsed["heading_deg"]}
+                    if parsed.get("steps") is not None and parsed.get("distance_m") is not None:
+                        fields.update(steps=parsed["steps"], distance_m=parsed["distance_m"])
+                    logger.log("phone", float(parsed.get("t") or time.time()), fields)
+                return
             if mtype == "band_status":
                 handler = getattr(self, "on_bridge_status", None)
                 if handler is not None:
