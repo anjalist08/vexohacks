@@ -45,6 +45,33 @@ final class Link: ObservableObject {
         open()
     }
 
+    /// Finds main.py on the iPhone hotspot network by trying every address on it (172.20.10.2-14).
+    func findLaptop(port: Int = 8790, then use: @escaping (String) -> Void) {
+        status = "Looking for the laptop on this phone's hotspot…"
+        var found = false
+        for last in 2...14 {
+            let address = "172.20.10.\(last):\(port)"
+            guard let u = URL(string: "ws://" + address) else { continue }
+            let t = URLSession.shared.webSocketTask(with: u)
+            t.resume()
+            t.receive { [weak self] result in
+                Task { @MainActor in
+                    t.cancel(with: .goingAway, reason: nil)
+                    guard let self, !found, case .success = result else { return }
+                    found = true
+                    use(address)
+                    self.connect(address)
+                }
+            }
+        }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            if !found {
+                self.status = "No laptop found on the hotspot. Check: main.py runs with --host hotspot, the Mac is on this phone's hotspot, and Settings > Privacy & Security > Local Network > Wayback is on."
+            }
+        }
+    }
+
     func disconnect() {
         wanted = false
         task?.cancel(with: .goingAway, reason: nil)

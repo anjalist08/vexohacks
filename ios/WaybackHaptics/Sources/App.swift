@@ -9,13 +9,15 @@ struct WaybackHapticsApp: App {
 
 struct ContentView: View {
     @StateObject private var link = Link()
-    @AppStorage("address") private var address = "172.20.10.2:8790"
+    @AppStorage("address") private var address = ""
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Laptop (main.py --host …)") {
-                    TextField("172.20.10.2:8790", text: $address)
+                    Button("Find laptop automatically") { link.findLaptop { address = $0 } }
+                        .buttonStyle(.borderedProminent)
+                    TextField("or type the address main.py prints, e.g. 172.20.10.13:8790", text: $address)
                         .keyboardType(.numbersAndPunctuation)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
