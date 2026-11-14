@@ -60,6 +60,7 @@ can connect at a time. Copy `.env.example` to `.env` for the API keys. `.env` is
     config.py, interfaces.py   shared settings and data shapes
     app.py, main.py            the tools and the entry point
     tracker/  store/  voice/  web/
+    interop/                   FHIR R4 export for health systems (see interop/README.md)
     vexo-open-kit/             the band's kit (MIT), unchanged
     docs/                      earlier ideas and the original iPhone plan
     AGENTS.md                  rules for AI coding agents
