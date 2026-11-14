@@ -61,7 +61,10 @@ class ArrivalWatcher:
         p = self.app.store.current.points[index]
         tracker = self.app.tracker
         tracker.reanchor(p.x_m, p.y_m, tracker.heading, self.app.clock())
-        if lm_id == self.target:
+        navigator = getattr(self.app, "navigator", None)
+        if navigator is not None and not navigator.active:
+            self.disarm()               # the app's live guidance has announced the arrival
+        elif lm_id == self.target and navigator is None:
             self.notify("You have reached the %s." % label, "arrived")
             self.disarm()
         else:

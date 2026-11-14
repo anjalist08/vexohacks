@@ -121,7 +121,7 @@ def make_handler(hub: PhoneHub, token: str):
     return Handler
 
 
-def start(hub: PhoneHub, host="0.0.0.0", port=8765, cert=None, key=None):
+def start(hub: PhoneHub, host="0.0.0.0", port=8766, cert=None, key=None):
     """Start the server on a background thread. Returns (server, address to open)."""
     token = secrets.token_urlsafe(8)
     server = http.server.ThreadingHTTPServer((host, port), make_handler(hub, token))
@@ -154,7 +154,7 @@ def main(argv=None):
     g = p.add_mutually_exclusive_group(required=True)
     g.add_argument("--demo", action="store_true", help="run the synthetic-walk demo to the phone")
     g.add_argument("--learn", action="store_true", help="play every vibration pattern with its name")
-    p.add_argument("--port", type=int, default=8765)
+    p.add_argument("--port", type=int, default=8766, help="8766: the map page uses 8765")
     p.add_argument("--host", default="0.0.0.0", help="0.0.0.0 so the phone can reach it")
     p.add_argument("--cert", help="certificate file, for https (needed for the compass)")
     p.add_argument("--key", help="its private key file")

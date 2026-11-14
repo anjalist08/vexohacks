@@ -33,12 +33,17 @@ def cue_for_instruction(instruction) -> Optional[str]:
     return _TURN_CUES.get(turn)
 
 
+def cue_for_led(state: Optional[str]) -> Optional[str]:
+    """The cue for an LED state, if it has one."""
+    return _LED_CUES.get(state)
+
+
 def cue_for_result(result) -> Optional[str]:
     """The cue for a ToolResult: the first turn of new guidance, else its LED state."""
     steps = (result.data or {}).get("instructions")
     if steps:
         return cue_for_instruction(steps[0])
-    return _LED_CUES.get(result.led)
+    return cue_for_led(result.led)
 
 
 def haptic_message(cue: str, say: str = "") -> dict:
