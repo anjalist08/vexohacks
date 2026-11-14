@@ -23,6 +23,7 @@ Replays (tests/test_wrist.py): walk 3, a 59 m loop, ends 1.0 m from its start.
 import collections
 import math
 import statistics
+import time
 from typing import Callable, List, Optional
 
 import config
@@ -47,6 +48,8 @@ OFF_GRID_DEG = 30.0        # median this far off the grid while walking adds unc
 ACC_THR_G = 1.12           # smoothed |a| above this is a footfall...
 ACC_LOW_G = 1.03           # ...once it has dropped below this since the last one
 ACC_MIN_GAP_S = 0.28
+PHONE_FRESH_S = 2.0        # iPhone motion newer than this is used instead of the wrist's heading
+PHONE_STRIDE_MIN_STEPS = 10  # iPhone pedometer steps before its stride replaces STEP_LENGTH_M
 ACC_SMOOTH = 0.35
 
 
@@ -73,6 +76,13 @@ class WristTracker(PathTracker):
         self.acc_steps = 0
         self.band_steps = 0
         self._steps = 0
+        # iPhone sensor fusion (tracker.on_phone): heading relative to the start, and stride
+        self._phone_base: Optional[float] = None
+        self._phone_raw: Optional[float] = None
+        self.phone_heading: Optional[float] = None
+        self._phone_wall = 0.0
+        self.phone_steps: Optional[int] = None
+        self.phone_distance: Optional[float] = None
 
     # --- motion ------------------------------------------------------------------
     def on_motion(self, t, ax, ay, az, gx, gy, gz):
@@ -123,7 +133,8 @@ class WristTracker(PathTracker):
         self.unwrapped -= (yaw - self.bias) * dt
         # The cone shows where you face NOW (reacts in ~0.2 s); the map's walking direction
         # uses the slower 2 s median below so arm swing does not bend the line.
-        self.facing += (1.0 - math.exp(-dt / 0.2)) * (self.unwrapped - self.facing) if dt > 0 else 0.0
+        if not self.phone_fresh:
+            self.facing += (1.0 - math.exp(-dt / 0.2)) * (self.unwrapped - self.facing) if dt > 0 else 0.0
         self._window.append((t, self.unwrapped))
         while self._window and t - self._window[0][0] > MEDIAN_S:
             self._window.popleft()
@@ -134,19 +145,57 @@ class WristTracker(PathTracker):
             return self._advance_locked(t, 1)
         return None
 
+    @property
+    def phone_fresh(self) -> bool:
+        return self.phone_heading is not None and time.time() - self._phone_wall < PHONE_FRESH_S
+
+    @property
+    def heading_source(self) -> str:
+        return "phone" if self.phone_fresh else "wrist"
+
+    def _walk_heading(self) -> float:
+        """The heading the grid follows: the iPhone's (body) heading while it is arriving,
+        else the wrist's 2 s median."""
+        return self.phone_heading if self.phone_fresh else self.smooth
+
     def _update_grid(self, t: float):
+        src = self._walk_heading()
         if not self.snap_turns:
-            self.heading = self.smooth
+            self.heading = src
             return
-        if abs(self.smooth - self.heading) <= SNAP_HYST_DEG:
+        if abs(src - self.heading) <= SNAP_HYST_DEG:
             self._away_since = None
             return
         if self._away_since is None:
             self._away_since = t
             return
         if t - self._away_since >= SNAP_HOLD_S:
-            self.heading = 90.0 * round(self.smooth / 90.0)
+            self.heading = 90.0 * round(src / 90.0)
             self._away_since = None
+
+    # --- iPhone sensor fusion ------------------------------------------------------
+    def on_phone(self, msg: dict) -> None:
+        """One {"type": "phone_motion"} message from the iPhone app: heading_deg (clockwise,
+        unwrapped, gyro fusion), steps and distance_m (Apple's pedometer since the app started).
+        The phone in a pocket turns with the body and does not swing like a wrist, so while these
+        arrive its heading drives the walking direction, and its pedometer sets the stride."""
+        with self._lock:
+            h = msg.get("heading_deg")
+            if isinstance(h, (int, float)):
+                self._phone_raw = float(h)
+                if self.running:
+                    if self._phone_base is None:
+                        # heading 0 = the way you faced at start; if the route is already under
+                        # way, line the phone up with the walking direction so far
+                        self._phone_base = float(h) - (self.smooth if self.calibrated else 0.0)
+                    self.phone_heading = float(h) - self._phone_base
+                    self.facing = self.phone_heading
+                    self._phone_wall = time.time()
+            steps, dist = msg.get("steps"), msg.get("distance_m")
+            if isinstance(steps, int) and isinstance(dist, (int, float)):
+                self.phone_steps, self.phone_distance = steps, float(dist)
+                if steps >= PHONE_STRIDE_MIN_STEPS and dist > 0:
+                    self.step_length_m = min(1.0, max(0.4, dist / steps))
 
     def _footfall(self, t: float, mag: float) -> bool:
         self._acc_s = mag if self._acc_s is None else self._acc_s + ACC_SMOOTH * (mag - self._acc_s)
@@ -165,7 +214,7 @@ class WristTracker(PathTracker):
         self.uncertainty_deg += DRIFT_PER_STEP_DEG * n
         if self.snap_turns and self._away_since is None:
             # walking clearly off the grid (a diagonal or a curve), not just mid-turn
-            off = abs(self.smooth - self.heading)
+            off = abs(self._walk_heading() - self.heading)
             if off > OFF_GRID_DEG:
                 self.uncertainty_deg += 0.25 * (off - OFF_GRID_DEG) * n
         d = n * self.step_length_m
@@ -209,6 +258,9 @@ class WristTracker(PathTracker):
         with self._lock:
             # keep the median and the grid continuous with the confirmed heading
             self.heading = self.unwrapped = self.smooth = self.facing = float(wrap_deg(heading_deg))
+            if self._phone_raw is not None:
+                self._phone_base = self._phone_raw - self.heading
+                self.phone_heading = self.heading
             self._window.clear()
             self._away_since = None
         return sample
@@ -244,4 +296,7 @@ def tracker_status(tracker) -> dict:
         "bias_dps": round(tracker.bias, 2),
         "uncertain": bool(tracker.heading_uncertain),
         "state": tracker.state,
+        "heading_source": getattr(tracker, "heading_source", "wrist"),
+        "stride_m": round(tracker.step_length_m, 2),
+        "phone_steps": getattr(tracker, "phone_steps", None),
     }

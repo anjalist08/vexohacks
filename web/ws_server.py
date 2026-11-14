@@ -511,6 +511,11 @@ class MapWebSocketServer:
                 if bridge is not None:
                     bridge.receive(parsed)
                 return
+            if mtype == "phone_motion":          # the iPhone app's own heading and pedometer
+                tracker = getattr(self.app, "tracker", None)
+                if tracker is not None and hasattr(tracker, "on_phone"):
+                    tracker.on_phone(parsed)
+                return
             if mtype == "band_status":
                 handler = getattr(self, "on_bridge_status", None)
                 if handler is not None:

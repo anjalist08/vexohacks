@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import UIKit
+import CoreMotion
 
 struct TrailPoint { var x: Double; var y: Double; var jump: Bool }
 struct Place: Identifiable, Equatable {
@@ -66,6 +67,7 @@ final class Guide: ObservableObject {
     private var band: BandLink?             // made only when the laptop asks the phone to carry the band
 
     let haptics = Haptics()
+    private let phoneMotion = PhoneMotion()   // the iPhone's own heading + pedometer, for sensor fusion
     private var task: URLSessionWebSocketTask?
     private var wanted: URL?
 
@@ -94,9 +96,12 @@ final class Guide: ObservableObject {
         wanted = url
         open(url)
         UIApplication.shared.isIdleTimerDisabled = true      // haptics only play while the app is on screen
+        phoneMotion.onMessage = { [weak self] msg in Task { @MainActor in self?.send(msg) } }
+        phoneMotion.start()
     }
 
     func disconnect() {
+        phoneMotion.stop()
         band?.stop()
         band = nil
         bandStatus = ""
@@ -308,5 +313,81 @@ final class Guide: ObservableObject {
             }
             sub = stepsLeft.map { "\($0) steps on this stretch, to \(target)" } ?? "to \(target)"
         }
+    }
+}
+
+
+/// The iPhone's own motion, sent to the laptop 10 times a second as {"type": "phone_motion"} for
+/// sensor fusion (tracker/wrist.py, WristTracker.on_phone). In a pocket the phone turns with the
+/// body and does not swing like a wrist, so the laptop uses its heading for the walking direction,
+/// and Apple's pedometer (calibrated to the walker) for the stride.
+/// Heading uses gyro fusion without the magnetometer (.xArbitraryCorrectedZVertical), so steel
+/// and elevators indoors cannot swing it; the laptop makes it relative to the start of the route.
+final class PhoneMotion {
+    var onMessage: (([String: Any]) -> Void)?
+    private let motion = CMMotionManager()
+    private let pedometer = CMPedometer()
+    private let queue = OperationQueue()
+    private let lock = NSLock()
+    private var lastYaw: Double?
+    private var heading = 0.0          // degrees clockwise, unwrapped (keeps counting past 360)
+    private var steps: Int?
+    private var distance: Double?
+    private var timer: Timer?
+
+    func start() {
+        stop()
+        queue.maxConcurrentOperationCount = 1
+        if motion.isDeviceMotionAvailable {
+            motion.deviceMotionUpdateInterval = 1.0 / 30
+            motion.startDeviceMotionUpdates(using: .xArbitraryCorrectedZVertical, to: queue) { [weak self] m, _ in
+                guard let self, let m else { return }
+                let yaw = m.attitude.yaw * 180 / .pi          // counter-clockwise about the vertical
+                self.lock.lock()
+                if let last = self.lastYaw {
+                    var d = yaw - last
+                    if d > 180 { d -= 360 } else if d < -180 { d += 360 }
+                    self.heading -= d                          // clockwise, like the laptop's map
+                }
+                self.lastYaw = yaw
+                self.lock.unlock()
+            }
+        }
+        if CMPedometer.isStepCountingAvailable() {
+            pedometer.startUpdates(from: Date()) { [weak self] data, _ in
+                guard let self, let data else { return }
+                self.lock.lock()
+                self.steps = data.numberOfSteps.intValue
+                self.distance = data.distance?.doubleValue
+                self.lock.unlock()
+            }
+        }
+        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in self?.emit() }
+    }
+
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+        motion.stopDeviceMotionUpdates()
+        pedometer.stopUpdates()
+        lock.lock()
+        lastYaw = nil
+        heading = 0
+        steps = nil
+        distance = nil
+        lock.unlock()
+    }
+
+    private func emit() {
+        lock.lock()
+        defer { lock.unlock() }
+        guard lastYaw != nil else { return }
+        var msg: [String: Any] = ["type": "phone_motion", "t": Date().timeIntervalSince1970,
+                                  "heading_deg": (heading * 10).rounded() / 10]
+        if let steps, let distance {
+            msg["steps"] = steps
+            msg["distance_m"] = (distance * 100).rounded() / 100
+        }
+        onMessage?(msg)
     }
 }

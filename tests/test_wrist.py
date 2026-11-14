@@ -106,3 +106,44 @@ class SyntheticTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PhoneFusionTests(unittest.TestCase):
+    """iPhone heading and pedometer (phone_motion messages) drive direction and stride."""
+
+    def test_phone_heading_drives_the_walk_and_pedometer_sets_stride(self):
+        tr = WristTracker(step_length_m=0.7, step_source="band")
+        tr.start(0.0)
+        t, steps = 0.0, 1000
+
+        def tick(n_samples, phone_heading, gz=0.0, walking=False):
+            nonlocal t, steps
+            for i in range(n_samples):
+                t += 0.02
+                tr.on_motion(t, 0.0, 0.0, 1.0, 0.0, 0.0, gz)      # wrist: still (or spinning, gz)
+                if i % 5 == 0:
+                    tr.on_phone({"type": "phone_motion", "heading_deg": phone_heading})
+                if walking and i % 25 == 0:
+                    steps += 1
+                    tr.on_activity(t, steps, "walk")
+
+        tick(50, 30.0)                                  # calibrate; phone faces 30 deg in the pocket
+        tick(500, 30.0, walking=True)                   # 20 steps straight ahead
+        tr.on_phone({"type": "phone_motion", "heading_deg": 120.0, "steps": 20, "distance_m": 16.0})
+        tick(500, 120.0, walking=True)                  # phone says: turned right; 20 more steps
+        self.assertEqual(tr.heading_source, "phone")
+        self.assertAlmostEqual(tr.step_length_m, 0.8)    # 16 m / 20 steps from the pedometer
+        self.assertEqual(tr.heading, 90.0)
+        self.assertGreater(tr.x, 10.0)                   # went right after the turn
+        self.assertAlmostEqual(tr.y, 20 * 0.7, delta=1.5)
+
+    def test_wrist_spin_is_ignored_while_the_phone_is_fresh(self):
+        tr = WristTracker(step_length_m=0.7, step_source="band")
+        tr.start(0.0)
+        t = 0.0
+        for i in range(300):                             # calibrate, then the wrist spins 90 deg/s
+            t += 0.02
+            tr.on_motion(t, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0 if i < 50 else 90.0)
+            if i % 5 == 0:
+                tr.on_phone({"type": "phone_motion", "heading_deg": 0.0})
+        self.assertEqual(tr.heading, 0.0)
