@@ -138,6 +138,7 @@ final class PhoneVoice: NSObject, AVAudioPlayerDelegate {
                 return
             }
             guide?.voice = "Heard: \(words)"
+            guide?.logHeard(words, viaSpeech: true)
             await understand(words)
             busy = false
         }

@@ -14,6 +14,19 @@ struct Place: Identifiable, Equatable {
 }
 struct DirectionStep: Identifiable { let id: Int; let turn: String; let steps: Int; let text: String }
 
+/// One item in the Home screen's live activity feed: what you said, what Wayback did,
+/// turn/guidance buzz cues, and occasional Vexo band alerts (disconnect, reconnect, low battery).
+struct FeedItem: Identifiable, Equatable {
+    enum Kind: String, Equatable { case heard, action, buzz, band }
+    let id = UUID()
+    let time: Date
+    let kind: Kind
+    let title: String
+    let detail: String?
+    let icon: String
+    let tint: String
+}
+
 /// JSON numbers arrive as NSNumber; read them as Double or Int whatever their form.
 private func num(_ v: Any?) -> Double? { (v as? NSNumber)?.doubleValue }
 private func int(_ v: Any?) -> Int? { (v as? NSNumber)?.intValue }
@@ -64,6 +77,12 @@ final class Guide: ObservableObject {
     @Published var lastReply = ""
     @Published var bridgeWanted = false     // the laptop runs --bridge and wants this phone to carry the band
     @Published var phoneOnly = false        // iPhone only: no laptop; the phone tracks, guides, listens and speaks
+    @Published var feed: [FeedItem] = []    // newest-first live log shown on the Home (Guide) tab
+
+    private var lastLoggedLinkState = "not connected"
+    private var lastLoggedCue: (cue: String, at: Date)?
+    private var lowBatteryLogged = false
+    private var hadConnectedOnce = false
 
     lazy var brain: PhoneBrain = { let b = PhoneBrain(); b.guide = self; return b }()
     lazy var voiceEngine: PhoneVoice = PhoneVoice(guide: self)
@@ -200,6 +219,7 @@ final class Guide: ObservableObject {
     func command(_ text: String) {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty else { return }
+        logHeard(t, viaSpeech: false)
         if phoneOnly {
             lastReply = "You typed: \(t)"
             Task { await voiceEngine.understand(t) }
@@ -207,6 +227,115 @@ final class Guide: ObservableObject {
         }
         send(["type": "command", "text": t])
         lastReply = "Sent: \(t)"
+    }
+
+    // MARK: - Home screen activity feed helpers
+
+    func clearFeed() { feed.removeAll() }
+
+    private func pushFeed(_ item: FeedItem) {
+        // Skip exact back-to-back duplicate titles within 1.5 s.
+        if let top = feed.first, top.kind == item.kind, top.title == item.title,
+           item.time.timeIntervalSince(top.time) < 1.5 {
+            return
+        }
+        feed.insert(item, at: 0)
+        if feed.count > 50 { feed.removeLast(feed.count - 50) }
+    }
+
+    func logHeard(_ words: String, viaSpeech: Bool = true) {
+        let clean = words.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return }
+        pushFeed(FeedItem(
+            time: Date(),
+            kind: .heard,
+            title: "You: \"\(clean)\"",
+            detail: viaSpeech ? "Heard from wrist mic" : "Tapped / typed command",
+            icon: viaSpeech ? "waveform.and.mic" : "hand.tap.fill",
+            tint: "blue"
+        ))
+    }
+
+    func logAction(_ title: String, detail: String? = nil, icon: String = "sparkles", tint: String = "green") {
+        pushFeed(FeedItem(time: Date(), kind: .action, title: title, detail: detail, icon: icon, tint: tint))
+    }
+
+    func logBuzz(_ cue: String) {
+        // Ignore the quiet 4 s keep-alive tick so the feed stays readable.
+        guard cue != "tick" else { return }
+        let now = Date()
+        if let prev = lastLoggedCue, prev.cue == cue, now.timeIntervalSince(prev.at) < 8.0 {
+            return
+        }
+        lastLoggedCue = (cue, now)
+        let labels: [String: (String, String)] = [
+            "wrong_left": ("Turn left (buzz ••)", "Facing right of route"),
+            "wrong_right": ("Turn right (buzz •••)", "Facing left of route"),
+            "on_track": ("Facing the right way (buzz ━━━)", "Locked onto current leg"),
+            "turn_soon": ("Turn coming up (buzz ····)", "Approaching corner"),
+            "turn_left": ("Turn left now (buzz ━•)", "Corner reached"),
+            "turn_right": ("Turn right now (buzz ━••)", "Corner reached"),
+            "turn_around": ("Turn around now (buzz ━━)", "Reverse direction"),
+            "arrived": ("Arrived at destination (buzz ━━━)", "Guidance complete"),
+            "lost": ("Position uncertain (buzz •••••)", "Say \"I'm at the …\" to re-anchor"),
+        ]
+        guard let info = labels[cue] else { return }
+        pushFeed(FeedItem(
+            time: now,
+            kind: .buzz,
+            title: info.0,
+            detail: info.1,
+            icon: "iphone.radiowaves.left.and.right",
+            tint: cue == "arrived" ? "purple" : cue == "on_track" ? "green" : cue == "lost" ? "red" : "orange"
+        ))
+    }
+
+    func noteBandLinkTransition(_ rawStatus: String) {
+        let s = rawStatus.lowercased()
+        guard s != lastLoggedLinkState else { return }
+        let prev = lastLoggedLinkState
+        lastLoggedLinkState = s
+        if s == "connected" || s == "reconnected" {
+            let re = (s == "reconnected") || (hadConnectedOnce && (prev == "reconnecting" || prev == "lost" || prev == "disconnected" || prev == "not connected"))
+            hadConnectedOnce = true
+            pushFeed(FeedItem(
+                time: Date(),
+                kind: .band,
+                title: re ? "\(bandName) reconnected" : "\(bandName) connected",
+                detail: bandVia.isEmpty ? nil : bandVia,
+                icon: "checkmark.circle.fill",
+                tint: "green"
+            ))
+        } else if s == "reconnecting" || s == "lost" || s == "disconnected" {
+            guard hadConnectedOnce else { return }
+            pushFeed(FeedItem(
+                time: Date(),
+                kind: .band,
+                title: s == "reconnecting" ? "\(bandName) disconnected — reconnecting…" : "\(bandName) disconnected",
+                detail: "Double-tap \(bandName) if its blue blink stopped",
+                icon: "antenna.radiowaves.left.and.right.slash",
+                tint: "orange"
+            ))
+        }
+    }
+
+    func noteBattery(percent: Int?, state: String) {
+        guard let pct = percent else { return }
+        if pct > 20 || state == "charging" {
+            lowBatteryLogged = false
+            return
+        }
+        if pct <= 15 && !lowBatteryLogged {
+            lowBatteryLogged = true
+            pushFeed(FeedItem(
+                time: Date(),
+                kind: .band,
+                title: "\(bandName) low battery (\(pct)%)",
+                detail: "Plug into USB-C power soon",
+                icon: "battery.25",
+                tint: "red"
+            ))
+        }
     }
 
     /// The Band tab's button: connect the iPhone to the band over Bluetooth now.
@@ -224,6 +353,7 @@ final class Guide: ObservableObject {
         band = nil
         bandLinkStatus = "not connected"
         bandStatus = "Disconnected from the band"
+        noteBandLinkTransition("disconnected")
     }
 
     var carryingBand: Bool { band != nil }
@@ -245,6 +375,8 @@ final class Guide: ObservableObject {
                 guard let self else { return }
                 if msg["type"] as? String == "band_status", let status = msg["status"] as? String {
                     self.bandLinkStatus = status
+                    self.bandVia = "iPhone Bluetooth"
+                    self.noteBandLinkTransition(status)
                     if status == "connected" && self.phoneOnly && self.state == "idle" {
                         self.big = "Ready"
                         self.sub = "Double-tap the band and say \"start route\"."
@@ -260,6 +392,7 @@ final class Guide: ObservableObject {
     func tryCue(_ cue: String) {
         haptics.play(cue)
         lastCue = cue
+        logBuzz(cue)
     }
 
     // MARK: messages from the laptop app
@@ -273,6 +406,7 @@ final class Guide: ObservableObject {
             if let cue = m["cue"] as? String {
                 lastCue = cue
                 if buzzing { haptics.play(cue) }
+                logBuzz(cue)
             }
         case "haptic_hint":
             showHint(m)
@@ -280,13 +414,25 @@ final class Guide: ObservableObject {
             let s = m["state"] as? String ?? ""
             switch s {
             case "listening": voice = "Listening… speak now"
-            case "heard": voice = "Heard: " + (m["text"] as? String ?? "")
+            case "heard":
+                let heardText = m["text"] as? String ?? ""
+                voice = "Heard: " + heardText
+                logHeard(heardText, viaSpeech: true)
             case "thinking": voice = "Understanding…"
-            case "done": voice = m["say"] as? String ?? ""
+            case "done":
+                let spoken = m["say"] as? String ?? ""
+                voice = spoken
+                if !spoken.isEmpty {
+                    logAction("Wayback: \"\(spoken)\"", icon: "speaker.wave.2.fill", tint: "cyan")
+                }
             default: voice = m["text"] as? String ?? ""
             }
         case "say":
-            voice = m["text"] as? String ?? ""
+            let spoken = m["text"] as? String ?? ""
+            voice = spoken
+            if !spoken.isEmpty {
+                logAction("Wayback: \"\(spoken)\"", icon: "speaker.wave.2.fill", tint: "cyan")
+            }
         case "band_number":
             if let n = int(m["band"]), n == BandConfig.number {   // only our band
                 bridgeWanted = true
@@ -299,22 +445,34 @@ final class Guide: ObservableObject {
         case "mode":
             mode = m["mode"] as? String ?? ""
         case "link":
-            bandLinkStatus = m["status"] as? String ?? "not connected"
+            let s = m["status"] as? String ?? "not connected"
+            bandLinkStatus = s
+            noteBandLinkTransition(s)
         case "led":
             ledState = m["state"] as? String ?? "idle"
         case "reset":
             trail = []; backTrail = []; places = []; directions = []; guiding = false; waypoints = []
+            logAction("Started route", detail: "Stand still briefly to calibrate gyro", icon: "play.circle.fill", tint: "green")
         case "point":
             let p = TrailPoint(x: num(m["x_m"]) ?? 0, y: num(m["y_m"]) ?? 0, jump: m["jump"] as? Bool ?? false)
             if guiding { backTrail.append(p) } else { trail.append(p) }
             position = CGPoint(x: p.x, y: p.y)
             steps = int(m["steps"]) ?? steps
+            if p.jump {
+                logAction("Re-anchored position", detail: String(format: "Snapped to (%.1f, %.1f m)", p.x, p.y), icon: "scope", tint: "blue")
+            }
         case "landmark":
             let place = Place(id: m["id"] as? String ?? UUID().uuidString, label: m["label"] as? String ?? "place",
                               x: num(m["x_m"]) ?? position.x, y: num(m["y_m"]) ?? position.y,
                               note: m["note"] as? String, floor: m["floor"] as? String)
+            let isNew = !places.contains(where: { $0.id == place.id })
             if let i = places.firstIndex(where: { $0.id == place.id }) { places[i] = place } else { places.append(place) }
+            if isNew {
+                logAction("Added landmark: \(place.label.capitalized)", detail: place.note, icon: "mappin.circle.fill", tint: "purple")
+            }
         case "guidance":
+            let wasGuiding = guiding
+            let prevIdx = directionIndex
             let list = m["instructions"] as? [[String: Any]] ?? []
             directions = list.enumerated().map { i, d in
                 DirectionStep(id: i, turn: d["turn"] as? String ?? "", steps: int(d["steps"]) ?? 0,
@@ -327,8 +485,14 @@ final class Guide: ObservableObject {
                 guard w.count >= 2, let x = num(w[0]), let y = num(w[1]) else { return nil }
                 return CGPoint(x: x, y: y)
             }
+            if guiding && !wasGuiding {
+                logAction("Guiding to \(guideTarget)", detail: directions.first?.text, icon: "figure.walk.circle.fill", tint: "cyan")
+            } else if guiding && directionIndex != prevIdx, directionIndex < directions.count {
+                logAction(directions[directionIndex].text, detail: "Step \(directionIndex + 1) of \(directions.count)", icon: "arrow.triangle.turn.up.right.circle.fill", tint: "cyan")
+            }
             if !guiding { backTrail = [] }
         case "tracker":
+            let wasRecording = recording
             recording = m["running"] as? Bool ?? recording
             calibrated = m["calibrated"] as? Bool ?? calibrated
             facing = num(m["live_heading_deg"]) ?? facing
@@ -336,6 +500,9 @@ final class Guide: ObservableObject {
             activity = m["state"] as? String ?? activity
             gyroBias = num(m["bias_dps"]) ?? gyroBias
             steps = int(m["steps"]) ?? steps
+            if wasRecording && !recording {
+                logAction("Ended route", detail: "\(steps) steps recorded", icon: "stop.circle.fill", tint: "gray")
+            }
         case "band_metric":
             switch m["kind"] as? String {
             case "info":
@@ -345,6 +512,7 @@ final class Guide: ObservableObject {
                 battery = int(m["percent"])
                 batteryState = m["state"] as? String ?? ""
                 batteryVolts = num(m["millivolts"]).map { $0 / 1000 }
+                noteBattery(percent: battery, state: batteryState)
             case "temperature":
                 chipTemp = num(m["celsius"])
             default:

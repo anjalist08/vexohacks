@@ -49,9 +49,12 @@ final class PhoneBrain {
         case "event":
             if m["event"] as? String == "double-tap" { guide?.voiceEngine.doubleTap() }
         case "battery":
-            guide?.battery = Int(n("percent"))
-            guide?.batteryState = m["state"] as? String ?? ""
+            let pct = Int(n("percent"))
+            let bState = m["state"] as? String ?? ""
+            guide?.battery = pct
+            guide?.batteryState = bState
             guide?.batteryVolts = n("millivolts") / 1000
+            guide?.noteBattery(percent: pct, state: bState)
         case "temperature":
             guide?.chipTemp = n("celsius")
         case "audio":
@@ -153,6 +156,7 @@ final class PhoneBrain {
         if let cue = out.cue {
             g.lastCue = cue
             if g.buzzing { g.haptics.play(cue) }
+            g.logBuzz(cue)
         }
     }
 
@@ -171,33 +175,51 @@ final class PhoneBrain {
             guide?.backTrail = []; guide?.directions = []; guide?.guiding = false; guide?.waypoints = []
             tracker.start(at: t)
             publish()
+            guide?.logAction("Started route", detail: "Stand still briefly to calibrate gyro", icon: "play.circle.fill", tint: "green")
             say("Route started. Stand still for a moment.", led: "route_started")
         case .stopRoute:
             routeActive = false; nav = nil; tracker.stop(); guide?.guiding = false
             publish()
+            guide?.logAction("Ended route", detail: "\(points.count) points · \(places.count) \(places.count == 1 ? "landmark" : "landmarks") saved", icon: "stop.circle.fill", tint: "gray")
             say("Route saved.", led: "idle")
         case .remember(let label, let note):
-            guard routeActive, !points.isEmpty else { say("Start a route first.", led: "uncertain"); return }
+            guard routeActive, !points.isEmpty else {
+                guide?.logAction("Wayback: \"Start a route first.\"", icon: "exclamationmark.bubble.fill", tint: "orange")
+                say("Start a route first.", led: "uncertain")
+                return
+            }
             let name = label.isEmpty ? "spot \(places.count + 1)" : label
             let p = points[points.count - 1]
             let id = "lm\(nextPlace)"; nextPlace += 1
             places.append(Place(id: id, label: name, x: p.x, y: p.y, note: note, floor: nil))
             placeIndex[id] = points.count - 1
             publish()
+            guide?.logAction("Added landmark: \(name.capitalized)", detail: note, icon: "mappin.circle.fill", tint: "purple")
             say("Saved: \(name).", led: "landmark_saved")
         case .navigate(let target):
             navigate(to: target)
         case .reanchor(let target):
-            guard let id = placeId(for: target), let i = placeIndex[id] else { say("I don't know that place.", led: "uncertain"); return }
+            guard let id = placeId(for: target), let i = placeIndex[id] else {
+                guide?.logAction("Wayback: \"I don't know that place.\"", icon: "questionmark.bubble.fill", tint: "orange")
+                say("I don't know that place.", led: "uncertain")
+                return
+            }
             nav = nil; guide?.guiding = false
             jumpNext = i
             tracker.reanchor(x: points[i].x, y: points[i].y, heading: tracker.heading, t: t)
+            guide?.logAction("Re-anchored at \(label(of: id).capitalized)", detail: "Position snapped & drift cleared", icon: "scope", tint: "blue")
             say("Got it, you're at the \(label(of: id)).", led: "recording")
         case .find(let query):
-            guard let id = placeId(for: query) else { say("I don't have a saved place like that."); return }
+            guard let id = placeId(for: query) else {
+                guide?.logAction("Wayback: \"I don't have a saved place like that.\"", icon: "questionmark.bubble.fill", tint: "orange")
+                say("I don't have a saved place like that.")
+                return
+            }
             let steps = Int((distanceBack(to: placeIndex[id] ?? 0) / tracker.stepLength).rounded())
+            guide?.logAction("Located \(label(of: id).capitalized)", detail: "About \(steps) steps away along your route", icon: "sparkle.magnifyingglass", tint: "indigo")
             say("The \(label(of: id)) is about \(steps) steps away along your route.")
         case .ask(let q):
+            guide?.logAction("Wayback: \"\(q)\"", icon: "questionmark.bubble.fill", tint: "orange")
             say(q)
         }
     }
@@ -248,20 +270,32 @@ final class PhoneBrain {
     }
 
     private func navigate(to target: String) {
-        guard points.count > 1 else { say("There is no recorded route to follow yet.", led: "uncertain"); return }
+        guard points.count > 1 else {
+            guide?.logAction("Wayback: \"There is no recorded route to follow yet.\"", icon: "exclamationmark.bubble.fill", tint: "orange")
+            say("There is no recorded route to follow yet.", led: "uncertain")
+            return
+        }
         let index: Int, name: String
         if ["start", "the start", "beginning"].contains(target.lowercased()) && placeId(for: target) == nil {
             index = 0; name = "start"
         } else if let id = placeId(for: target), let i = placeIndex[id] {
             index = i; name = label(of: id)
         } else {
-            say("I don't know that place. Which one did you mean?", led: "uncertain"); return
+            guide?.logAction("Wayback: \"I don't know that place. Which one did you mean?\"", icon: "questionmark.bubble.fill", tint: "orange")
+            say("I don't know that place. Which one did you mean?", led: "uncertain")
+            return
         }
-        guard let order = path(from: points.count - 1, to: index) else { say("I can't find a path you walked there.", led: "uncertain"); return }
+        guard let order = path(from: points.count - 1, to: index) else {
+            guide?.logAction("Wayback: \"I can't find a path you walked there.\"", icon: "exclamationmark.bubble.fill", tint: "orange")
+            say("I can't find a path you walked there.", led: "uncertain")
+            return
+        }
         let route = order.map { points[$0] }
         guard let n = Navigation(route: route, target: name, targetIndex: index, facing: tracker.heading,
                                  stepLength: tracker.stepLength) else {
-            say("You're already at the \(name).", led: "arrived"); return
+            guide?.logAction("Already at \(name)", icon: "checkmark.circle.fill", tint: "green")
+            say("You're already at the \(name).", led: "arrived")
+            return
         }
         nav = n
         if !tracker.running { tracker.resume() }
@@ -272,8 +306,9 @@ final class PhoneBrain {
         guide?.directions = n.steps.enumerated().map { DirectionStep(id: $0.offset, turn: $0.element.turn, steps: $0.element.count, text: $0.element.text) }
         guide?.directionIndex = 0
         let texts = n.steps.map(\.text)
-        say(texts.count == 1 ? texts[0] : ([texts[0]] + texts.dropFirst().map { "then " + $0.prefix(1).lowercased() + $0.dropFirst() }).joined(separator: " "),
-            led: "navigating")
+        let spoken = texts.count == 1 ? texts[0] : ([texts[0]] + texts.dropFirst().map { "then " + $0.prefix(1).lowercased() + $0.dropFirst() }).joined(separator: " ")
+        guide?.logAction("Guiding to \(name)", detail: spoken, icon: "figure.walk.circle.fill", tint: "cyan")
+        say(spoken, led: "navigating")
     }
 
     private func follow(_ n: Navigation, x: Double, y: Double) {
@@ -281,10 +316,14 @@ final class PhoneBrain {
             switch event {
             case .say(let text, let state, let period):
                 guide?.voice = text
-                if !text.isEmpty { guide?.voiceEngine.speak(text) }
+                if !text.isEmpty {
+                    guide?.logAction(text, detail: "Guidance update", icon: "arrow.triangle.turn.up.right.circle.fill", tint: "cyan")
+                    guide?.voiceEngine.speak(text)
+                }
                 if let state { led(state, period: period) }
             case .arrived(let text):
                 guide?.voiceEngine.speak(text); guide?.voice = text
+                guide?.logAction(text, detail: "Position re-anchored at \(n.target)", icon: "flag.checkered", tint: "purple")
                 led("arrived")
                 guide?.guiding = false
                 // reset to the destination's recorded spot (cancels drift) and keep recording from there
