@@ -601,7 +601,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     from store.route_store import RouteStore
     from tracker.events import read_log
-    from tracker.pdr import PathTracker
+    from tracker.wrist import make_tracker
 
     parser = argparse.ArgumentParser(description="Live Spatial Memory Map WebSocket & HTTP preview server.")
     group = parser.add_mutually_exclusive_group(required=True)
@@ -623,7 +623,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     print(banner)
 
     now_ref = [time.time()]
-    tracker = PathTracker()
+    tracker = make_tracker(synthetic=args.sim)
     store = RouteStore()
     app = SpatialMemoryApp(
         tracker,

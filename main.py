@@ -21,7 +21,7 @@ from app import SpatialMemoryApp  # noqa: E402
 from store.band_mirror import BandLandmarkMirror  # noqa: E402
 from store.route_store import RouteStore  # noqa: E402
 from tracker.events import SampleLogger, feed, read_log, synthetic_walk  # noqa: E402
-from tracker.pdr import PathTracker  # noqa: E402
+from tracker.wrist import make_tracker  # noqa: E402
 from web.ws_server import MapWebSocketServer, _start_static_http  # noqa: E402
 
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -74,7 +74,7 @@ def run_sim():
     print("SIMULATION: a synthetic walk, not real sensing.\n")
     walk1 = synthetic_walk(legs=((20, "left"), (15, None)))
     now = [walk1[0][1]]
-    app = SpatialMemoryApp(PathTracker(), RouteStore(), speak=say, led=PrintLed(), clock=lambda: now[0])
+    app = SpatialMemoryApp(make_tracker(synthetic=True), RouteStore(), speak=say, led=PrintLed(), clock=lambda: now[0])
 
     def user(text):
         print('\n> "%s"' % text)
@@ -122,7 +122,7 @@ def run_replay(path, ws_port=8765, http_port=8000, no_web=False):
     print("REPLAY of a logged walk (%s). This is not live sensing.\n" % path)
     events = read_log(path)
     now = [events[0][1]] if events else [0.0]
-    app = SpatialMemoryApp(PathTracker(), RouteStore(), speak=say, led=PrintLed(), clock=lambda: now[0])
+    app = SpatialMemoryApp(make_tracker(), RouteStore(), speak=say, led=PrintLed(), clock=lambda: now[0])
     ws, httpd = _start_web_servers(
         app, mode="REPLAY", ws_port=ws_port, http_port=http_port,
         enable_ws=not no_web, enable_http=not no_web,
@@ -149,7 +149,7 @@ def run_band(ws_port=8765, http_port=8000, no_web=False):
     band_source.require_band_number()
     log_dir = config.LOG_DIR if os.path.isabs(config.LOG_DIR) else os.path.join(REPO_ROOT, config.LOG_DIR)
     routes_file = config.ROUTES_FILE if os.path.isabs(config.ROUTES_FILE) else os.path.join(REPO_ROOT, config.ROUTES_FILE)
-    tracker = PathTracker()
+    tracker = make_tracker()
     logger = SampleLogger(log_dir)
     led = LedController()
     speaker = ElevenLabsSpeaker()

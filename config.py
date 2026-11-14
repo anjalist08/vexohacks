@@ -11,6 +11,8 @@ Do not quote accuracy numbers from them.
 BAND = 80
 
 # --- Path tracking ------------------------------------------------------------
+TRACKER_MODEL = "wrist"       # "wrist" (tracker/wrist.py, tuned on real wrist walks) or "classic" (tracker/pdr.py)
+STEP_SOURCE = "accel"         # wrist model: "accel" (footfalls in the motion data) or "band" (band's counter, starts late)
 STEP_LENGTH_M = 0.70          # PLACEHOLDER: walk a measured distance, divide by steps
 MOTION_RATE_HZ = 25           # motion samples a second (10, 25, 50, 100)
 ACTIVITY_RATE = "fastest"     # step readings up to 10 a second on firmware 1.1
