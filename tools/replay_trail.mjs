@@ -17,6 +17,13 @@ for (const r of rows) {
   else if (r.kind === 'activity') tr.activity(t, Number(r.steps), r.state);
 }
 const f = (v) => v.toFixed(1);
+const dir = (h) => 'NESW'[((Math.round(h / 90) % 4) + 4) % 4];
+const segs = [];
+for (let i = 1; i < tr.points.length; i++) {
+  const d = dir(tr.points[i].h);
+  if (segs.length && segs.at(-1)[0] === d) segs.at(-1)[1] += 1; else segs.push([d, 1]);
+}
+console.log(`route (direction + steps, N = the way you faced at start): ${segs.map(([d, n]) => d + n).join(' ')}`);
 console.log(`steps used ${tr.steps} (band counter ${tr.bandSteps}, motion ${tr.accSteps}), path ${f(tr.distance)} m`);
 console.log(`gyro bias at end ${tr.bias.toFixed(2)} deg/s, turns: ${tr.turns.map((q) => (q.deg < 0 ? 'L' : 'R')).join(' ')}`);
 console.log(`ends at x=${f(tr.x)} y=${f(tr.y)}: ${f(Math.hypot(tr.x, tr.y))} m from the start`);

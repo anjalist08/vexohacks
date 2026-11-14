@@ -1,27 +1,28 @@
-// Path tracking for the live trail page. Same method as tracker/pdr.py, in JavaScript so
-// the page can run on its own in Chrome:
+// Path tracking for the live trail page, tuned on two real walks (data/logs/walk1-*, walk2-*):
 // - gravity = low-pass of the accelerometer; yaw rate = gyro projected onto gravity, so it
 //   does not matter how the band sits on the wrist
-// - the first calibS seconds after start() measure the gyro bias (stand still)
-// - yaw is integrated all the time; still + quiet periods only nudge the bias
-// - with snap, a settled turn is rounded to the nearest 90 degrees
+// - calibration waits for real stillness: the first quietN samples in a row with the gyro
+//   below quietGyro set the gyro bias (a fixed 2-second window caught a moving hand)
+// - the bias keeps being re-estimated whenever the band is still again
+// - heading = gyro integrated all the time, then a rolling MEDIAN over medianS seconds:
+//   arm swing on the wrist makes the raw heading swing by up to ~100 degrees, the median
+//   keeps the direction you are actually walking
+// - with snap, the heading is held on a 90-degree grid (hallways) and only moves to another
+//   grid line when the median stays more than snapHyst degrees away for snapHoldS seconds.
+//   Errors do not pile up turn after turn, as long as drift stays under ~45 degrees.
 // - every step moves the position by stepLen along the heading
 // Heading is in degrees, clockwise from the direction you faced at start (0 = ahead, 90 = right).
-// Steps can come from the band's own step counter or from a simple peak detector on the
-// accelerometer, so the two can be compared on a real walk.
 
 export const DEFAULTS = {
   stepLen: 0.7,          // metres per step (PLACEHOLDER until measured)
   gravityAlpha: 0.05,    // low-pass weight for gravity, per motion sample
-  calibS: 2.0,           // seconds standing still after start
-  snap: true,            // round settled turns to 90 degrees
-  turnRate: 25,          // deg/s above this counts as turning
-  settleS: 0.6,          // quiet time before a turn counts as finished
-  minTurn: 45,           // net turns smaller than this are ignored (snap only)
-  quietGyro: 4,          // deg/s: total gyro below this for quietN samples = band at rest
-  quietN: 25,            // ~0.5 s at 50/s
-  calibMaxGyro: 12,      // deg/s: calibration ignores samples moving faster than this
+  quietGyro: 6,          // deg/s: total gyro below this...
+  quietN: 15,            // ...for this many samples in a row (~0.3 s at 50/s) = band at rest
   biasAlpha: 0.02,
+  medianS: 2.0,          // seconds of heading the rolling median covers
+  snap: true,            // hold the heading on a 90-degree grid
+  snapHyst: 50,          // degrees away from the current grid line before moving
+  snapHoldS: 0.5,        // ...for at least this long
   flip: false,           // swap left and right if the band's axes are mirrored
   stepSource: 'accel',   // 'accel' (detector below) or 'band' (band's step counter: starts ~15 s late)
   accThr: 1.12,          // g: smoothed |a| above this is a step...
@@ -50,10 +51,13 @@ export class Trail {
   reset() {
     this.running = false;
     this.x = 0; this.y = 0;
-    this.heading = 0; this.raw = 0; this.bias = 0;
-    this.calib = []; this.calibUntil = Infinity; this.calibrated = false; this.quiet = [];
+    this.heading = 0;           // heading used for steps (grid line when snapping)
+    this.unwrapped = 0;         // integrated gyro heading, not wrapped
+    this.smooth = 0;            // rolling median of unwrapped
+    this.bias = 0; this.calibrated = false; this.quiet = [];
+    this.window = [];           // [t, unwrapped] over the last medianS seconds
+    this.awaySince = null;
     this.g = null; this.lastT = null;
-    this.turning = false; this.turnStart = 0; this.quietSince = null;
     this.bandLast = null; this.bandSteps = 0;
     this.accSteps = 0; this.accArmed = true; this.accLastStep = -Infinity; this.accS = null;
     this.steps = 0;
@@ -62,18 +66,20 @@ export class Trail {
     this.turns = [];
   }
 
-  start(tSec) {
+  start() {
     this.reset();
     this.running = true;
-    this.calibUntil = tSec + this.o.calibS;
   }
 
   stop() { this.running = false; }
 
   get calibrating() { return this.running && !this.calibrated; }
 
-  /** Heading to draw: the live gyro heading while a turn is under way. */
-  get shownHeading() { return this.turning || !this.o.snap ? this.raw : this.heading; }
+  /** Heading to draw: where you are facing now (smoothed), wrapped to -180..180. */
+  get shownHeading() { return wrap(this.smooth); }
+
+  /** For tools that still read .raw */
+  get raw() { return wrap(this.unwrapped); }
 
   motion(t, ax, ay, az, gx, gy, gz) {
     if (!this.running || ax == null || gx == null) return;
@@ -85,52 +91,40 @@ export class Trail {
     if (norm < 0.3) { this.lastT = t; return; }
     let yaw = (gx * g[0] + gy * g[1] + gz * g[2]) / norm;
     if (this.o.flip) yaw = -yaw;
-
-    const gyroMag = Math.hypot(gx, gy, gz);
-    if (t < this.calibUntil) {
-      if (gyroMag < this.o.calibMaxGyro) this.calib.push(yaw);   // a hand movement must not skew the bias
-      this.lastT = t;
-      return;
-    }
-    if (!this.calibrated) {
-      if (this.calib.length) this.bias = median(this.calib);
-      this.calibrated = true;
-    }
-
     const dt = this.lastT == null ? 0 : Math.max(0, Math.min(0.2, t - this.lastT));
     this.lastT = t;
-    // Band at rest (whatever its "state" says, which lags ~10 s): keep the bias honest.
-    if (gyroMag < this.o.quietGyro) {
+
+    // Stillness: calibrate the first time, then keep the bias honest.
+    if (Math.hypot(gx, gy, gz) < this.o.quietGyro) {
       this.quiet.push(yaw);
       if (this.quiet.length > this.o.quietN) this.quiet.shift();
-      if (this.quiet.length === this.o.quietN && !this.turning) this.bias += this.o.biasAlpha * (median(this.quiet) - this.bias);
+      if (this.quiet.length === this.o.quietN) {
+        if (!this.calibrated) { this.bias = median(this.quiet); this.calibrated = true; }
+        else this.bias += this.o.biasAlpha * (median(this.quiet) - this.bias);
+      }
     } else {
       this.quiet = [];
     }
-    const rate = yaw - this.bias;
+    if (!this.calibrated) return;       // hold still: nothing is tracked until the gyro is calibrated
+
     // positive yaw about "up" = counter-clockwise = left = lower heading
-    this.raw = wrap(this.raw - rate * dt);
-    this._turn(t, rate);
+    this.unwrapped -= (yaw - this.bias) * dt;
+    this.window.push([t, this.unwrapped]);
+    while (this.window.length && t - this.window[0][0] > this.o.medianS) this.window.shift();
+    this.smooth = median(this.window.map((w) => w[1]));
+    this._heading(t);
     this._accStep(t, Math.hypot(ax, ay, az));
   }
 
-  _turn(t, rate) {
-    if (!this.o.snap) { this.heading = this.raw; this.turning = Math.abs(rate) > this.o.turnRate; return; }
-    if (Math.abs(rate) > this.o.turnRate) {
-      if (!this.turning) { this.turning = true; this.turnStart = this.raw; }
-      this.quietSince = null;
-      return;
-    }
-    if (!this.turning) return;
-    if (this.quietSince == null) { this.quietSince = t; return; }
-    if (t - this.quietSince < this.o.settleS) return;
-    const net = wrap(this.raw - this.turnStart);
-    const snapped = Math.abs(net) >= this.o.minTurn ? 90 * Math.round(net / 90) : 0;
-    this.heading = wrap(this.heading + snapped);
-    this.raw = this.heading;
-    this.turning = false;
-    this.quietSince = null;
-    if (snapped) this.turns.push({ x: this.x, y: this.y, deg: snapped });
+  _heading(t) {
+    if (!this.o.snap) { this.heading = this.smooth; return; }
+    if (Math.abs(this.smooth - this.heading) <= this.o.snapHyst) { this.awaySince = null; return; }
+    if (this.awaySince == null) { this.awaySince = t; return; }
+    if (t - this.awaySince < this.o.snapHoldS) return;
+    const next = 90 * Math.round(this.smooth / 90);
+    if (next !== this.heading) this.turns.push({ x: this.x, y: this.y, deg: next - this.heading });
+    this.heading = next;
+    this.awaySince = null;
   }
 
   _accStep(t, mag) {

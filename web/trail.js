@@ -20,6 +20,7 @@ const settings = () => ({
   snap: $('snap').checked,
   flip: $('flip').checked,
   stepSource: $('stepSource').value,
+  ...(sim ? { quietGyro: 40 } : {}),   // the pretend band never holds perfectly still
 });
 let trail = new Trail(settings());
 for (const id of ['stepLen', 'accThr', 'snap', 'flip', 'stepSource']) {
@@ -83,6 +84,8 @@ $('connect').onclick = async () => {
       sim = new SimTransport(number, { autoTap: false });
       band = await Band.connect(number, { transport: sim });
       sim.setActivity('walk', { cadence: 110 });
+      $('stepSource').value = 'band';     // the pretend band's motion has no footsteps in it
+      Object.assign(trail.o, settings());
     } else {
       say('Pick your band in the list. Double-tap it first if it is not there.');
       band = await Band.connect(number, { autoReconnect: true });
@@ -99,7 +102,7 @@ $('connect').onclick = async () => {
       while (peaks.length && t - peaks[0][0] > 2) peaks.shift();
       if (!before.cal && trail.calibrated) dbg(t, `calibrated: gyro bias ${trail.bias.toFixed(2)} deg/s. Walk now.`);
       if (trail.accSteps > before.acc) dbg(t, `motion step #${trail.accSteps} (smoothed |a| ${trail.accS.toFixed(2)} g)${trail.o.stepSource === 'accel' ? ' -> map' : ''}`);
-      if (trail.turns.length > before.turns) { const q = trail.turns.at(-1); dbg(t, `turn ${q.deg < 0 ? 'LEFT' : 'RIGHT'} ${Math.abs(q.deg)} deg, heading now ${Math.round(trail.heading)}`); }
+      if (trail.turns.length > before.turns) { const q = trail.turns.at(-1); dbg(t, `turn ${Math.abs(q.deg) >= 180 ? 'U-TURN' : q.deg < 0 ? 'LEFT' : 'RIGHT'} ${Math.abs(q.deg)} deg, walking heading now ${Math.round(trail.heading)}`); }
     });
     band.on('activity', (e) => {
       const t = e.t / 1000;
@@ -122,7 +125,7 @@ $('connect').onclick = async () => {
     setLink(`${band.name}${sim ? ' (pretend)' : ''}`, true);
     dbg(null, `connected to ${band.name}${sim ? ' (PRETEND)' : ''}, firmware ${band.info?.firmware}, streams: motion 50/s, activity fastest`);
     $('start').disabled = false;
-    say(sim ? 'PRETEND band connected. This is simulated data, not your walk.' : `Connected to ${band.name}. Press Start route, then stand still for 2 seconds.`);
+    say(sim ? 'PRETEND band connected. This is simulated data, not your walk.' : `Connected to ${band.name}. Press Start route, hold your arm still a moment, then walk.`);
   } catch (e) {
     $('connect').disabled = false;
     say(e.message, true);
@@ -132,15 +135,11 @@ $('connect').onclick = async () => {
 $('start').onclick = async () => {
   log = [];
   trail = new Trail(settings());
-  // start on the band's clock: the next motion sample sets the calibration window
-  trail.running = true;
-  trail.calibUntil = Infinity;
-  const startOnNext = (m) => { trail.start(m.t / 1000); band.off('motion', startOnNext); };
-  band.on('motion', startOnNext);
+  trail.start();
   $('start').disabled = true; $('stop').disabled = false; $('save').disabled = true;
   try { await band.setLed('#00c853', { pattern: 'breathe', period: 2000 }); } catch { /* mic on: light is locked */ }
-  dbg(null, `route started (steps from: ${trail.o.stepSource}, step length ${trail.o.stepLen} m). Stand still 2 s.`);
-  say('Stand still for 2 seconds... then walk.');
+  dbg(null, `route started (steps from: ${trail.o.stepSource}, step length ${trail.o.stepLen} m). Hold still until it says Recording.`);
+  say('Hold your arm still for a moment while the gyro calibrates... then walk.');
 };
 
 $('stop').onclick = async () => {
@@ -226,7 +225,7 @@ function draw() {
     pen.fillStyle = '#ffffff'; pen.strokeStyle = '#5d6676'; pen.lineWidth = 2;
     pen.beginPath(); pen.arc(X(t.x), Y(t.y), 5, 0, Math.PI * 2); pen.fill(); pen.stroke();
     pen.fillStyle = '#5d6676'; pen.font = '12px system-ui, sans-serif';
-    pen.fillText(t.deg < 0 ? 'left' : 'right', X(t.x) + 9, Y(t.y) - 8);
+    pen.fillText(Math.abs(t.deg) >= 180 ? 'U-turn' : t.deg < 0 ? 'left' : 'right', X(t.x) + 9, Y(t.y) - 8);
   }
   // start
   pen.fillStyle = '#1e8e3e'; pen.strokeStyle = '#fff'; pen.lineWidth = 3;
@@ -260,7 +259,7 @@ function draw() {
   if (trail.calibrating) { st.textContent = 'calibrating: stand still'; st.className = 'pill cal'; }
   else if (trail.running) { st.textContent = 'recording'; st.className = 'pill live'; }
   else { st.textContent = 'idle'; st.className = 'pill'; }
-  if (trail.running && trail.calibrated && $('msg').textContent.startsWith('Stand still')) say('Recording. Walk!');
+  if (trail.running && trail.calibrated && $('msg').textContent.startsWith('Hold your arm still')) say('Recording. Walk!');
   requestAnimationFrame(draw);
 }
 resize();
