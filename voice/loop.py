@@ -14,8 +14,11 @@ Critical band invariants (`vexo-open-kit/AGENTS.md`):
    or `led.reapply` runs.
 """
 import os
+import shutil
+import subprocess
 import sys
 import threading
+import time
 from typing import Callable, Optional, Tuple
 
 import config
@@ -101,6 +104,8 @@ class VoiceLoop:
         self._turn_lock = threading.Lock()
         self._busy = False
         self._worker: Optional[threading.Thread] = None
+        self._listening = False               # the band's mic is on in toggle mode
+        self._end_listen = threading.Event()  # second double-tap: stop listening now
 
     @classmethod
     def create(
@@ -138,10 +143,61 @@ class VoiceLoop:
         Never listens inside the band event handler thread; only flags `_tap_event`.
         Returns True if a turn was queued, False if ignored because a turn is active.
         """
+        if self._listening:                 # second double-tap: mic off, then answer
+            self._end_listen.set()
+            return True
         if self._busy:
             return False
         self._tap_event.set()
         return True
+
+    def _chime(self, name: str) -> None:
+        """A short macOS system sound, so listening can be followed without looking at a screen."""
+        if not getattr(config, "VOICE_CHIMES", True) or not shutil.which("afplay"):
+            return
+        path = "/System/Library/Sounds/%s.aiff" % name
+        if os.path.exists(path):
+            try:
+                subprocess.Popen(["afplay", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except OSError:
+                pass
+
+    def _listen_toggle(self, speech, on_text) -> str:
+        """Mic on until a second double-tap, a pause after speech, or the time limit.
+
+        The same steps as the kit's speech.listen (create, start, feed audio, mic on, wait,
+        mic off, stop), with an early stop. Runs on the worker thread, never in a band handler.
+        """
+        max_s = float(getattr(config, "LISTEN_MAX_SECONDS", 15.0))
+        pause_s = float(getattr(config, "LISTEN_PAUSE_STOP_SECONDS", 2.0))
+        last_text = [None]
+
+        def _text(text, final):
+            if (text or "").strip():
+                last_text[0] = time.time()
+            on_text(text, final)
+
+        ears = speech.create(keyterm="landmark").start(_text)
+        feed = ears.feed
+        band = self.band
+        band.on("audio", feed)
+        self._end_listen.clear()
+        self._listening = True
+        try:
+            band.configure(audio=True)          # the light goes solid blue: the microphone is on
+            self._chime("Tink")
+            self._status("listening", seconds=max_s, toggle=True)
+            start = time.time()
+            while time.time() - start < max_s and not self._end_listen.is_set():
+                band.wait(0.1)
+                if last_text[0] is not None and time.time() - last_text[0] >= pause_s:
+                    break                       # they stopped talking
+            band.configure(audio=False)
+        finally:
+            self._listening = False
+            band.off("audio", feed)
+        self._chime("Pop")
+        return ears.stop()
 
     def start_background(self) -> threading.Thread:
         """Start a daemon worker thread that runs one turn per queued double-tap."""
@@ -310,10 +366,13 @@ class VoiceLoop:
 
         try:
             speech = _load_kit_speech()
-            self._status("listening", seconds=seconds)
-            # keyterm: Deepgram nova-3 prompt for a word the wrist mic often mishears (the kit
-            # sends one keyterm; it cannot repeat the parameter).
-            transcript = speech.listen(self.band, seconds, on_text=_on_text, keyterm="landmark")
+            if getattr(config, "LISTEN_MODE", "toggle") == "toggle" and hasattr(speech, "create"):
+                transcript = self._listen_toggle(speech, _on_text)
+            else:
+                self._status("listening", seconds=seconds)
+                # keyterm: Deepgram nova-3 prompt for a word the wrist mic often mishears (the
+                # kit sends one keyterm; it cannot repeat the parameter).
+                transcript = speech.listen(self.band, seconds, on_text=_on_text, keyterm="landmark")
             return True, transcript or "", ""
         except (Exception, SystemExit) as exc:
             _safe_mic_off(self.band)

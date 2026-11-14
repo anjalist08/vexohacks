@@ -478,7 +478,7 @@ class MapWebSocketServer:
             if mtype == "ping":
                 client.send_json({"type": "pong"})
                 return
-            if mtype == "talk":                  # the page's Talk button: same as a double-tap
+            if mtype == "talk":                  # the page's Talk / Stop button: same as a double-tap
                 loop = getattr(self, "voice_loop", None)
                 if loop is not None and getattr(loop, "band", None) is not None:
                     loop.on_double_tap()

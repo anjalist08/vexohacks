@@ -811,6 +811,7 @@
 
   // --- Talk to the band -----------------------------------------------------
   var voiceTimer = null;
+  var voiceListeningToggle = false;
   var voiceWatchdog = null;
   var STEP_ORDER = ["listening", "thinking", "done"];
 
@@ -829,7 +830,8 @@
     clearTimeout(voiceWatchdog);
     els.voiceStatus.classList.remove("error");
     var busy = stateName === "starting" || stateName === "listening" || stateName === "heard" || stateName === "thinking";
-    els.talkBtn.disabled = busy;
+    voiceListeningToggle = stateName === "listening" && !!msg.toggle;
+    els.talkBtn.disabled = busy && !voiceListeningToggle;   // while listening, the button is "Stop"
     els.talkBtn.classList.toggle("listening", stateName === "listening" || stateName === "starting");
     els.voiceBadge.textContent = {
       starting: "starting", listening: "listening", heard: "heard", thinking: "thinking",
@@ -839,6 +841,11 @@
     if (stateName === "starting") {
       els.talkLabel.textContent = "…";
       els.voiceStatus.textContent = "Turning the band's microphone on…";
+      els.voiceHeard.textContent = "";
+      setSteps("listening");
+    } else if (stateName === "listening" && msg.toggle) {
+      els.talkLabel.textContent = "Stop";
+      setRich(els.voiceStatus, "Listening — speak now.", " Double-tap again (or pause) when you're done.");
       els.voiceHeard.textContent = "";
       setSteps("listening");
     } else if (stateName === "listening") {
@@ -868,7 +875,7 @@
       setSteps(null);
     } else {
       els.talkLabel.textContent = "Talk";
-      setRich(els.voiceStatus, "Tap Talk", " (or double-tap the band), then speak.");
+      setRich(els.voiceStatus, "Double-tap the band", " (or tap Talk), speak, then double-tap again.");
       setSteps(null);
     }
     if (busy) {   // never leave the button stuck if the band stops answering
@@ -921,8 +928,10 @@
 
   els.talkBtn.addEventListener("click", function () {
     if (socket && socket.readyState === WebSocket.OPEN) {
-      setVoice("starting");
-      socket.send(JSON.stringify({ type: "talk" }));
+      if (!voiceListeningToggle) {
+        setVoice("starting");
+      }
+      socket.send(JSON.stringify({ type: "talk" }));   // while listening: stop, same as a double-tap
     } else {
       setVoice("error", { text: "Not connected to the app. Start it with python3 main.py --band." });
     }

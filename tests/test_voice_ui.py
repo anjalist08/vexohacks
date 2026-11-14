@@ -84,5 +84,103 @@ class VoiceStatusEventTests(unittest.TestCase):
         self.assertEqual(events[-1]["tool"], "start_route")
 
 
+
+class ToggleListenTests(unittest.TestCase):
+    """Double-tap = mic on; double-tap again (or a pause after speech) = mic off, then answer."""
+
+    def make(self, script):
+        from unittest import mock
+        import config
+
+        class Band:
+            def __init__(self):
+                self.audio, self.handlers, self.t = False, {}, 0.0
+
+            def on(self, kind, fn):
+                self.handlers[kind] = fn
+
+            def off(self, kind, fn):
+                self.handlers.pop(kind, None)
+
+            def configure(self, audio=None, **kw):
+                if audio is not None:
+                    self.audio = audio
+
+            def wait(self, seconds):
+                time.sleep(0.01)
+                script(self, loop)
+
+        class Ears:
+            def __init__(self):
+                self.on_text = None
+
+            def start(self, on_text):
+                self.on_text = on_text
+                return self
+
+            def feed(self, *a):
+                pass
+
+            def stop(self):
+                return " ".join(spoken)
+
+        spoken = []
+        ears = Ears()
+
+        class Speech:
+            @staticmethod
+            def create(**options):
+                return ears
+
+        app = make_app()
+        loop = VoiceLoop(app, band=Band(), choose_fn=lambda words, **kw: ("start_route", {}))
+        loop._ears, loop._spoken = ears, spoken
+        patches = [mock.patch("voice.loop._load_kit_speech", return_value=Speech),
+                   mock.patch.object(config, "VOICE_CHIMES", False),
+                   mock.patch.object(config, "LISTEN_MAX_SECONDS", 3.0),
+                   mock.patch.dict(os.environ, {"VEXO_DEEPGRAM_API_KEY": "test-vexo-dg"})]
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+        return loop
+
+    def test_second_double_tap_stops_listening(self):
+        calls = {"n": 0}
+
+        def script(band, loop):
+            calls["n"] += 1
+            if calls["n"] == 3:
+                loop._spoken.append("start route")
+                loop._ears.on_text("start route", True)
+            if calls["n"] == 5:
+                loop.on_double_tap()          # second double-tap, before any pause
+        loop = self.make(script)
+        t0 = time.time()
+        res = loop.run_turn()
+        self.assertLess(time.time() - t0, 1.5)
+        self.assertFalse(loop.band.audio)     # mic is off again
+        self.assertFalse(loop._listening)
+        self.assertTrue(res.ok)
+        self.assertTrue(res.say.startswith("Route started"))
+
+    def test_pause_after_speech_stops_listening(self):
+        import config
+        calls = {"n": 0}
+
+        def script(band, loop):
+            calls["n"] += 1
+            if calls["n"] == 2:
+                loop._spoken.append("start route")
+                loop._ears.on_text("start route", True)
+        loop = self.make(script)
+        from unittest import mock
+        with mock.patch.object(config, "LISTEN_PAUSE_STOP_SECONDS", 0.2):
+            t0 = time.time()
+            res = loop.run_turn()
+        self.assertLess(time.time() - t0, 2.0)
+        self.assertFalse(loop.band.audio)
+        self.assertTrue(res.ok)
+
+
 if __name__ == "__main__":
     unittest.main()
