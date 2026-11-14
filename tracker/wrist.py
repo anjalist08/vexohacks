@@ -63,6 +63,7 @@ class WristTracker(PathTracker):
         super()._reset(t)
         self.unwrapped = 0.0
         self.smooth = 0.0
+        self.facing = 0.0          # quick heading for the facing cone (~0.2 s smoothing)
         self._window = collections.deque()
         self._quiet: List[float] = []
         self._away_since: Optional[float] = None
@@ -120,6 +121,9 @@ class WristTracker(PathTracker):
 
         # positive yaw about "up" = counter-clockwise = left = lower heading
         self.unwrapped -= (yaw - self.bias) * dt
+        # The cone shows where you face NOW (reacts in ~0.2 s); the map's walking direction
+        # uses the slower 2 s median below so arm swing does not bend the line.
+        self.facing += (1.0 - math.exp(-dt / 0.2)) * (self.unwrapped - self.facing) if dt > 0 else 0.0
         self._window.append((t, self.unwrapped))
         while self._window and t - self._window[0][0] > MEDIAN_S:
             self._window.popleft()
@@ -204,7 +208,7 @@ class WristTracker(PathTracker):
         sample = super().reanchor(x, y, heading_deg, t)
         with self._lock:
             # keep the median and the grid continuous with the confirmed heading
-            self.heading = self.unwrapped = self.smooth = float(wrap_deg(heading_deg))
+            self.heading = self.unwrapped = self.smooth = self.facing = float(wrap_deg(heading_deg))
             self._window.clear()
             self._away_since = None
         return sample
@@ -225,7 +229,7 @@ def tracker_status(tracker) -> dict:
     """A small live snapshot for the map page (sent a few times a second): whether the
     route is recording, whether the gyro is calibrated yet, where the wearer faces right
     now (even standing still), and the step counts from both sources."""
-    live = getattr(tracker, "smooth", None)
+    live = getattr(tracker, "facing", None)
     return {
         "type": "tracker",
         "model": type(tracker).__name__,

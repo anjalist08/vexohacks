@@ -53,7 +53,8 @@ export class Trail {
     this.x = 0; this.y = 0;
     this.heading = 0;           // heading used for steps (grid line when snapping)
     this.unwrapped = 0;         // integrated gyro heading, not wrapped
-    this.smooth = 0;            // rolling median of unwrapped
+    this.smooth = 0;            // rolling median of unwrapped (walking direction)
+    this.facing = 0;            // quick heading for the facing cone (~0.2 s smoothing)
     this.bias = 0; this.calibrated = false; this.quiet = [];
     this.window = [];           // [t, unwrapped] over the last medianS seconds
     this.awaySince = null;
@@ -76,7 +77,7 @@ export class Trail {
   get calibrating() { return this.running && !this.calibrated; }
 
   /** Heading to draw: where you are facing now (smoothed), wrapped to -180..180. */
-  get shownHeading() { return wrap(this.smooth); }
+  get shownHeading() { return wrap(this.facing); }
 
   /** For tools that still read .raw */
   get raw() { return wrap(this.unwrapped); }
@@ -109,6 +110,7 @@ export class Trail {
 
     // positive yaw about "up" = counter-clockwise = left = lower heading
     this.unwrapped -= (yaw - this.bias) * dt;
+    if (dt > 0) this.facing += (1 - Math.exp(-dt / 0.2)) * (this.unwrapped - this.facing);
     this.window.push([t, this.unwrapped]);
     while (this.window.length && t - this.window[0][0] > this.o.medianS) this.window.shift();
     this.smooth = median(this.window.map((w) => w[1]));
