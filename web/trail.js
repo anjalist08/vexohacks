@@ -40,6 +40,40 @@ function record(kind, t, f) {
 
 $('pretend').addEventListener('change', () => { $('simbtns').hidden = !$('pretend').checked; });
 
+// ---- debug log: every step, turn and band reading, readable on the page and downloadable
+const dbgLines = [];
+const MOST_DBG = 5000;
+const dbgState = { actCount: 0, lastLifetime: null, cadence: null, bandState: null, lastActAt: null, loggedState: null, mag: null };
+const peaks = [];                   // [t, smoothed |a|] over the last 2 s
+const wall = () => new Date().toTimeString().slice(0, 8);
+function dbg(t, text) {
+  const line = `${wall()}  t=${t == null ? '-' : t.toFixed(2)}  ${text}`;
+  dbgLines.push(line);
+  if (dbgLines.length > MOST_DBG) dbgLines.shift();
+  const box = $('dbg');
+  const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 4;
+  box.textContent = dbgLines.slice(-300).join('\n');
+  if (atBottom) box.scrollTop = box.scrollHeight;
+}
+$('saveDbg').onclick = () => {
+  const settingsLine = `settings: ${JSON.stringify(settings())}\n`;
+  const blob = new Blob([settingsLine + dbgLines.join('\n') + '\n'], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `debug-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.txt`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+setInterval(() => {
+  $('actCount').textContent = dbgState.actCount;
+  $('lifetime').textContent = dbgState.lastLifetime ?? '–';
+  $('cadence').textContent = dbgState.cadence == null ? '–' : `${dbgState.cadence}/min`;
+  $('actAge').textContent = dbgState.lastActAt == null ? 'never' : `${((performance.now() - dbgState.lastActAt) / 1000).toFixed(1)} s ago`;
+  $('mag').textContent = dbgState.mag == null ? '–' : `${dbgState.mag.toFixed(2)} g`;
+  const pk = peaks.length ? Math.max(...peaks.map((p) => p[1])) : null;
+  $('peak').textContent = pk == null ? '–' : `${pk.toFixed(2)} g`;
+}, 250);
+
 $('connect').onclick = async () => {
   const number = Number($('band').value);
   try {
@@ -56,13 +90,29 @@ $('connect').onclick = async () => {
     band.on('motion', (m) => {
       samplesThisSecond += 1;
       const t = m.t / 1000;
+      const before = { acc: trail.accSteps, turns: trail.turns.length, cal: trail.calibrated, steps: trail.steps };
       trail.motion(t, m.ax, m.ay, m.az, m.gx, m.gy, m.gz);
       if (trail.running) record('motion', t, m);
+      const mag = Math.hypot(m.ax, m.ay, m.az);
+      dbgState.mag = trail.accS ?? mag;
+      peaks.push([t, trail.accS ?? mag]);
+      while (peaks.length && t - peaks[0][0] > 2) peaks.shift();
+      if (!before.cal && trail.calibrated) dbg(t, `calibrated: gyro bias ${trail.bias.toFixed(2)} deg/s. Walk now.`);
+      if (trail.accSteps > before.acc) dbg(t, `motion step #${trail.accSteps} (smoothed |a| ${trail.accS.toFixed(2)} g)${trail.o.stepSource === 'accel' ? ' -> map' : ''}`);
+      if (trail.turns.length > before.turns) { const q = trail.turns.at(-1); dbg(t, `turn ${q.deg < 0 ? 'LEFT' : 'RIGHT'} ${Math.abs(q.deg)} deg, heading now ${Math.round(trail.heading)}`); }
     });
     band.on('activity', (e) => {
       const t = e.t / 1000;
+      dbgState.actCount += 1;
+      const prev = dbgState.lastLifetime;
+      dbgState.lastLifetime = e.steps; dbgState.cadence = e.cadence; dbgState.bandState = e.state; dbgState.lastActAt = performance.now();
+      const mapBefore = trail.steps;
       trail.activity(t, e.steps, e.state);
       if (trail.running) record('activity', t, e);
+      if (prev == null) dbg(t, `first activity reading: band lifetime steps ${e.steps}, state ${e.state}`);
+      else if (e.steps !== prev) dbg(t, `band steps ${prev} -> ${e.steps} (+${e.steps - prev}), cadence ${e.cadence}/min, ${e.state}${trail.steps > mapBefore ? ' -> map' : trail.running ? (trail.calibrated ? '' : ' (ignored: calibrating)') : ' (ignored: route not started)'}`);
+      else if (e.state !== dbgState.loggedState) dbg(t, `band state: ${e.state} (steps unchanged at ${e.steps})`);
+      dbgState.loggedState = e.state;
     });
     band.on('reconnecting', () => setLink('reconnecting...', false));
     band.on('reconnected', () => setLink(`${band.name}${sim ? ' (pretend)' : ''}`, true));
@@ -70,6 +120,7 @@ $('connect').onclick = async () => {
     await band.configure({ motion: 50, sensors: 'both', activity: 'fastest' });
     await band.setLed('#ffffff', { brightness: 0.2 });
     setLink(`${band.name}${sim ? ' (pretend)' : ''}`, true);
+    dbg(null, `connected to ${band.name}${sim ? ' (PRETEND)' : ''}, firmware ${band.info?.firmware}, streams: motion 50/s, activity fastest`);
     $('start').disabled = false;
     say(sim ? 'PRETEND band connected. This is simulated data, not your walk.' : `Connected to ${band.name}. Press Start route, then stand still for 2 seconds.`);
   } catch (e) {
@@ -88,6 +139,7 @@ $('start').onclick = async () => {
   band.on('motion', startOnNext);
   $('start').disabled = true; $('stop').disabled = false; $('save').disabled = true;
   try { await band.setLed('#00c853', { pattern: 'breathe', period: 2000 }); } catch { /* mic on: light is locked */ }
+  dbg(null, `route started (steps from: ${trail.o.stepSource}, step length ${trail.o.stepLen} m). Stand still 2 s.`);
   say('Stand still for 2 seconds... then walk.');
 };
 
@@ -95,6 +147,7 @@ $('stop').onclick = async () => {
   trail.stop();
   $('start').disabled = false; $('stop').disabled = true; $('save').disabled = log.length === 0;
   try { await band.setLed('#ffffff', { brightness: 0.2 }); } catch { /* ignore */ }
+  dbg(null, `route stopped: map ${trail.steps} steps, band counter ${trail.bandSteps}, motion detector ${trail.accSteps}, ${trail.distance.toFixed(1)} m`);
   say(`Stopped. ${trail.steps} steps, ${trail.distance.toFixed(1)} m. Download the log to replay or tune it.`);
 };
 

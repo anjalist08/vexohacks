@@ -70,6 +70,15 @@
     <label>Motion step threshold <input id="accThr" type="number" step="0.01" value="1.12"> g</label>
     <label><input id="snap" type="checkbox" checked> Snap turns to 90°</label>
     <label><input id="flip" type="checkbox"> Swap left and right</label>
+    <h2>Debug</h2>
+    <div class="stat"><span>Band step readings received</span><b id="actCount">0</b></div>
+    <div class="stat"><span>Last reading</span><b id="actAge">never</b></div>
+    <div class="stat"><span>Band lifetime steps</span><b id="lifetime">–</b></div>
+    <div class="stat"><span>Band cadence</span><b id="cadence">–</b></div>
+    <div class="stat"><span>Motion |a| now</span><b id="mag">–</b></div>
+    <div class="stat"><span>Peak |a|, last 2 s</span><b id="peak">–</b></div>
+    <pre id="dbg" style="margin:0;max-height:220px;overflow:auto;background:#0f1520;color:#cfe3ff;font:11.5px/1.4 ui-monospace,Menlo,monospace;padding:8px;border-radius:6px;white-space:pre-wrap"></pre>
+    <button id="saveDbg">Download debug log</button>
     <p class="hint">Press Start route and stand still for 2 seconds while the gyro calibrates. Walk with your arm swinging normally. If turns come out mirrored, tick "Swap left and right". "Download log" saves a CSV that <code>python3 main.py --replay FILE</code> can replay.</p>
   </aside>
 </main>
