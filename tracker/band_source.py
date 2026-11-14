@@ -21,14 +21,17 @@ def require_band_number() -> int:
     return config.BAND
 
 
-def connect(tracker, logger=None, on_double_tap=None, on_link=None):
+def connect(tracker, logger=None, on_double_tap=None, on_link=None, on_uncertain=None):
     """Connect to the team's band, stream motion and steps into tracker, log every sample.
 
     on_double_tap(): called on a double-tap (starts one listening turn).
     on_link(text): called with "connected", "reconnecting" or "reconnected".
+    on_uncertain(is_uncertain): called when tracker.heading_uncertain transitions False<->True.
     Returns the connected band (vexo_open.sync.Band).
     """
     number = require_band_number()
+    if on_uncertain is not None:
+        tracker.on_uncertainty(on_uncertain)
     if KIT_PYTHON not in sys.path:
         sys.path.insert(0, KIT_PYTHON)
     from vexo_open.sync import Band
