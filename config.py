@@ -34,7 +34,7 @@ OUTPUT_MODE = "both"          # "both", "light-only" or "voice-only" (stretch go
 
 # --- Models and voices (no keys here: keys live in .env) ----------------------
 GEMINI_MODEL = None           # confirm the Gemini 4 model id in the sponsor channel
-ELEVENLABS_VOICE_ID = None    # pick a voice in ElevenLabs and paste its id here
+ELEVENLABS_VOICE_ID = "SAz9YHcvj6GT2YYXdXww"   # River: calm, neutral, informative
 LISTEN_SECONDS = 4.0          # how long one tap-to-talk turn records
 
 # --- Files ------------------------------------------------------------------
