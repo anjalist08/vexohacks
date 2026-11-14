@@ -33,7 +33,9 @@ struct GuideView: View {
     }
 
     private var linkText: String {
-        if guide.phoneOnly { return "iPhone only" }
+        if guide.phoneOnly {
+            return guide.bandConnectedOnPhone ? "\(BandConfig.name) connected" : "searching for \(BandConfig.name)…"
+        }
         switch guide.link {
         case .off: return "not connected"
         case .connecting: return "connecting…"

@@ -13,10 +13,11 @@ final class BandLink: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     private var peripheral: CBPeripheral?
     private var rxChar: CBCharacteristic?
     private var wantConnected = false
-    private var verified = false
+    private(set) var verified = false
     private var seq: UInt8 = 0
     private var queue: [[UInt8]] = []             // commands wait their turn: one at a time
     private var waiting: (seq: UInt8, sentAt: Date)?
+    private var infoRetries = 0
     private var clockAnchor: (tMs: UInt32, at: Double)?
 
     override init() {
@@ -61,21 +62,31 @@ final class BandLink: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         central.connect(p, options: connectOptions)
     }
 
+    /// Forget the remembered CoreBluetooth peripheral UUID so the next connect scans fresh.
+    static func forgetRemembered() {
+        UserDefaults.standard.removeObject(forKey: savedKey)
+    }
+
     func stop() {
         wantConnected = false
         attempt += 1
         central.stopScan()
         if let p = peripheral { central.cancelPeripheralConnection(p) }
+        reset()
     }
 
     /// Scan unless a link is up or being set up. A pending remembered connect does not stop the scan.
+    /// AllowDuplicates ensures iOS delivers the scan-response packet (local name) even if packet 1 arrived first.
     private func scanIfReady() {
         guard wantConnected, central.state == .poweredOn, !verified,
               peripheral == nil || peripheral?.state == .disconnected || peripheral?.state == .connecting
                 && UserDefaults.standard.string(forKey: BandLink.savedKey) == peripheral?.identifier.uuidString
         else { return }
-        if peripheral == nil { onStatus?("Looking for \(BandConfig.name)… double-tap the band") }
-        central.scanForPeripherals(withServices: [CBUUID(string: BandProtocol.service)], options: nil)
+        if peripheral == nil { onStatus?("Looking for \(BandConfig.name)… double-tap the band so it blinks blue") }
+        central.scanForPeripherals(
+            withServices: [CBUUID(string: BandProtocol.service)],
+            options: [CBCentralManagerScanOptionAllowDuplicatesKey: true]
+        )
     }
 
     // MARK: finding only our band
@@ -100,7 +111,9 @@ final class BandLink: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         peripheral = p
         p.delegate = self
         onStatus?("Found \(BandConfig.name), connecting…")
-        c.connect(p, options: connectOptions)
+        if p.state != .connecting && p.state != .connected {
+            c.connect(p, options: connectOptions)
+        }
         watchdog(p)
     }
 
@@ -121,6 +134,7 @@ final class BandLink: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         c.stopScan()
         peripheral = p
         p.delegate = self
+        infoRetries = 0
         onStatus?("Connected, checking it is band \(BandConfig.number)…")
         p.discoverServices([CBUUID(string: BandProtocol.service)])
         if attempt == 0 || !verified { watchdog(p) }
@@ -132,6 +146,7 @@ final class BandLink: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
             useAutoReconnect = false                       // this iOS refuses auto-reconnect: connect plainly
             onStatus?("Connecting to \(BandConfig.name)…")
             c.connect(p, options: connectOptions)
+            watchdog(p)
             return
         }
         reset()
@@ -174,7 +189,7 @@ final class BandLink: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     }
 
     private func reset() {
-        peripheral = nil; rxChar = nil; verified = false; queue = []; waiting = nil; clockAnchor = nil
+        peripheral = nil; rxChar = nil; verified = false; queue = []; waiting = nil; infoRetries = 0; clockAnchor = nil
     }
 
     // MARK: services
@@ -204,11 +219,34 @@ final class BandLink: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     func peripheral(_ p: CBPeripheral, didUpdateNotificationStateFor ch: CBCharacteristic, error: Error?) {
         guard ch.uuid == CBUUID(string: BandProtocol.tx) else { return }
         guard error == nil, ch.isNotifying else { return failed("Listening to the band", error, p) }
-        send(BandProtocol.Op.getInfo)            // first: is this really our band?
+        requestInfo()                            // first: is this really our band?
     }
 
     func peripheral(_ p: CBPeripheral, didWriteValueFor ch: CBCharacteristic, error: Error?) {
-        if let error, !verified { onStatus?("Sending to the band failed: \(error.localizedDescription)") }
+        if let error, !verified {
+            onStatus?("Handshaking with \(BandConfig.name) (\(error.localizedDescription))…")
+            waiting = nil
+            scheduleInfoRetry()
+        }
+    }
+
+    private func requestInfo() {
+        guard wantConnected, !verified, peripheral != nil, rxChar != nil else { return }
+        infoRetries += 1
+        send(BandProtocol.Op.getInfo)
+        scheduleInfoRetry()
+    }
+
+    private func scheduleInfoRetry() {
+        let mine = attempt
+        let count = infoRetries
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak self] in
+            guard let self, self.attempt == mine, self.wantConnected, !self.verified,
+                  self.infoRetries == count, count < 4 else { return }
+            self.waiting = nil
+            self.queue.removeAll()
+            self.requestInfo()
+        }
     }
 
     // MARK: commands, one at a time (contract: wait for each response, 2 s timeout)
@@ -236,6 +274,8 @@ final class BandLink: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
             guard s == waiting?.seq else { return }
             waiting = nil
             if op == BandProtocol.Op.getInfo.rawValue && !verified {
+                // Contract §2.2: ignore a truncated GET_INFO OK response (< 16 bytes) and keep waiting.
+                if status == 0 && data.count < 16 { return }
                 guard status == 0, BandProtocol.bandNumber(fromInfo: data) == BandConfig.number else {
                     onStatus?("That is not band \(BandConfig.number). Disconnected.")   // rule: never use another band
                     wantConnected = false
@@ -296,10 +336,12 @@ final class BandLink: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         switch op {
         case "configure": configure(a)
         case "setLed":
+            let bright = (a["brightness"] as? NSNumber)?.doubleValue ?? 1
+            let period = (a["period"] as? NSNumber)?.intValue ?? 1000
             send(.ledSet, BandProtocol.ledArgs(color: a["color"] as? String ?? "#ffffff",
-                                               brightness: (a["brightness"] as? Double) ?? 1,
+                                               brightness: bright,
                                                pattern: a["pattern"] as? String ?? "solid",
-                                               periodMs: (a["period"] as? Int) ?? 1000))
+                                               periodMs: period))
         case "ledOff":
             send(.ledSet, BandProtocol.ledArgs(color: "#000000", brightness: 0, pattern: "off", periodMs: 1000))
         default: break
@@ -317,7 +359,7 @@ final class BandLink: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
             default: return nil
             }
         }
-        if let rate = a["motion"] as? Int, rate > 0 {
+        if !(a["motion"] is Bool), let rate = (a["motion"] as? NSNumber)?.intValue, rate > 0 {
             send(.imuSet, [UInt8([10, 25, 50, 100].contains(rate) ? rate : 50), 2] + BandProtocol.u16(2000))
         }
         if let v = on(a["motion"]) { v ? start.append(.motion) : stopping.append(.motion) }
@@ -328,7 +370,9 @@ final class BandLink: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         }
         if let v = on(a["battery"]) { v ? start.append(.battery) : stopping.append(.battery) }
         if let v = on(a["temperature"]) {
-            if v, let s = a["temperature"] as? Int, (1...255).contains(s) { send(.tempSetInterval, [UInt8(s)]) }
+            if v, !(a["temperature"] is Bool), let s = (a["temperature"] as? NSNumber)?.intValue, (1...255).contains(s) {
+                send(.tempSetInterval, [UInt8(s)])
+            }
             v ? start.append(.temp) : stopping.append(.temp)
         }
         if let v = on(a["audio"]) { v ? start.append(.audio) : stopping.append(.audio) }
