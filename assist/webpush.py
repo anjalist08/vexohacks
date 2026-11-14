@@ -139,7 +139,7 @@ def valid_subscription(sub) -> bool:
 
 
 class WebPushSender:
-    """Call it with a haptic message (assist.haptics.haptic_message), like NtfySender."""
+    """Call it with a cue message (assist.cues.cue_message), like NtfySender."""
 
     def __init__(self, vapid: Vapid, store_path: Optional[str] = None,
                  post: Callable[[str, bytes, dict], int] = _post,

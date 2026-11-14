@@ -8,49 +8,138 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Vexo">
 <style>
-  :root { --bg: #ffffff; --fg: #111111; --muted: #555555; --btn: #111111; --btn-fg: #ffffff; --ok: #0a7d32; --warn: #a33a00; }
+  :root { --bg: #ffffff; --fg: #111111; --muted: #555555; --line: #c8c8c8; --btn: #111111; --btn-fg: #ffffff; --ok: #0a7d32; }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #000000; --fg: #f2f2f2; --muted: #b0b0b0; --btn: #f2f2f2; --btn-fg: #000000; --ok: #4cd37a; --warn: #ff9a5c; }
+    :root { --bg: #000000; --fg: #f2f2f2; --muted: #b0b0b0; --line: #444444; --btn: #f2f2f2; --btn-fg: #000000; --ok: #4cd37a; }
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--fg);
     font: 20px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  main { display: flex; flex-direction: column; gap: 16px; min-height: 100%; padding: 16px; }
-  #say { font-size: 30px; font-weight: 700; min-height: 3.2em; }
-  #big { flex: 1; min-height: 45vh; width: 100%; border: 0; border-radius: 20px;
+  main { display: flex; flex-direction: column; gap: 16px; min-height: 100vh; padding: 16px; }
+  #say { font-size: 30px; font-weight: 700; min-height: 3.2em; overflow-wrap: anywhere; }
+  #big { flex: 1; min-height: 40vh; width: 100%; border: 0; border-radius: 20px;
     background: var(--btn); color: var(--btn-fg); font-size: 40px; font-weight: 800; }
-  #big:focus-visible { outline: 6px solid var(--ok); outline-offset: 4px; }
+  #big:focus-visible, .row input:focus-visible { outline: 6px solid var(--ok); outline-offset: 4px; }
+  fieldset { border: 1px solid var(--line); border-radius: 14px; padding: 8px 14px 12px; margin: 0; }
+  legend { font-size: 16px; color: var(--muted); padding: 0 6px; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; }
+  .row input[type=checkbox] { width: 28px; height: 28px; flex-shrink: 0; }
+  .row input[type=range] { flex: 1; max-width: 55%; height: 32px; }
   #status { color: var(--muted); font-size: 16px; }
-  .ok { color: var(--ok); } .warn { color: var(--warn); }
 </style>
 </head>
 <body>
 <main>
-  <div id="say" role="status" aria-live="assertive">Tap Start to begin.</div>
+  <div id="say" role="status" aria-live="assertive">Put on your headphones, then tap Start.</div>
   <button id="big" type="button">Start</button>
+  <fieldset>
+    <legend>Cues</legend>
+    <label class="row">Sounds in headphones <input type="checkbox" id="optSound" checked></label>
+    <label class="row">Walking ticks <input type="checkbox" id="optTicks" checked></label>
+    <label class="row">Vibration <input type="checkbox" id="optVibrate" checked></label>
+    <label class="row">Keep screen on (sounds stop when it locks) <input type="checkbox" id="optAwake" checked></label>
+    <label class="row">Volume <input type="range" id="optVolume" min="0.1" max="1" step="0.1" value="0.7"></label>
+  </fieldset>
   <div id="status" aria-live="polite"></div>
 </main>
 <script>
-  // Guidance cues from the laptop arrive as {"type":"haptic","cue","pattern","say"}.
-  // The phone vibrates the pattern and shows the line (screen readers announce it).
-  // It sends back {"type":"compass","heading","t"} and {"type":"confirm"}.
-  const sayEl = document.getElementById('say');
-  const big = document.getElementById('big');
-  const statusEl = document.getElementById('status');
+  // Cues from the laptop arrive as {"type":"cue","cue","pattern","sound":{notes,pan},"say","quiet"}.
+  // The phone plays the sound in the headphones (left/right ear by "pan"), vibrates the
+  // pattern where it can, and shows the line, which screen readers announce. Ticks and
+  // approach pings are "quiet": heard, never announced. It sends back
+  // {"type":"compass","heading","t"} and {"type":"confirm"}.
+  const $ = (id) => document.getElementById(id);
+  const sayEl = $('say'), big = $('big'), statusEl = $('status');
   const token = new URLSearchParams(location.search).get('k') || '';
   const canVibrate = typeof navigator.vibrate === 'function';
-  const state = { link: 'not connected', compass: 'off', vibrate: canVibrate ? 'on' : 'not on this phone',
-                  notify: 'off' };
   const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
                 (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const standalone = window.navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
-  let ws = null, started = false, lastSent = 0, retry = 1000;
+  const state = { link: 'not connected', sound: 'off', vibrate: canVibrate ? 'on' : 'not on this phone',
+                  compass: 'off', notify: 'off', awake: 'off' };
+  let ws = null, started = false, lastSent = 0, retry = 1000, audio = null, wakeLock = null;
 
-  function showStatus() {
-    statusEl.textContent = 'Link: ' + state.link + ' · Vibration: ' + state.vibrate + ' · Compass: ' +
-      state.compass + ' · Notifications: ' + state.notify;
+  // --- settings, remembered on this phone only -------------------------------------------
+  const opts = { optSound: true, optTicks: true, optVibrate: true, optAwake: true, optVolume: 0.7 };
+  try { Object.assign(opts, JSON.parse(localStorage.getItem('vexo-cue-options') || '{}')); } catch (e) {}
+  for (const id of Object.keys(opts)) {
+    const el = $(id);
+    if (el.type === 'checkbox') el.checked = !!opts[id]; else el.value = opts[id];
+    el.addEventListener('change', () => {
+      opts[id] = el.type === 'checkbox' ? el.checked : Number(el.value);
+      try { localStorage.setItem('vexo-cue-options', JSON.stringify(opts)); } catch (e) {}
+      if (id === 'optAwake') keepAwake();
+      if (id === 'optVolume' || id === 'optSound') playSound({ notes: [{ f: 784, at: 0, ms: 90, wave: 'sine', gain: 0.35 }], pan: 0 });
+    });
   }
 
+  function showStatus() {
+    statusEl.textContent = 'Link: ' + state.link + ' · Sound: ' + state.sound + ' · Vibration: ' + state.vibrate +
+      ' · Screen on: ' + state.awake + ' · Notifications: ' + state.notify + ' · Compass: ' + state.compass;
+  }
+
+  // --- sound: made here from the note lists, nothing to download ---------------------------
+  function startAudio() {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) { state.sound = 'not on this phone'; return; }
+    // iPhone: play even with the ring/silent switch on (Safari 17 and newer).
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+    audio = new Ctx();
+    audio.resume();
+    state.sound = 'on';
+  }
+
+  function playSound(sound) {
+    if (!audio || !opts.optSound || !sound || !Array.isArray(sound.notes)) return;
+    if (audio.state !== 'running') audio.resume();
+    const t0 = audio.currentTime + 0.02;
+    const out = audio.createGain();
+    out.gain.value = Number(opts.optVolume) || 0.7;
+    let node = out;
+    if (audio.createStereoPanner) {
+      const pan = audio.createStereoPanner();
+      pan.pan.value = Math.max(-1, Math.min(1, Number(sound.pan) || 0));
+      out.connect(pan);
+      node = pan;
+    }
+    node.connect(audio.destination);
+    for (const n of sound.notes) {
+      const f = Number(n.f), at = Number(n.at) / 1000, len = Number(n.ms) / 1000, g = Number(n.gain);
+      if (!(f > 20 && f < 8000 && len > 0 && len <= 2 && at >= 0 && at <= 3 && g > 0 && g <= 1)) continue;
+      const osc = audio.createOscillator(), env = audio.createGain();
+      osc.type = ['sine', 'triangle', 'square'].includes(n.wave) ? n.wave : 'sine';
+      osc.frequency.value = f;
+      const start = t0 + at, end = start + len, rel = Math.min(0.06, len / 3);
+      env.gain.setValueAtTime(0, start);
+      env.gain.linearRampToValueAtTime(g, start + 0.005);
+      env.gain.setValueAtTime(g, end - rel);
+      env.gain.linearRampToValueAtTime(0, end);
+      osc.connect(env); env.connect(out);
+      osc.start(start); osc.stop(end + 0.02);
+    }
+  }
+
+  // --- keep the screen on: a locked iPhone stops a web page's sound -----------------------
+  async function keepAwake() {
+    if (!opts.optAwake) {
+      if (wakeLock) { try { await wakeLock.release(); } catch (e) {} wakeLock = null; }
+      state.awake = 'off'; showStatus(); return;
+    }
+    if (!('wakeLock' in navigator)) { state.awake = 'not on this phone'; showStatus(); return; }
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      state.awake = 'on';
+      wakeLock.addEventListener('release', () => { state.awake = 'off'; showStatus(); });
+    } catch (e) { state.awake = 'refused'; }
+    showStatus();
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible' || !started) return;
+    if (audio && audio.state !== 'running') audio.resume();
+    if (opts.optAwake && !wakeLock) keepAwake();
+  });
+
+  // --- the link to the laptop ---------------------------------------------------------------
   function connect() {
     const scheme = location.protocol === 'https:' ? 'wss://' : 'ws://';
     ws = new WebSocket(scheme + location.host + '/ws?k=' + encodeURIComponent(token));
@@ -59,12 +148,17 @@
     ws.onmessage = (e) => {
       let msg;
       try { msg = JSON.parse(e.data); } catch (err) { return; }
-      if (msg.type !== 'haptic') return;
-      if (canVibrate && Array.isArray(msg.pattern)) navigator.vibrate(msg.pattern.map(Number));
-      if (msg.say) sayEl.textContent = msg.say;       // textContent only, never innerHTML
+      if (!msg || msg.type !== 'cue') return;
+      if (msg.cue === 'step_tick' && !opts.optTicks) return;
+      playSound(msg.sound);
+      if (canVibrate && opts.optVibrate && Array.isArray(msg.pattern) && msg.pattern.length) {
+        navigator.vibrate(msg.pattern.map(Number));
+      }
+      if (msg.say && !msg.quiet) sayEl.textContent = msg.say;       // textContent only, never innerHTML
     };
   }
 
+  // --- compass -------------------------------------------------------------------------------
   function sendHeading(heading) {
     const now = Date.now();
     if (heading == null || isNaN(heading) || now - lastSent < 200) return;   // 5 readings a second
@@ -96,7 +190,7 @@
     }
   }
 
-  // Notifications (Web Push): the only way an iPhone web page can buzz the phone and the Watch.
+  // --- notifications (Web Push): reach the phone and the Watch when the screen is locked ----
   async function startNotifications() {
     if (!window.isSecureContext) { state.notify = 'needs an https page'; return; }
     if (isIOS && !standalone) { state.notify = 'add this page to the Home Screen first'; return; }
@@ -122,24 +216,27 @@
     }
   }
 
+  // --- the big button: Start, then Yes ---------------------------------------------------------
   big.addEventListener('click', async () => {
     if (!started) {
       started = true;
-      if (canVibrate) navigator.vibrate(80);        // the first tap also unlocks vibration
-      await startNotifications();             // first: iOS asks for permission only right after a tap
+      startAudio();                            // sound and vibration unlock only on a tap
+      if (canVibrate && opts.optVibrate) navigator.vibrate(80);
+      playSound({ notes: [{ f: 523, at: 0, ms: 90, wave: 'sine', gain: 0.3 }, { f: 784, at: 110, ms: 120, wave: 'sine', gain: 0.3 }], pan: 0 });
+      await startNotifications();             // iPhone asks for permission only right after a tap
       await startCompass();
+      await keepAwake();
       connect();
       big.textContent = 'Yes';
       big.setAttribute('aria-label', 'Yes, I am there');
-      sayEl.textContent = canVibrate ? 'Ready. Keep this page open.'
-        : state.notify === 'on' ? 'Ready. Key moments arrive as notifications, even with the screen off.'
-        : isIOS && !standalone ? 'To get notifications on this iPhone: tap Share, then Add to Home Screen, and open it from there.'
-        : 'Ready. This phone cannot vibrate from a web page, so cues are spoken and shown here.';
+      sayEl.textContent = state.sound === 'on'
+        ? 'Ready. Cues play in your headphones. Keep this page open.'
+        : 'Ready. Cues are shown here and spoken by the laptop.';
       showStatus();
       return;
     }
     if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'confirm' }));
-    if (canVibrate) navigator.vibrate(60);
+    if (canVibrate && opts.optVibrate) navigator.vibrate(60);
   });
   showStatus();
 </script>

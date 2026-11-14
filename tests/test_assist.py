@@ -13,8 +13,7 @@ sys.path.insert(0, os.path.join(ROOT, "vexo-open-kit", "examples", "python"))
 from app import SpatialMemoryApp  # noqa: E402
 from assist import attach  # noqa: E402
 from assist.compass import CompassCorrector, circular_mean  # noqa: E402
-from assist.haptics import HAPTIC_PATTERNS, cue_for_result  # noqa: E402
-from interfaces import ToolResult  # noqa: E402
+from assist.cues import CUES, QUIET_CUES, cue_for_instruction, cue_for_led, cue_message  # noqa: E402
 from store.route_store import RouteStore  # noqa: E402
 from tracker.events import feed, synthetic_walk  # noqa: E402
 from tracker.pdr import PathTracker  # noqa: E402
@@ -22,10 +21,11 @@ from tracker.pdr import PathTracker  # noqa: E402
 
 class Recorder:
     def __init__(self):
-        self.said, self.buzzed = [], []
+        self.said, self.buzzed, self.msgs = [], [], []
 
     def send(self, msg):
         self.buzzed.append(msg["cue"])
+        self.msgs.append(msg)
 
 
 def recorded(rec):
@@ -49,27 +49,128 @@ def recorded(rec):
     return app, helper, walk_more
 
 
-class HapticTests(unittest.TestCase):
-    def test_left_and_right_feel_different(self):
-        self.assertNotEqual(len(HAPTIC_PATTERNS["turn_left"]), len(HAPTIC_PATTERNS["turn_right"]))
+class CueTests(unittest.TestCase):
+    def test_left_and_right_differ_by_ear_and_count(self):
+        left, right = cue_message("turn_left"), cue_message("turn_right")
+        self.assertEqual((left["sound"]["pan"], right["sound"]["pan"]), (-1.0, 1.0))
+        self.assertNotEqual(len(left["pattern"]), len(right["pattern"]))
+        self.assertNotEqual(len(left["sound"]["notes"]), len(right["sound"]["notes"]))
 
-    def test_patterns_are_valid_vibrate_lists(self):
-        for name, p in HAPTIC_PATTERNS.items():
-            self.assertTrue(p and all(isinstance(ms, int) and 0 < ms <= 1000 for ms in p), name)
+    def test_every_cue_is_short_quiet_and_valid(self):
+        for name in CUES:
+            msg = cue_message(name)
+            notes = msg["sound"]["notes"]
+            self.assertTrue(notes, name)
+            self.assertLessEqual(max(n["at"] + n["ms"] for n in notes), 1000, name)
+            for n in notes:
+                self.assertTrue(20 < n["f"] < 8000 and 0 < n["gain"] <= 0.5, name)
+                self.assertIn(n["wave"], ("sine", "triangle", "square"), name)
+            self.assertTrue(all(isinstance(ms, int) and 0 < ms <= 1000 for ms in msg["pattern"]), name)
 
-    def test_cue_from_guidance_and_led(self):
-        guide = ToolResult(True, "x", "navigating", {"instructions": [{"turn": "left"}]})
-        self.assertEqual(cue_for_result(guide), "turn_left")
-        self.assertEqual(cue_for_result(ToolResult(False, "x", "uncertain")), "uncertain")
-        self.assertIsNone(cue_for_result(ToolResult(True, "Note saved.", None)))
+    def test_no_two_cues_sound_alike(self):
+        shapes = [tuple((n["f"], n["at"], n["ms"]) for n in cue_message(c)["sound"]["notes"]) for c in CUES]
+        self.assertEqual(len(shapes), len(set(shapes)))
 
-    def test_light_only_mode_sends_no_vibration(self):
+    def test_pan_and_pitch_overrides(self):
+        msg = cue_message("approach", pan=5, pitch=1.5)
+        self.assertEqual(msg["sound"]["pan"], 1.0)
+        self.assertEqual(msg["sound"]["notes"][0]["f"], 1500)
+        self.assertEqual(cue_message("approach")["sound"]["notes"][0]["f"], 1000)   # the table is not changed
+
+    def test_mapping(self):
+        self.assertEqual(cue_for_instruction({"turn": "left"}), "turn_left")
+        self.assertEqual(cue_for_led("uncertain"), "uncertain")
+        self.assertIsNone(cue_for_led("navigating"))
+        self.assertTrue({"step_tick", "approach"} <= QUIET_CUES)
+
+    def test_light_only_mode_sends_no_cues(self):
         rec = Recorder()
         app, _, _ = recorded(rec)
         app.call_tool("set_mode", {"mode": "light-only"})
         rec.buzzed.clear()
         app.call_tool("navigate_to", {"target": "start"})
         self.assertEqual(rec.buzzed, [])
+
+
+class JourneyTests(unittest.TestCase):
+    """The sequence a walker hears: start, travelling, turns, the approach, arrival."""
+
+    def run_demo(self):
+        from assist import demo
+        rec = Recorder()
+        demo.run(send=rec.send, speak=rec.said.append)
+        return rec
+
+    def test_order_of_a_whole_journey(self):
+        cues = self.run_demo().buzzed
+        self.assertEqual(cues[0], "route_started")
+        self.assertIn("travel_start", cues)
+        self.assertLess(cues.index("route_started"), cues.index("travel_start"))
+        self.assertEqual(cues[-1], "arrived")
+        self.assertEqual(cues.count("arrived"), 1)
+
+    def test_walking_ticks_every_few_steps(self):
+        from assist import TICK_STEPS
+        cues = self.run_demo().buzzed
+        first_leg = cues[cues.index("travel_start"):cues.index("landmark_saved", 2)]
+        self.assertEqual(first_leg.count("step_tick"), 35 // TICK_STEPS - 1)
+
+    def test_turn_is_announced_from_its_side(self):
+        msgs = self.run_demo().msgs
+        right = [m for m in msgs if m["cue"] == "turn_right"]
+        self.assertTrue(right)
+        before = msgs[:msgs.index(right[0])]
+        pings = [m for m in before[-4:] if m["cue"] == "approach"]
+        self.assertTrue(pings and all(m["sound"]["pan"] == 1.0 for m in pings))
+
+    def test_pings_rise_near_the_destination(self):
+        msgs = self.run_demo().msgs
+        last_turn = max(i for i, m in enumerate(msgs) if m["cue"].startswith("turn_"))
+        pitches = [m["sound"]["notes"][0]["f"] for m in msgs[last_turn:] if m["cue"] == "approach"]
+        self.assertGreaterEqual(len(pitches), 2)
+        self.assertEqual(pitches, sorted(pitches))
+        self.assertGreater(pitches[-1], pitches[0])
+
+    def test_ticks_can_be_turned_off(self):
+        rec = Recorder()
+        walk = synthetic_walk(legs=((20, None),))
+        app = SpatialMemoryApp(PathTracker(step_length_m=0.7), RouteStore(), speak=rec.said.append,
+                               clock=lambda: walk[0][1])
+        attach(app, send=rec.send, ticks=False)
+        app.call_tool("start_route", {})
+        feed(app.tracker, walk)
+        self.assertIn("travel_start", rec.buzzed)
+        self.assertNotIn("step_tick", rec.buzzed)
+
+
+class EarconTests(unittest.TestCase):
+    def test_wav_is_stereo_and_panned(self):
+        import io
+        import struct
+        import wave
+        from assist.earcons import render
+        for pan, louder in ((-1.0, 0), (1.0, 1)):
+            data = render(cue_message("turn_left", pan=pan)["sound"])
+            with wave.open(io.BytesIO(data)) as w:
+                self.assertEqual((w.getnchannels(), w.getsampwidth()), (2, 2))
+                self.assertLess(w.getnframes() / w.getframerate(), 1.0)
+                frames = w.readframes(w.getnframes())
+            samples = struct.unpack("<%dh" % (len(frames) // 2), frames)
+            energy = [sum(abs(v) for v in samples[ch::2]) for ch in (0, 1)]
+            self.assertGreater(energy[louder], 10 * max(1, energy[1 - louder]))
+
+    def test_laptop_player_plays_and_skips_ticks_when_off(self):
+        from assist.earcons import LaptopSound
+        played = []
+        sound = LaptopSound(ticks=False, play=played.append)
+        self.assertFalse(sound(cue_message("step_tick")))
+        self.assertTrue(sound(cue_message("arrived")))
+        for _ in range(100):
+            if sound.played:
+                break
+            time.sleep(0.02)
+        self.assertEqual(sound.played, ["arrived"])
+        self.assertTrue(played[0].endswith(".wav") and os.path.getsize(played[0]) > 1000)
 
 
 class CompassTests(unittest.TestCase):
@@ -179,7 +280,7 @@ class PhoneLinkTests(unittest.TestCase):
             self.assertIn(b"navigator.vibrate", page)
             ws = WebSocket("ws://127.0.0.1:%d/ws?k=%s" % (port, token), timeout=5)
             self.assertTrue(hub.connected.wait(5))
-            hub.broadcast({"type": "haptic", "cue": "arrived", "pattern": [700], "say": "hi"})
+            hub.broadcast(cue_message("arrived", "hi"))
             self.assertEqual(json.loads(ws.recv(timeout=5))["cue"], "arrived")
             ws.send(json.dumps({"type": "confirm"}))
             for _ in range(50):
@@ -200,34 +301,31 @@ class NtfyTests(unittest.TestCase):
                           clock=lambda: now[0], background=False)
 
     def test_only_key_moments_and_never_names(self):
-        from assist.haptics import haptic_message
         posts, now = [], [0.0]
         send = self.sender(posts, now)
-        self.assertFalse(send(haptic_message("turn_left", "Turn left, walk 18 steps.")))
-        self.assertTrue(send(haptic_message("confirm_prompt", "Are you at the elevator?")))
+        self.assertFalse(send(cue_message("turn_left", "Turn left, walk 18 steps.")))
+        self.assertTrue(send(cue_message("confirm_prompt", "Are you at the elevator?")))
         url, body, headers = posts[0]
         self.assertEqual(url, "https://ntfy.sh/vexo-test-topic-123456")
         self.assertNotIn(b"elevator", body)
         self.assertEqual(headers["Priority"], "high")
 
     def test_repeats_are_held_back(self):
-        from assist.haptics import haptic_message
         posts, now = [], [0.0]
         send = self.sender(posts, now)
-        send(haptic_message("arrived"))
-        send(haptic_message("arrived"))
+        send(cue_message("arrived"))
+        send(cue_message("arrived"))
         now[0] = 5.0
-        send(haptic_message("arrived"))
+        send(cue_message("arrived"))
         self.assertEqual(len(posts), 2)
 
     def test_failure_does_not_stop_guidance(self):
-        from assist.haptics import haptic_message
         from assist.notify import NtfySender
 
         def broken(*a):
             raise OSError("offline")
         send = NtfySender("vexo-test-topic-123456", post=broken, background=False)
-        self.assertTrue(send(haptic_message("uncertain")))
+        self.assertTrue(send(cue_message("uncertain")))
         self.assertEqual(send.sent, 0)
 
     def test_short_topics_are_refused(self):
@@ -238,7 +336,8 @@ class NtfyTests(unittest.TestCase):
 
     def test_demo_sends_only_generic_notifications(self):
         from assist import demo
-        from assist.notify import NtfySender, fan_out
+        from assist import fan_out
+        from assist.notify import NtfySender
         posts, ticks = [], iter(range(0, 10000, 10))     # each cue 10 s apart, as on a real walk
         ntfy = NtfySender("vexo-test-topic-123456", post=lambda u, b, h: posts.append(b) or 200,
                           clock=lambda: float(next(ticks)), background=False)
@@ -313,7 +412,6 @@ class WebPushTests(unittest.TestCase):
 
     def test_sender_sends_generic_words_and_drops_gone_phones(self):
         import tempfile
-        from assist.haptics import haptic_message
         from assist.webpush import Vapid, WebPushSender
         sub, decrypt = phone_keys()
         calls, status = [], [201]
@@ -324,8 +422,8 @@ class WebPushTests(unittest.TestCase):
             self.assertFalse(send.subscribe({"endpoint": "http://not-https", "keys": sub["keys"]}))
             self.assertTrue(send.subscribe(sub))
             self.assertEqual(oct(os.stat(path).st_mode & 0o777), "0o600")
-            self.assertFalse(send(haptic_message("turn_left", "Turn left")))
-            self.assertTrue(send(haptic_message("confirm_prompt", "Are you at the elevator?")))
+            self.assertFalse(send(cue_message("turn_left", "Turn left")))
+            self.assertTrue(send(cue_message("confirm_prompt", "Are you at the elevator?")))
             url, body, headers = calls[0]
             self.assertEqual(url, sub["endpoint"])
             self.assertEqual(headers["Content-Encoding"], "aes128gcm")
@@ -333,7 +431,7 @@ class WebPushTests(unittest.TestCase):
             self.assertEqual(message["title"], "Check")
             self.assertNotIn("elevator", json.dumps(message))
             status[0] = 410
-            send(haptic_message("arrived"))
+            send(cue_message("arrived"))
             self.assertEqual(send.subscriptions, [])
 
     def test_server_push_routes(self):

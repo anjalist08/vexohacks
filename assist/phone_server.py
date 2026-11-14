@@ -1,10 +1,11 @@
 """Serves assist/phone.html to the phone and talks to it over a websocket.
 
-    python3 -m assist.phone_server --demo      synthetic walk; a connected phone vibrates
-    python3 -m assist.phone_server --learn     plays every vibration pattern, with its name
+    python3 -m assist.phone_server --demo      synthetic walk; the phone plays every cue
+    python3 -m assist.phone_server --learn     plays every cue (sound and vibration), with its name
 
 Open the address it prints on the phone (same Wi-Fi), and tap Start. The phone then
-gets {"type": "haptic", ...} messages and sends back compass readings and "confirm".
+gets {"type": "cue", ...} messages (a sound for headphones, a vibration, a line of text)
+and sends back compass readings and "confirm".
 
 The phone's compass only works on an https:// page. Give the server a certificate:
     python3 -m assist.phone_server --demo --cert cert.pem --key key.pem
@@ -239,7 +240,9 @@ def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     g = p.add_mutually_exclusive_group(required=True)
     g.add_argument("--demo", action="store_true", help="run the synthetic-walk demo to the phone")
-    g.add_argument("--learn", action="store_true", help="play every vibration pattern with its name")
+    g.add_argument("--learn", action="store_true", help="play every cue (sound and vibration) with its name")
+    p.add_argument("--laptop-sound", action="store_true",
+                   help="also play the cue sounds on this laptop (headphones paired with the laptop)")
     p.add_argument("--port", type=int, default=8766, help="8766: the map page uses 8765")
     p.add_argument("--host", default="0.0.0.0", help="0.0.0.0 so the phone can reach it")
     p.add_argument("--cert", help="certificate file, for https (needed for the compass)")
@@ -279,20 +282,25 @@ def main(argv=None):
     else:
         input("\nPress Enter to begin, once the phone is set up. ")
     time.sleep(1.5)
-    send_all = notify.fan_out(hub.broadcast, ntfy, push)
+    from assist import fan_out
+    laptop = None
+    if a.laptop_sound:
+        from assist.earcons import LaptopSound
+        laptop = LaptopSound()
+    send_all = fan_out(hub.broadcast, ntfy, push, laptop)
     try:
         if a.learn:
-            from assist.haptics import HAPTIC_PATTERNS, haptic_message
-            for cue in HAPTIC_PATTERNS:
+            from assist.cues import CUES, cue_message
+            for cue in CUES:
                 name = cue.replace("_", " ")
-                print("    [BUZZ] %s" % name)
-                send_all(haptic_message(cue, name))
+                print("    [CUE] %s" % name)
+                send_all(cue_message(cue, name))
                 time.sleep(3.0)
         else:
             from assist import demo
 
             def send(msg):
-                demo.print_haptic(msg)
+                demo.print_cue(msg)
                 send_all(msg)
             demo.run(send=send, pause=3.0)
     except KeyboardInterrupt:

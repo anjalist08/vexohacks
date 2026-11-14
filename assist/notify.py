@@ -21,7 +21,7 @@ import secrets
 import threading
 import time
 import urllib.request
-from typing import Callable, Optional
+from typing import Callable
 
 DEFAULT_SERVER = "https://ntfy.sh"
 
@@ -47,7 +47,7 @@ def _post(url: str, body: bytes, headers: dict, timeout: float = 5.0) -> int:
 
 
 class NtfySender:
-    """Call it with a haptic message (assist.haptics.haptic_message). Sends in the background,
+    """Call it with a cue message (assist.cues.cue_message). Sends in the background,
     so a slow network never holds up guidance."""
 
     def __init__(self, topic: str, server: str = DEFAULT_SERVER,
@@ -89,12 +89,3 @@ class NtfySender:
                 print("    [NTFY] could not send a notification (%s). Guidance goes on without it."
                       % type(e).__name__)
 
-
-def fan_out(*senders: Optional[Callable[[dict], object]]) -> Callable[[dict], None]:
-    """One send function that passes each message to every sender given."""
-    live = [s for s in senders if s is not None]
-
-    def send(msg):
-        for s in live:
-            s(msg)
-    return send
