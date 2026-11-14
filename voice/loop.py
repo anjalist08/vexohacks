@@ -32,6 +32,12 @@ KIT_EXAMPLES_PYTHON = os.path.join(
 )
 
 
+def _printable(text: str, limit: int = 200) -> str:
+    """Speech text, safe to print: no terminal control characters, at most `limit` chars."""
+    clean = "".join(c if c.isprintable() else " " for c in str(text))
+    return clean[:limit] + ("..." if len(clean) > limit else "")
+
+
 def _safe_mic_off(band) -> None:
     """Switch off the band's microphone so the LED unlocks."""
     if band is None or not hasattr(band, "configure"):
@@ -213,6 +219,7 @@ class VoiceLoop:
                 self._restore_led()
                 return None
             words = (heard or "").strip()
+            self._log('Heard: "%s"' % _printable(words) if words else "Heard nothing (speak while the light is blue).")
 
         if not words:
             self._restore_led()
@@ -237,6 +244,7 @@ class VoiceLoop:
             )
             return self.app.keyword_command(words)
 
+        self._log("Gemini chose %s %s" % (tool_name, _printable(str(tool_args))))
         return self.app.call_tool(tool_name, tool_args)
 
     def _listen_once(self) -> Tuple[bool, str, str]:
