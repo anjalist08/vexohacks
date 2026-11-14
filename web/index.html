@@ -54,8 +54,9 @@
   .spacer { flex: 1; }
   main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; padding: 16px 20px 24px; }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
-  .map { position: relative; min-height: 520px; overflow: hidden; }
-  .map svg { width: 100%; height: 100%; min-height: 520px; display: block; }
+  .map { position: sticky; top: 16px; align-self: start; height: calc(100vh - 110px); min-height: 420px;
+    overflow: hidden; }
+  .map svg { width: 100%; height: 100%; display: block; }
   .map .legend { position: absolute; left: 12px; bottom: 10px; font-size: 12px; color: var(--muted);
     display: flex; gap: 14px; flex-wrap: wrap; }
   .map .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px;
@@ -68,7 +69,7 @@
   .card .body { padding: 14px 16px; }
   .led-row { display: flex; align-items: center; gap: 14px; }
   .led { width: 44px; height: 44px; border-radius: 50%; flex: none; background: #333;
-    box-shadow: 0 0 0 4px var(--chip); --period: 1000ms; }
+    border: 1px solid var(--grid-strong); box-shadow: 0 0 0 4px var(--chip); --period: 1000ms; }
   .led.off { background: var(--chip); }
   .led.blink { animation: blink var(--period) steps(1, end) infinite; }
   .led.breathe { animation: breathe var(--period) ease-in-out infinite; }
@@ -91,6 +92,12 @@
   .say.empty { color: var(--muted); font-size: 14px; }
   ol.guide { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
   ol.guide li { display: flex; gap: 10px; align-items: center; }
+  ol.guide li.done { opacity: .4; }
+  ol.guide li.now .arrow { background: var(--accent); color: var(--panel); }
+  ol.guide li.now { font-weight: 600; }
+  .navnow { font-size: 20px; font-weight: 650; margin-bottom: 12px; letter-spacing: -.01em; }
+  .navnow .sub { font-size: 13px; font-weight: 400; letter-spacing: 0; }
+  .navnow.bad { color: var(--bad); }
   ol.guide .arrow { width: 28px; height: 28px; border-radius: 8px; background: var(--chip); display: grid;
     place-items: center; flex: none; font-size: 15px; }
   ul.marks { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
@@ -118,7 +125,7 @@
   @media (max-width: 900px) {
     main { grid-template-columns: 1fr; padding: 12px 16px 20px; }
     header { padding: 12px 16px; }
-    .map, .map svg { min-height: 360px; }
+    .map { position: relative; top: 0; height: 60vh; min-height: 340px; }
   }
 </style>
 </head>
@@ -184,7 +191,8 @@
     </div></div>
 
     <div class="card" id="guideCard" hidden><div class="body">
-      <h2>Way back</h2>
+      <h2>Directions</h2>
+      <div class="navnow" id="navNow" hidden></div>
       <ol class="guide" id="guide"></ol>
     </div></div>
 
@@ -270,9 +278,20 @@
         "stroke-width": 1, "vector-effect": "non-scaling-stroke" }, grid);
     }
 
+    if (s.nav && s.nav.corners.length > 1) {
+      el("polyline", { points: s.nav.corners.map((p) => `${p[0]},${-p[1]}`).join(" "), fill: "none",
+        stroke: "var(--accent)", "stroke-width": 10, opacity: 0.25, "stroke-linejoin": "round",
+        "stroke-linecap": "round", "vector-effect": "non-scaling-stroke" }, svg);
+    }
     if (pts.length > 1) {
-      el("polyline", { points: pts.map((p) => `${p[0]},${-p[1]}`).join(" "), fill: "none", stroke: "var(--path)",
-        "stroke-width": 3, "stroke-linejoin": "round", "stroke-linecap": "round", "vector-effect": "non-scaling-stroke" }, svg);
+      // A re-anchor is a jump, not a walk: draw each walked piece on its own.
+      const cuts = [0, ...((s.route && s.route.breaks) || []), pts.length];
+      for (let c = 0; c < cuts.length - 1; c++) {
+        const piece = pts.slice(cuts[c], cuts[c + 1]);
+        if (piece.length < 2) continue;
+        el("polyline", { points: piece.map((p) => `${p[0]},${-p[1]}`).join(" "), fill: "none", stroke: "var(--path)",
+          "stroke-width": 3, "stroke-linejoin": "round", "stroke-linecap": "round", "vector-effect": "non-scaling-stroke" }, svg);
+      }
     }
     if (pts.length) {
       el("circle", { cx: pts[0][0], cy: -pts[0][1], r: 7 * unit, fill: "var(--start)" }, svg);
@@ -321,7 +340,7 @@
     const tr = s.tracking;
     $("track").textContent = !tr.running ? (s.route ? "Route stopped." : "Not recording.")
       : !tr.calibrated ? "Calibrating the gyro: stand still…"
-      : `Recording · ${tr.state} · step length ${tr.step_length_m.toFixed(2)} m`;
+      : `${s.nav ? "Guiding you back to the " + s.nav.target : "Recording"} · ${tr.state} · step length ${tr.step_length_m.toFixed(2)} m`;
 
     const say = $("say");
     say.classList.toggle("empty", !s.say);
@@ -333,9 +352,24 @@
     lastSay = s.say;
 
     $("guideCard").hidden = !s.guidance.length;
-    $("guide").replaceChildren(...s.guidance.map((g) => {
+    const nav = s.nav;
+    const navNow = $("navNow");
+    navNow.hidden = !nav;
+    if (nav) {
+      navNow.className = "navnow" + (nav.off_route || nav.wrong_way ? " bad" : "");
+      const n = (k) => `${k} step${k === 1 ? "" : "s"}`;
+      const headline = nav.off_route ? "Off the route"
+        : nav.wrong_way ? "Wrong way, turn around"
+        : nav.next_turn ? (nav.steps_to_turn <= 1 ? `Turn ${nav.next_turn} now` : `${n(nav.steps_to_turn)}, then turn ${nav.next_turn}`)
+        : `${n(nav.remaining_steps)} to the ${nav.target}`;
+      navNow.replaceChildren(document.createTextNode(headline), div("sub",
+        `${n(nav.remaining_steps)} left to the ${nav.target} · ${nav.offset_m.toFixed(1)} m from the path`));
+    }
+    $("guide").replaceChildren(...s.guidance.map((g, i) => {
       const a = div("arrow", ARROWS[g.turn] || "•");
-      return li([a, div("", g.text)]);
+      const item = li([a, div("", g.text)]);
+      if (nav) item.className = i < nav.segment ? "done" : i === nav.segment ? "now" : "";
+      return item;
     }));
 
     const marks = $("marks");

@@ -35,7 +35,8 @@ def _project(p: Tuple[float, float], a: Tuple[float, float], b: Tuple[float, flo
 
 class Navigator:
     def __init__(self, segments: List[dict], instructions: List[Instruction], target_name: str,
-                 step_length_m: float):
+                 step_length_m: float, target_index: int = None):
+        self.target_index = target_index          # the destination's point index on the route
         self.segments = segments
         self.instructions = instructions          # one per segment, then "arrive"
         self.target_name = target_name

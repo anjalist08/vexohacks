@@ -29,20 +29,23 @@ class SpatialMemoryApp:
         self.guidance = []                # Instructions of the current return trip
         self.on_result = []               # functions called with every ToolResult (e.g. the dashboard)
         self.navigator = None             # store.navigator.Navigator while guiding someone back
+        self._jump_next = None            # set to a point index: the next sample is a re-anchor to that point
         tracker.on_sample(self._on_sample)
 
     def _on_sample(self, sample):
         """Every new position: record it, or, while guiding, follow it along the path."""
         nav = self.navigator
         if nav is None:
-            self.store.add_point(sample)
+            same_as, self._jump_next = self._jump_next, None
+            self.store.add_point(sample, jump=same_as is not None, same_as=same_as)
             return
         for result in nav.update(sample):
             self.output(result)
         if nav.arrived and self.navigator is nav:
             self.navigator = None
-            x, y = nav.target
-            self.tracker.reanchor(x, y, self.tracker.heading, sample.t)   # cancel drift at the destination
+            p = self.store.current.points[nav.target_index]
+            self._jump_next = nav.target_index           # same place as the destination's recorded point
+            self.tracker.reanchor(p.x_m, p.y_m, self.tracker.heading, sample.t)   # cancel drift there
 
     # --- dispatch ----------------------------------------------------------------
     def call_tool(self, name: str, args: Optional[dict] = None) -> ToolResult:
@@ -131,9 +134,12 @@ class SpatialMemoryApp:
             index, name = lm.point_index, lm.label
         self.guidance = self.store.plan_return(index, name, self.tracker.heading, self.tracker.step_length_m)
         segments = self.store.return_segments(index)
+        if segments is None:
+            return ToolResult(False, "I can't find a path you walked to the %s." % name, "uncertain")
         if not segments:
+            self.guidance = []
             return ToolResult(True, "You're already at the %s." % name, "arrived")
-        self.navigator = Navigator(segments, self.guidance, name, self.tracker.step_length_m)
+        self.navigator = Navigator(segments, self.guidance, name, self.tracker.step_length_m, index)
         if not self.tracker.running:
             self.tracker.resume()
         steps = [i.text for i in self.guidance]
@@ -145,6 +151,8 @@ class SpatialMemoryApp:
         if lm is None or self.store.route_of(lm) is not self.store.current:
             return ToolResult(False, "I don't know that place on this route.", "uncertain")
         p = self.store.current.points[lm.point_index]
+        self.navigator = None
+        self._jump_next = lm.point_index
         self.tracker.reanchor(p.x_m, p.y_m, p.heading_deg, self.clock())
         return ToolResult(True, "Got it, you're at the %s." % lm.label, "recording")
 

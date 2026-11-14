@@ -72,8 +72,11 @@ def run_sim(web_port=None, speed=3.0):
             time.sleep(1.5)
         return result
 
+    app_last = [walk1]
+
     def walk(events, what):
         print("\n  (walking: %s)" % what)
+        app_last[0] = events
         if dash:
             feed_paced(app.tracker, events, speed)
         else:
@@ -86,13 +89,17 @@ def run_sim(web_port=None, speed=3.0):
     user("remember this as the entrance")
     walk(walk1, "20 steps, stop and turn left, 15 steps")
     user("remember this as the elevator near the blue sign")
-    last_steps = [f["steps"] for k, t, f in walk1 if k == "activity"][-1]
+    last_steps = [f["steps"] for k, t, f in app_last[0] if k == "activity"][-1]
     walk(synthetic_walk(legs=((10, None),), t0=now[0] + 0.04, start_steps=last_steps, seed=2), "10 more steps")
     user("where was the elevator")
     result = user("take me back to the entrance")
     print("\nReturn guidance, computed from the recorded path:")
     for i in result.data.get("instructions", []):
         print("   %-8s %3d steps  %5.1f m   %s" % (i["turn"], i["steps"], i["distance_m"], i["text"]))
+    last_steps = [f["steps"] for k, t, f in app_last[0] if k == "activity"][-1]
+    walk(synthetic_walk(legs=((0, "around"), (25, "right"), (18, None)), t0=now[0] + 0.04,
+                        start_steps=last_steps, seed=4, still_s=0.5),
+         "following the guidance back: turn around, 25 steps, turn right, 18 steps")
     if dash:
         wait_forever()
     return 0 if result.ok else 1

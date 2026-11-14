@@ -1,8 +1,12 @@
-"""Routes, landmarks, notes, and return guidance computed from the recorded path.
+"""Routes, landmarks, notes, and guidance computed from the recorded path.
 
-The laptop JSON file is the source of truth. Return guidance walks the saved points
-backwards: it never uses a map, and the model never supplies a coordinate.
+The laptop JSON file is the source of truth. A route is a personal route graph: each
+recorded point is a node, each walked step is an edge, and a re-anchor ("I'm at the
+elevator", or arriving somewhere) adds a zero-length edge saying two points are the same
+place. Guidance is the shortest path through that graph, in either direction. It never
+uses a map, and the model never supplies a coordinate.
 """
+import heapq
 import json
 import math
 import os
@@ -35,16 +39,19 @@ class Route:
     landmarks: List[Landmark] = field(default_factory=list)
     notes: List[dict] = field(default_factory=list)       # {"point_index", "text"} not tied to a landmark
     active: bool = True
+    breaks: List[List[int]] = field(default_factory=list)  # [j, k]: point j was reached by a re-anchor jump,
+                                                            # not a walk; it is the same place as point k (-1: unknown)
 
     def to_dict(self):
         return {"id": self.id, "title": self.title, "active": self.active,
                 "points": [p.to_dict() for p in self.points],
-                "landmarks": [l.to_dict() for l in self.landmarks], "notes": self.notes}
+                "landmarks": [l.to_dict() for l in self.landmarks], "notes": self.notes, "breaks": self.breaks}
 
     @staticmethod
     def from_dict(d):
         return Route(d["id"], d["title"], [PoseSample(**p) for p in d["points"]],
-                     [Landmark(**l) for l in d["landmarks"]], d.get("notes", []), d.get("active", False))
+                     [Landmark(**l) for l in d["landmarks"]], d.get("notes", []), d.get("active", False),
+                     d.get("breaks", []))
 
 
 class RouteStore:
@@ -72,8 +79,13 @@ class RouteStore:
             self.current.active = False
         self.save()
 
-    def add_point(self, sample: PoseSample):
+    def add_point(self, sample: PoseSample, jump: bool = False, same_as: int = None):
+        """Record a point. jump=True: the position was reset (re-anchor), so the line to it
+        was never walked and is neither drawn nor used for guidance. same_as: the index of the
+        earlier point it is the same place as, which links the two in the route graph."""
         if self.current and self.current.active:
+            if jump:
+                self.current.breaks.append([len(self.current.points), -1 if same_as is None else same_as])
             self.current.points.append(sample)
 
     # --- landmarks and notes ---------------------------------------------------
@@ -137,19 +149,66 @@ class RouteStore:
         pts = self.current.points
         return list(reversed(pts[target_index:]))
 
-    def distance_back(self, target_index: int) -> float:
-        pts = self.path_back(target_index)
-        return sum(math.hypot(b.x_m - a.x_m, b.y_m - a.y_m) for a, b in zip(pts, pts[1:]))
+    def route_path(self, start: int, goal: int) -> Optional[List[int]]:
+        """Shortest path of point indices from start to goal through the route graph, or None."""
+        pts = self.current.points
+        jumps = {j: k for j, k in self.current.breaks}
+        adj = {i: [] for i in range(len(pts))}
+        for i in range(1, len(pts)):
+            if i in jumps:
+                continue
+            d = math.hypot(pts[i].x_m - pts[i - 1].x_m, pts[i].y_m - pts[i - 1].y_m)
+            adj[i - 1].append((i, d))
+            adj[i].append((i - 1, d))
+        for j, k in jumps.items():
+            if 0 <= k < len(pts):
+                adj[j].append((k, 0.0))
+                adj[k].append((j, 0.0))
+        best = {start: 0.0}
+        prev = {}
+        queue = [(0.0, start)]
+        while queue:
+            d, i = heapq.heappop(queue)
+            if i == goal:
+                path = [goal]
+                while path[-1] != start:
+                    path.append(prev[path[-1]])
+                return list(reversed(path))
+            if d > best.get(i, math.inf):
+                continue
+            for j, w in adj[i]:
+                if d + w < best.get(j, math.inf):
+                    best[j] = d + w
+                    prev[j] = i
+                    heapq.heappush(queue, (d + w, j))
+        return None
 
-    def return_segments(self, target_index: int) -> List[dict]:
-        """The recorded path back to target_index, merged into straight segments.
+    def _walked_pairs(self, target_index: int) -> Optional[List[Tuple[PoseSample, PoseSample]]]:
+        """(a, b) steps from the current point to target_index along walked edges, or None."""
+        pts = self.current.points
+        path = self.route_path(len(pts) - 1, target_index)
+        if path is None:
+            return None
+        jumps = {j for j, k in self.current.breaks}
+        return [(pts[a], pts[b]) for a, b in zip(path, path[1:])
+                if abs(a - b) == 1 and max(a, b) not in jumps]       # skip same-place links
+
+    def distance_back(self, target_index: int) -> float:
+        pairs = self._walked_pairs(target_index) or []
+        return sum(math.hypot(b.x_m - a.x_m, b.y_m - a.y_m) for a, b in pairs)
+
+    def return_segments(self, target_index: int) -> Optional[List[dict]]:
+        """The walked path from here to target_index, merged into straight segments.
+        None if the route graph has no walked path there.
 
         Each segment: {"heading": deg, "dist": m, "start": (x, y), "end": (x, y)}, in walking
         order. Consecutive segments join end to start, so the corners form a polyline.
         """
-        pts = self.path_back(target_index)
+        pairs = self._walked_pairs(target_index)
+        if pairs is None:
+            return None
         raw = []    # [heading, dx, dy, start_x, start_y]
-        for a, b in zip(pts, pts[1:]):
+        for a, b in pairs:
             dx, dy = b.x_m - a.x_m, b.y_m - a.y_m
             if math.hypot(dx, dy) < 1e-6:
                 continue
@@ -178,7 +237,7 @@ class RouteStore:
         step_len = step_length_m or config.STEP_LENGTH_M
         out: List[Instruction] = []
         facing = facing_deg
-        for seg in self.return_segments(target_index):
+        for seg in self.return_segments(target_index) or []:
             h, dist = seg["heading"], seg["dist"]
             steps = max(1, int(round(dist / step_len)))
             delta = _wrap(h - facing)

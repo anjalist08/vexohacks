@@ -75,6 +75,7 @@ class Dashboard:
             "route": None if route is None else {
                 "id": route.id, "title": route.title, "active": route.active,
                 "points": [[round(p.x_m, 3), round(p.y_m, 3)] for p in route.points],
+                "breaks": [j for j, k in route.breaks],
                 "notes": route.notes},
             "pose": {"x": pose.x_m, "y": pose.y_m, "heading": pose.heading_deg, "steps": pose.steps},
             "tracking": {"running": app.tracker.running, "calibrated": app.tracker.calibrated,
@@ -86,6 +87,7 @@ class Dashboard:
             "landmarks": [dict(l.to_dict(), x=route.points[l.point_index].x_m, y=route.points[l.point_index].y_m)
                           for l in (route.landmarks if route else [])],
             "guidance": [i.to_dict() for i in app.guidance],
+            "nav": app.navigator.status() if app.navigator else None,
             "say": self.last_say,
             "result": self.last_result,
             "time": time.time(),

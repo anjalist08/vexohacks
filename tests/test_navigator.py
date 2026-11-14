@@ -87,6 +87,23 @@ class NavigatorTests(unittest.TestCase):
         self.walk_more(((0, "around"), (10, "around"), (7, None)))
         self.assertIn("You're walking away from the start. Turn around.", self.said)
 
+    def test_after_arriving_it_routes_forward_through_the_graph(self):
+        self.app.call_tool("navigate_to", {"target": "lm1"})
+        self.walk_more(((0, "around"), (15, "right"), (18, None)))      # back at the entrance
+        route = self.app.store.current
+        self.assertEqual(route.breaks, [[len(route.points) - 1, 0]])   # linked to the start point
+        r = self.app.call_tool("navigate_to", {"target": "lm2"})        # now to the elevator: forward
+        turns = [(i["turn"], i["steps"]) for i in r.data["instructions"]]
+        self.assertEqual(turns, [("around", 20), ("left", 15), ("arrive", 0)])
+        self.said.clear()
+        self.walk_more(((0, "around"), (20, "left"), (13, None)), seed=5)
+        self.assertEqual(self.said[-1], "You have reached the elevator.")
+
+    def test_reanchor_is_not_a_walked_line(self):
+        self.app.call_tool("reanchor", {"landmark_id": "lm1"})          # "I'm at the entrance"
+        r = self.app.call_tool("find_landmark", {"query": "elevator"})
+        self.assertIn("about 35 steps", r.say)                          # via the route, not a straight line
+
     def test_stop_route_ends_guidance(self):
         self.app.call_tool("navigate_to", {"target": "start"})
         self.app.call_tool("stop_route", {})
