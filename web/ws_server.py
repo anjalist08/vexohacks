@@ -13,6 +13,7 @@ Safety rules:
 import argparse
 import base64
 import functools
+import hmac
 import hashlib
 import json
 import os
@@ -23,7 +24,7 @@ import threading
 import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from typing import List, Optional
-from urllib.parse import unquote, urlsplit
+from urllib.parse import unquote, urlsplit, parse_qs
 
 from app import SpatialMemoryApp
 
@@ -345,6 +346,19 @@ class MapWebSocketServer:
             self._send_http_error(sock, 400, "Bad Request")
             return False
 
+        # Another device (the phone) must present the phone token; this laptop needs none.
+        try:
+            peer = sock.getpeername()[0]
+        except OSError:
+            peer = ""
+        if not _is_loopback(peer):
+            target = lines[0].split(" ")[1] if len(lines[0].split(" ")) > 1 else ""
+            token = (parse_qs(urlsplit(target).query).get("token") or [""])[0]
+            expected = getattr(self, "phone_token", None)
+            if not expected or not hmac.compare_digest(token, expected):
+                self._send_http_error(sock, 403, "Forbidden")
+                return False
+
         response = (
             "HTTP/1.1 101 Switching Protocols\r\n"
             "Upgrade: websocket\r\n"
@@ -551,7 +565,14 @@ class _SafeStaticHandler(SimpleHTTPRequestHandler):
             return
         super().do_HEAD()
 
+    phone_token = None      # set per server; other devices may only load the phone page with it
+
     def _is_forbidden_path(self) -> bool:
+        if not _is_loopback(self.client_address[0] if self.client_address else ""):
+            parts = urlsplit(self.path)
+            token = (parse_qs(parts.query).get("token") or [""])[0]
+            return not (self.phone_token and unquote(parts.path) == "/web/phone.html"
+                        and hmac.compare_digest(token, self.phone_token))
         raw_path = unquote(urlsplit(self.path).path or "/")
         parts = [p for p in raw_path.split("/") if p and p != "."]
         for part in parts:
@@ -583,8 +604,40 @@ def start_status_pump(ws, tracker, stop_event: threading.Event, extra=None, ever
     return thread
 
 
-def _start_static_http(host: str, port: int, root_dir: str) -> ThreadingHTTPServer:
-    handler = functools.partial(_SafeStaticHandler, directory=root_dir)
+def start_haptic_pump(ws, app, stop_event: threading.Event, every: float = 0.2, log=print) -> threading.Thread:
+    """Five times a second: compare where the wearer faces with the route's next leg and send
+    the phone a hint (its arrow) and, when due, a buzz cue (store/haptics.py)."""
+    from store.haptics import HapticCoach, cue_message
+    coach = HapticCoach()
+
+    def loop():
+        while not stop_event.wait(every):
+            try:
+                tracker = app.tracker
+                facing = getattr(tracker, "facing", None)
+                facing = tracker.raw_heading if facing is None else facing
+                out = coach.update(app.navigator, facing, app.current_pose,
+                                   bool(getattr(tracker, "heading_uncertain", False)))
+                ws.broadcast(out["hint"])
+                if out["cue"]:
+                    ws.broadcast(cue_message(out["cue"], out["hint"]))
+                    if out["cue"] != "tick" and log:
+                        log("    [BUZZ] %s" % out["cue"])
+            except Exception as exc:      # never let the coach kill the server
+                print("    [haptics] %s" % exc)
+
+    thread = threading.Thread(target=loop, name="haptic-coach", daemon=True)
+    thread.start()
+    return thread
+
+
+def _is_loopback(addr: str) -> bool:
+    return addr in ("127.0.0.1", "::1", "::ffff:127.0.0.1", "localhost")
+
+
+def _start_static_http(host: str, port: int, root_dir: str, phone_token: Optional[str] = None) -> ThreadingHTTPServer:
+    handler_cls = type("_PhoneSafeStaticHandler", (_SafeStaticHandler,), {"phone_token": phone_token})
+    handler = functools.partial(handler_cls, directory=root_dir)
     httpd = ThreadingHTTPServer((host, port), handler)
     thread = threading.Thread(target=httpd.serve_forever, name="map-http", daemon=True)
     thread.start()
