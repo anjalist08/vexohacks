@@ -11,11 +11,15 @@ The voice loop (double-tap, Deepgram, Gemini, ElevenLabs) is built in voice/.
 import argparse
 import sys
 
-import config
-from app import SpatialMemoryApp
-from store.route_store import RouteStore
-from tracker.events import SampleLogger, feed, read_log, synthetic_walk
-from tracker.pdr import PathTracker
+import keys
+
+keys.prepare()   # before any AI SDK or the kit's speech module is imported
+
+import config  # noqa: E402
+from app import SpatialMemoryApp  # noqa: E402
+from store.route_store import RouteStore  # noqa: E402
+from tracker.events import SampleLogger, feed, read_log, synthetic_walk  # noqa: E402
+from tracker.pdr import PathTracker  # noqa: E402
 
 
 class PrintLed:

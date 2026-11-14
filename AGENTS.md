@@ -15,6 +15,9 @@ Read these first, in order:
   use synthetic walks and need no band. A person runs the real band from their own Terminal.
 - **Never read, print, log or commit `.env` or any key.** Keys are read from the environment
   at runtime only. Before every push, check that `git status` does not list `.env`.
+- **Only the `VEXO_` key names, only through `keys.py`.** Call `keys.prepare()` at start-up and
+  pass keys explicitly. Never read `GEMINI_API_KEY`, `GOOGLE_API_KEY` or `OPENAI_API_KEY`, and
+  never let an SDK pick a key up by itself: those names can hold a teammate's personal key.
 - **Never send a key to the browser page.** Deepgram, Gemini and ElevenLabs are called from
   Python only.
 - **Stay in your folder.** Each worker edits only the folders it owns (below).

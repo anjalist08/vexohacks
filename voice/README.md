@@ -24,8 +24,12 @@ One turn:
 Fallbacks: if Deepgram or Gemini fails, use `app.keyword_command(text)`. If ElevenLabs
 fails, use the macOS `say` command or print.
 
-Keys come from the environment (`.env`): `DEEPGRAM_API_KEY`, `GEMINI_API_KEY`,
-`ELEVENLABS_API_KEY`. Never print them. Tap-to-talk only: no always-on listening.
+Keys: call `keys.prepare()` once at start-up (before importing google-genai, Pipecat or the
+kit's `speech`), then pass every key explicitly: `keys.get("gemini")`, `keys.get("deepgram")`,
+`keys.get("elevenlabs")`. They read only `VEXO_GEMINI_API_KEY`, `VEXO_DEEPGRAM_API_KEY` and
+`VEXO_ELEVENLABS_API_KEY`. Never let an SDK find a key by itself: generic names such as
+`GEMINI_API_KEY` can be a teammate's personal, postpaid key. Never print them.
+Tap-to-talk only: no always-on listening.
 
 ## 2. Pipecat port (needed for the Deepgram track)
 
