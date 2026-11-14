@@ -8,7 +8,7 @@ Do not quote accuracy numbers from them.
 # The number on your band's bag (the band is called Vexo-HACK-NN).
 # Nothing connects to a band, real or pretend, until this is set.
 # Never use 42 or any other number from the kit's examples.
-BAND = None
+BAND = 80
 
 # --- Path tracking ------------------------------------------------------------
 STEP_LENGTH_M = 0.70          # PLACEHOLDER: walk a measured distance, divide by steps

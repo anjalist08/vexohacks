@@ -147,11 +147,13 @@ def run_band(ws_port=8765, http_port=8000, no_web=False):
     from voice.loop import VoiceLoop
 
     band_source.require_band_number()
+    log_dir = config.LOG_DIR if os.path.isabs(config.LOG_DIR) else os.path.join(REPO_ROOT, config.LOG_DIR)
+    routes_file = config.ROUTES_FILE if os.path.isabs(config.ROUTES_FILE) else os.path.join(REPO_ROOT, config.ROUTES_FILE)
     tracker = PathTracker()
-    logger = SampleLogger(config.LOG_DIR)
+    logger = SampleLogger(log_dir)
     led = LedController()
     speaker = ElevenLabsSpeaker()
-    app = SpatialMemoryApp(tracker, RouteStore(config.ROUTES_FILE), speak=speaker, led=led)
+    app = SpatialMemoryApp(tracker, RouteStore(routes_file), speak=speaker, led=led)
     voice_loop = VoiceLoop(app, listen_seconds=config.LISTEN_SECONDS)
     ws, httpd = _start_web_servers(
         app, mode="LIVE", ws_port=ws_port, http_port=http_port,
