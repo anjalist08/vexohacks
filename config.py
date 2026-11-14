@@ -38,7 +38,10 @@ WRONG_WAY_M = 3.0             # going back this far along the path counts as the
 OUTPUT_MODE = "both"          # "both", "light-only" or "voice-only" (stretch goal)
 
 # --- Models and voices (no keys here: keys live in .env) ----------------------
-GEMINI_MODEL = None           # confirm the Gemini 4 model id in the sponsor channel
+# From the "Build with Gemini 4" hackathon builder guide (Nov 2026):
+GEMINI_MODEL = "gemini-4-hydrogen"            # fast Gemini 4 for tool calls (free tier available)
+GEMINI_DECISION_MODEL = "gemini-decision-1"   # Decisions API: pick tool / landmark with confidence
+DECISION_MIN_CONFIDENCE = 0.75                # below this, ask the user instead of acting
 ELEVENLABS_VOICE_ID = "SAz9YHcvj6GT2YYXdXww"   # River: calm, neutral, informative
 LISTEN_SECONDS = 4.0          # how long one tap-to-talk turn records
 

@@ -13,9 +13,21 @@ One turn:
 1. Double-tap on the band (`band_source.connect(..., on_double_tap=...)`).
 2. Turn the mic on for `config.LISTEN_SECONDS`. The LED is locked solid blue meanwhile.
 3. Send the audio to Deepgram for text. Turn the mic off.
-4. Send the text to Gemini (`config.GEMINI_MODEL`, a Gemini 4 id) with `interfaces.TOOLS` as
-   function declarations, plus `app.landmark_summary()` so it can use landmark ids. It must
-   answer with a tool call.
+4. Decide what the user meant, with two Gemini models (per the "Build with Gemini 4" builder
+   guide, which recommends combining models in one loop):
+   - **Route with the Decisions API** (`config.GEMINI_DECISION_MODEL` = `gemini-decision-1`,
+     v1beta client, ~200 ms, no output tokens). One call, two `choice` questions over the
+     transcript: which tool (the names in `interfaces.TOOLS` plus `other`), and which landmark
+     (every saved landmark id with its label as the description, plus `start` and `other`).
+     If either confidence is below `config.DECISION_MIN_CONFIDENCE`, or two landmarks are close,
+     call `ask_user` instead of acting.
+   - **Fill free-text arguments with Gemini 4 Hydrogen** (`config.GEMINI_MODEL`) only when the
+     tool needs them (a new landmark's label, floor and note; a note's text). Declare the
+     tools as native function declarations from `interfaces.TOOLS`. Never ask it for raw JSON
+     in plain text.
+   - Guide rules: install `google-genai>=3.2.0` (check it supports Python 3.9, or use a newer
+     Python); do not pass temperature, top-p, top-k or thinking budgets to Gemini 4 models;
+     pass the key explicitly with `keys.get("gemini")`.
 5. Run it with `app.call_tool(name, args)`. That validates the arguments and returns a
    `ToolResult` with `say` and `led`.
 6. Speak `say` with ElevenLabs (`config.ELEVENLABS_VOICE_ID`) on the laptop speaker. The
