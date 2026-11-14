@@ -12,6 +12,7 @@ On --band, double-tap triggers one spoken turn: band mic -> Deepgram -> Gemini 4
 import argparse
 import os
 import sys
+import threading
 
 import keys
 
@@ -22,8 +23,8 @@ from app import SpatialMemoryApp  # noqa: E402
 from store.band_mirror import BandLandmarkMirror  # noqa: E402
 from store.route_store import RouteStore  # noqa: E402
 from tracker.events import SampleLogger, feed, read_log, synthetic_walk  # noqa: E402
-from tracker.pdr import PathTracker  # noqa: E402
-from web.ws_server import MapWebSocketServer, _start_static_http  # noqa: E402
+from tracker.wrist import make_tracker  # noqa: E402
+from web.ws_server import MapWebSocketServer, _start_static_http, start_status_pump  # noqa: E402
 
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 
@@ -75,7 +76,7 @@ def run_sim():
     print("SIMULATION: a synthetic walk, not real sensing.\n")
     walk1 = synthetic_walk(legs=((20, "left"), (15, None)))
     now = [walk1[0][1]]
-    app = SpatialMemoryApp(PathTracker(), RouteStore(), speak=say, led=PrintLed(), clock=lambda: now[0])
+    app = SpatialMemoryApp(make_tracker(synthetic=True), RouteStore(), speak=say, led=PrintLed(), clock=lambda: now[0])
 
     def user(text):
         print('\n> "%s"' % text)
@@ -123,11 +124,14 @@ def run_replay(path, ws_port=8765, http_port=8000, no_web=False):
     print("REPLAY of a logged walk (%s). This is not live sensing.\n" % path)
     events = read_log(path)
     now = [events[0][1]] if events else [0.0]
-    app = SpatialMemoryApp(PathTracker(), RouteStore(), speak=say, led=PrintLed(), clock=lambda: now[0])
+    app = SpatialMemoryApp(make_tracker(), RouteStore(), speak=say, led=PrintLed(), clock=lambda: now[0])
     ws, httpd = _start_web_servers(
         app, mode="REPLAY", ws_port=ws_port, http_port=http_port,
         enable_ws=not no_web, enable_http=not no_web,
     )
+    status_stop = threading.Event()
+    if ws is not None:
+        start_status_pump(ws, app.tracker, status_stop)
     try:
         app.call_tool("start_route", {"title": "replay"})
         if events:
@@ -137,8 +141,32 @@ def run_replay(path, ws_port=8765, http_port=8000, no_web=False):
         print("    [POS] x=%.1f m  y=%.1f m  heading=%.0f deg  steps=%d" % (p.x_m, p.y_m, p.heading_deg, p.steps))
         repl(app)
     finally:
+        status_stop.set()
         _stop_web_servers(ws, httpd)
     return 0
+
+
+class _QueuedSpeaker:
+    """Speaks in a background thread, one line after another. Speaking (ElevenLabs request
+    plus playback) takes seconds; called directly it held up the band's data and the map."""
+
+    def __init__(self, inner):
+        import queue
+        self._inner = inner
+        self._q = queue.Queue()
+        threading.Thread(target=self._run, name="speaker", daemon=True).start()
+
+    def __call__(self, text):
+        self._q.put(text)
+        return text
+
+    def _run(self):
+        while True:
+            text = self._q.get()
+            try:
+                self._inner(text)
+            except Exception as exc:
+                print("    [speech failed] %s" % exc)
 
 
 def run_band(ws_port=8765, http_port=8000, no_web=False, usb=False):
@@ -150,10 +178,10 @@ def run_band(ws_port=8765, http_port=8000, no_web=False, usb=False):
     band_source.require_band_number()
     log_dir = config.LOG_DIR if os.path.isabs(config.LOG_DIR) else os.path.join(REPO_ROOT, config.LOG_DIR)
     routes_file = config.ROUTES_FILE if os.path.isabs(config.ROUTES_FILE) else os.path.join(REPO_ROOT, config.ROUTES_FILE)
-    tracker = PathTracker()
+    tracker = make_tracker()
     logger = SampleLogger(log_dir)
     led = LedController()
-    speaker = ElevenLabsSpeaker()
+    speaker = _QueuedSpeaker(ElevenLabsSpeaker())   # speaking never blocks the band or the map
     app = SpatialMemoryApp(tracker, RouteStore(routes_file), speak=speaker, led=led)
     voice_loop = VoiceLoop(app, listen_seconds=config.LISTEN_SECONDS)
     ws, httpd = _start_web_servers(
@@ -186,11 +214,25 @@ def run_band(ws_port=8765, http_port=8000, no_web=False, usb=False):
     if getattr(band, "storage", None) is not None:
         app.band_mirror = BandLandmarkMirror(band.storage)
     voice_loop.start_background()
+    status_stop = threading.Event()
+    if ws is not None:
+        log_url = "/" + os.path.relpath(logger.path, REPO_ROOT).replace(os.sep, "/")
+
+        def status_extra():
+            logger.flush()          # so the page's log link has everything so far
+            return {"log": log_url}
+
+        start_status_pump(ws, tracker, status_stop, extra=status_extra)
+    if ws is not None:
+        print("Map:  http://localhost:%d/web/trail.html?ws_port=%d   (team map: http://localhost:%d/web/?ws_port=%d)"
+              % (http_port, ws.port, http_port, ws.port))
     print("Connected to %s. Double-tap the band to speak, or type commands below." % band.name)
     print("Logging every sample to %s" % logger.path)
+    print('Press "start route" on the map page (or type it here), hold your arm still a moment, then walk.')
     try:
         repl(app)
     finally:
+        status_stop.set()
         voice_loop.stop()
         _stop_web_servers(ws, httpd)
         logger.close()
