@@ -86,7 +86,8 @@ let lastTracker = null;
 function connectBackend() {
   if (socket && socket.readyState <= 1) socket.close();
   const port = Number($('wsPort').value) || 8765;
-  const url = `ws://127.0.0.1:${port}`;
+  const host = location.hostname && location.hostname !== 'localhost' ? location.hostname : '127.0.0.1';
+  const url = `ws://${host}:${port}`;
   say(`Connecting to main.py at ${url}...`);
   socket = new WebSocket(url);
   socket.onopen = () => {

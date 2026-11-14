@@ -169,7 +169,19 @@ class _QueuedSpeaker:
                 print("    [speech failed] %s" % exc)
 
 
-def run_band(ws_port=8765, http_port=8000, no_web=False, usb=False):
+def hotspot_address():
+    """This Mac's address on an iPhone Personal Hotspot network (172.20.10.x), or None."""
+    import re
+    import subprocess
+    try:
+        out = subprocess.run(["ifconfig"], capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    found = re.findall(r"inet (172\.20\.10\.\d+)", out)
+    return found[0] if found else None
+
+
+def run_band(ws_port=8765, http_port=8000, no_web=False, usb=False, host="127.0.0.1"):
     from tracker import band_source
     from voice.elevenlabs_tts import ElevenLabsSpeaker
     from voice.led_states import LedController
@@ -185,7 +197,7 @@ def run_band(ws_port=8765, http_port=8000, no_web=False, usb=False):
     app = SpatialMemoryApp(tracker, RouteStore(routes_file), speak=speaker, led=led)
     voice_loop = VoiceLoop(app, listen_seconds=config.LISTEN_SECONDS)
     ws, httpd = _start_web_servers(
-        app, mode="LIVE", ws_port=ws_port, http_port=http_port,
+        app, mode="LIVE", host=host, ws_port=ws_port, http_port=http_port,
         enable_ws=not no_web, enable_http=not no_web,
     )
 
@@ -224,8 +236,11 @@ def run_band(ws_port=8765, http_port=8000, no_web=False, usb=False):
 
         start_status_pump(ws, tracker, status_stop, extra=status_extra)
     if ws is not None:
-        print("Map:  http://localhost:%d/web/trail.html?ws_port=%d   (team map: http://localhost:%d/web/?ws_port=%d)"
-              % (http_port, ws.port, http_port, ws.port))
+        page_host = "localhost" if host == "127.0.0.1" else host
+        print("Map:  http://%s:%d/web/trail.html?ws_port=%d   (team map: http://%s:%d/web/?ws_port=%d)"
+              % (page_host, http_port, ws.port, page_host, http_port, ws.port))
+        if host != "127.0.0.1":
+            print("iPhone haptics app: connect to  %s:%d" % (host, ws.port))
     print("Connected to %s. Double-tap the band to speak, or type commands below." % band.name)
     print("Logging every sample to %s" % logger.path)
     print('Press "start route" on the map page (or type it here), hold your arm still a moment, then walk.')
@@ -249,13 +264,22 @@ def main(argv=None):
     p.add_argument("--ws-port", type=int, default=8765, help="WebSocket port for the map page (default: 8765)")
     p.add_argument("--http-port", type=int, default=8000, help="HTTP port for the map page (default: 8000)")
     p.add_argument("--usb", action="store_true", help="with --band: use the USB cable instead of Bluetooth")
+    p.add_argument("--host", default="127.0.0.1",
+                   help='address for the map and the iPhone app: "hotspot" = this Mac\'s iPhone Personal '
+                        'Hotspot address (172.20.10.x), so only the phone can connect (default: 127.0.0.1)')
     p.add_argument("--no-web", action="store_true", help="disable local HTTP/WebSocket servers on --band/--replay")
     a = p.parse_args(argv)
     if a.sim:
         return run_sim()
     if a.replay:
         return run_replay(a.replay, ws_port=a.ws_port, http_port=a.http_port, no_web=a.no_web)
-    return run_band(ws_port=a.ws_port, http_port=a.http_port, no_web=a.no_web, usb=a.usb)
+    host = a.host
+    if host == "hotspot":
+        host = hotspot_address()
+        if host is None:
+            raise SystemExit("No iPhone Personal Hotspot network found. On the iPhone turn on Settings > "
+                             "Personal Hotspot, connect the Mac to it (USB cable or Wi-Fi), then try again.")
+    return run_band(ws_port=a.ws_port, http_port=a.http_port, no_web=a.no_web, usb=a.usb, host=host)
 
 
 if __name__ == "__main__":
