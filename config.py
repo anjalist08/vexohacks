@@ -8,7 +8,7 @@ Do not quote accuracy numbers from them.
 # The number on your band's bag (the band is called Vexo-HACK-NN).
 # Nothing connects to a band, real or pretend, until this is set.
 # Never use 42 or any other number from the kit's examples.
-BAND = None
+BAND = 80                     # Vexo-HACK-80, the team's band (from the bag)
 
 # --- Path tracking ------------------------------------------------------------
 STEP_LENGTH_M = 0.70          # PLACEHOLDER: walk a measured distance, divide by steps
@@ -33,8 +33,13 @@ MIN_SEGMENT_M = 0.5           # segments shorter than this are dropped from the 
 OUTPUT_MODE = "both"          # "both", "light-only" or "voice-only" (stretch goal)
 
 # --- Models and voices (no keys here: keys live in .env) ----------------------
-GEMINI_MODEL = None           # confirm the Gemini 4 model id in the sponsor channel
+# From the "Build with Gemini 4" hackathon builder guide (Nov 2026):
+GEMINI_MODEL = "gemini-4-hydrogen"            # fast Gemini 4 for tool calls (free tier available)
+GEMINI_DECISION_MODEL = "gemini-decision-1"   # Decisions API: pick tool / landmark with confidence
+DECISION_MIN_CONFIDENCE = 0.75                # below this, ask the user instead of acting
 ELEVENLABS_VOICE_ID = "SAz9YHcvj6GT2YYXdXww"   # River: calm, neutral, informative
+MINIMAX_TTS_MODEL = "speech-2.8-turbo"         # backup voice when ElevenLabs fails (MiniMax T2A)
+MINIMAX_VOICE_ID = "English_Insightful_Speaker"
 LISTEN_SECONDS = 4.0          # how long one tap-to-talk turn records
 
 # --- Files ------------------------------------------------------------------

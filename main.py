@@ -3,6 +3,7 @@
     python3 main.py --sim             scripted demo on a synthetic walk (no band, no keys)
     python3 main.py --replay FILE     replay a logged real walk + live map page (label it a replay)
     python3 main.py --band            live band (set BAND in config.py first) + voice loop + live map page
+    python3 main.py --band --usb      the same over the USB cable
 
 Typed commands use the keyword fallback, e.g. "start route", "remember this as the elevator",
 "where was the elevator", "take me back to the start", "I'm at the elevator", "quit".
@@ -140,18 +141,20 @@ def run_replay(path, ws_port=8765, http_port=8000, no_web=False):
     return 0
 
 
-def run_band(ws_port=8765, http_port=8000, no_web=False):
+def run_band(ws_port=8765, http_port=8000, no_web=False, usb=False):
     from tracker import band_source
     from voice.elevenlabs_tts import ElevenLabsSpeaker
     from voice.led_states import LedController
     from voice.loop import VoiceLoop
 
     band_source.require_band_number()
+    log_dir = config.LOG_DIR if os.path.isabs(config.LOG_DIR) else os.path.join(REPO_ROOT, config.LOG_DIR)
+    routes_file = config.ROUTES_FILE if os.path.isabs(config.ROUTES_FILE) else os.path.join(REPO_ROOT, config.ROUTES_FILE)
     tracker = PathTracker()
-    logger = SampleLogger(config.LOG_DIR)
+    logger = SampleLogger(log_dir)
     led = LedController()
     speaker = ElevenLabsSpeaker()
-    app = SpatialMemoryApp(tracker, RouteStore(config.ROUTES_FILE), speak=speaker, led=led)
+    app = SpatialMemoryApp(tracker, RouteStore(routes_file), speak=speaker, led=led)
     voice_loop = VoiceLoop(app, listen_seconds=config.LISTEN_SECONDS)
     ws, httpd = _start_web_servers(
         app, mode="LIVE", ws_port=ws_port, http_port=http_port,
@@ -171,6 +174,7 @@ def run_band(ws_port=8765, http_port=8000, no_web=False):
             logger,
             on_double_tap=voice_loop.on_double_tap,
             on_link=on_link,
+            usb=usb,
         )
     except BaseException:
         _stop_web_servers(ws, httpd)
@@ -202,13 +206,14 @@ def main(argv=None):
     g.add_argument("--band", action="store_true", help="use the team's band (config.BAND)")
     p.add_argument("--ws-port", type=int, default=8765, help="WebSocket port for the map page (default: 8765)")
     p.add_argument("--http-port", type=int, default=8000, help="HTTP port for the map page (default: 8000)")
+    p.add_argument("--usb", action="store_true", help="with --band: use the USB cable instead of Bluetooth")
     p.add_argument("--no-web", action="store_true", help="disable local HTTP/WebSocket servers on --band/--replay")
     a = p.parse_args(argv)
     if a.sim:
         return run_sim()
     if a.replay:
         return run_replay(a.replay, ws_port=a.ws_port, http_port=a.http_port, no_web=a.no_web)
-    return run_band(ws_port=a.ws_port, http_port=a.http_port, no_web=a.no_web)
+    return run_band(ws_port=a.ws_port, http_port=a.http_port, no_web=a.no_web, usb=a.usb)
 
 
 if __name__ == "__main__":

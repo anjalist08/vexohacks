@@ -222,8 +222,8 @@ class GeminiClientTests(unittest.TestCase):
         self.assertEqual(low_payload["generationConfig"]["thinkingConfig"]["thinkingLevel"], "low")
 
     def test_choose_tool_fails_when_model_unset(self):
-        self.assertIsNone(config.GEMINI_MODEL)
-        with mock.patch.dict(os.environ, {"VEXO_GEMINI_API_KEY": "test-vexo-gemini-tok"}, clear=True):
+        with mock.patch.object(config, "GEMINI_MODEL", None), \
+                mock.patch.dict(os.environ, {"VEXO_GEMINI_API_KEY": "test-vexo-gemini-tok"}, clear=True):
             with self.assertRaises(GeminiError) as ctx:
                 choose_tool("start route", landmark_summary="none")
         self.assertIn("GEMINI_MODEL", str(ctx.exception))
@@ -287,7 +287,7 @@ class ElevenLabsSpeakerTests(unittest.TestCase):
 
         opener = CapturingOpener(responder)
         said_lines = []
-        speaker = ElevenLabsSpeaker(
+        speaker = ElevenLabsSpeaker(allow_minimax=False, 
             api_key=secret,
             opener=opener,
             player=fake_player,
@@ -321,7 +321,7 @@ class ElevenLabsSpeakerTests(unittest.TestCase):
 
         opener = CapturingOpener(lambda _req, _t: FakeHttpResponse(b"mp3-bytes"))
         say_calls = []
-        speaker = ElevenLabsSpeaker(
+        speaker = ElevenLabsSpeaker(allow_minimax=False, 
             api_key="test-vexo-xi-token",
             opener=opener,
             player=broken_player,
@@ -342,7 +342,7 @@ class ElevenLabsSpeakerTests(unittest.TestCase):
         say_calls = []
         with mock.patch.dict(os.environ, env, clear=True), \
                 mock.patch.object(keys, "ENV_FILE", "/nonexistent/.env"):
-            speaker = ElevenLabsSpeaker(
+            speaker = ElevenLabsSpeaker(allow_minimax=False, 
                 allow_macos_say=True,
                 say_runner=say_calls.append,
                 on_say=lambda _t: None,
@@ -353,7 +353,7 @@ class ElevenLabsSpeakerTests(unittest.TestCase):
 
             # Now disable macOS say too -> falls back to print("[SAY] ...")
             with mock.patch("builtins.print") as mock_print:
-                speaker_print = ElevenLabsSpeaker(allow_macos_say=False)
+                speaker_print = ElevenLabsSpeaker(allow_minimax=False, allow_macos_say=False)
                 self.assertEqual(speaker_print("Route saved."), "print")
                 mock_print.assert_called_once_with("    [SAY] Route saved.")
 
@@ -454,7 +454,7 @@ class VoiceLoopTests(unittest.TestCase):
             played.append(os.path.exists(mp3_path))
             turn_done.set()
 
-        speaker = ElevenLabsSpeaker(
+        speaker = ElevenLabsSpeaker(allow_minimax=False, 
             api_key="test-vexo-xi",
             opener=tts_opener,
             player=fake_player,

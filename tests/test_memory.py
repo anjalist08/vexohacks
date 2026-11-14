@@ -164,8 +164,14 @@ class AdvancingGuidanceTests(unittest.TestCase):
         self.assertFalse(app.navigator.active)
         self.assertEqual(app.navigator.current_index, 2)
 
-        # Outbound recorded points were not polluted by return-trip footsteps.
-        self.assertEqual(len(app.store.current.points), outbound_point_count)
+        # Return-trip footsteps were not recorded. On arrival the position was reset to the
+        # destination, recorded as a jump (never drawn or routed as a walked line), and
+        # recording resumed for any steps after that.
+        pts = app.store.current.points
+        self.assertEqual(app.store.current.breaks, [outbound_point_count])
+        self.assertAlmostEqual(pts[outbound_point_count].x_m, 0.0, places=6)
+        self.assertAlmostEqual(pts[outbound_point_count].y_m, 0.0, places=6)
+        self.assertLessEqual(len(pts) - outbound_point_count, 2)
 
         # Guidance events were emitted for initial plan, corner advance, and final arrival.
         guidance_events = [e for e in events if e["type"] == "guidance"]

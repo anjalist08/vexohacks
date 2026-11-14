@@ -39,6 +39,7 @@ class SpatialMemoryApp:
         self.band_mirror = band_mirror
         self.led_state = "idle"
         self._last_pose: Optional[PoseSample] = None
+        self._jump_next = False           # the next tracker sample is a re-anchor, not a walked step
         self._event_listeners: List[Callable[[dict], None]] = []
         tracker.on_sample(self.on_pose)
         if hasattr(tracker, "on_uncertainty"):
@@ -111,18 +112,35 @@ class SpatialMemoryApp:
     def on_pose(self, sample: PoseSample) -> None:
         """Handle each PoseSample emitted by the tracker."""
         self._last_pose = sample
-        if self.navigator is None:
-            self.store.add_point(sample)
-        self._emit({"type": "point", **sample.to_dict()})
+        jump, self._jump_next = self._jump_next, False
+        guiding = self.navigator is not None and self.navigator.active
+        if not guiding:                   # the return walk itself is not recorded
+            self.store.add_point(sample, jump=jump)
+        event = {"type": "point", **sample.to_dict()}
+        if jump:
+            event["jump"] = True          # a reset, not a walk: the map must not draw a line to it
+        self._emit(event)
 
-        if self.navigator is not None and self.navigator.active:
-            upd = self.navigator.update(sample)
+        if guiding:
+            nav = self.navigator
+            upd = nav.update(sample)
             if upd.say:
                 self._say_text(upd.say)
             if upd.led:
                 self._show_led(upd.led, period=upd.led_period)
             if upd.advanced or upd.arrived:
-                self._emit({"type": "guidance", **self.navigator.to_dict()})
+                self._emit({"type": "guidance", **nav.to_dict()})
+            if upd.arrived and nav is self.navigator:
+                self._reanchor_at(nav.target_x, nav.target_y, sample.heading_deg, sample.t)
+
+    def _reanchor_at(self, x: float, y: float, heading_deg: float, t: Optional[float] = None) -> None:
+        """Reset the tracker to a known spot. Cancels drift and, in the tracker, clears the
+        heading uncertainty; the reset is recorded as a jump, never as a walked line."""
+        self._jump_next = True
+        try:
+            self.tracker.reanchor(x, y, heading_deg, t)
+        finally:
+            self._jump_next = False
 
     # --- dispatch ----------------------------------------------------------------
     def call_tool(self, name: str, args: Optional[dict] = None) -> ToolResult:
@@ -241,7 +259,7 @@ class SpatialMemoryApp:
         self._cancel_guidance()
         self.navigator = None
         p = self.store.current.points[lm.point_index]
-        self.tracker.reanchor(p.x_m, p.y_m, p.heading_deg, self.clock())
+        self._reanchor_at(p.x_m, p.y_m, p.heading_deg, self.clock())
         return ToolResult(True, "Got it, you're at the %s." % lm.label, "recording")
 
     def ask_user(self, question: str) -> ToolResult:

@@ -6,7 +6,8 @@ Rules enforced here:
 - Blocks HTTP redirects (`_NoRedirect`) so the header is never forwarded elsewhere.
 - Shows only HTTP status numbers on error, never keys or untrusted error payloads.
 - Always deletes temporary MP3 files in `finally:`.
-- Falls back cleanly to macOS `say`, and then terminal `print("    [SAY] ...")`.
+- Falls back to MiniMax TTS (voice/minimax_tts.py) when VEXO_MINIMAX_API_KEY is set, then to
+  macOS `say`, and then terminal `print("    [SAY] ...")`.
 """
 import json
 import os
@@ -22,6 +23,7 @@ from typing import Callable, Optional
 
 import config
 import keys
+from voice import minimax_tts
 
 API_BASE = "https://api.elevenlabs.io/v1/text-to-speech"
 DEFAULT_MODEL_ID = "eleven_turbo_v2_5"
@@ -147,6 +149,9 @@ class ElevenLabsSpeaker:
         say_runner: Optional[Callable[[str], None]] = None,
         on_say: Optional[Callable[[str], None]] = None,
         timeout: float = DEFAULT_TIMEOUT,
+        minimax_api_key: Optional[str] = None,
+        minimax_opener=None,
+        allow_minimax: bool = True,
     ) -> None:
         keys.prepare()
         self.voice_id = voice_id
@@ -158,12 +163,15 @@ class ElevenLabsSpeaker:
         self.say_runner = say_runner
         self.on_say = on_say
         self.timeout = timeout
+        self._minimax_key = minimax_api_key
+        self.minimax_opener = minimax_opener
+        self.allow_minimax = allow_minimax
 
     def __call__(self, text: str) -> str:
         return self.speak(text)
 
     def speak(self, text: str) -> str:
-        """Speak `text` and return backend used: `'elevenlabs'`, `'macos_say'`, `'print'`, or `'none'`."""
+        """Speak `text`; returns the backend used: 'elevenlabs', 'minimax', 'macos_say', 'print' or 'none'."""
         clean = (text or "").strip()
         if not clean:
             return "none"
@@ -191,6 +199,9 @@ class ElevenLabsSpeaker:
                 msg = str(exc) if isinstance(exc, ElevenLabsError) else exc.__class__.__name__
                 print("    [TTS] ElevenLabs unavailable (%s); falling back." % msg, file=sys.stderr)
 
+        if self._try_minimax(clean):
+            return "minimax"
+
         if self._try_macos_say(clean):
             return "macos_say"
 
@@ -209,6 +220,24 @@ class ElevenLabsSpeaker:
                     os.remove(tmp_path)
                 except OSError:
                     pass
+
+    def _try_minimax(self, text: str) -> bool:
+        """Backup voice: MiniMax, only if its key is set."""
+        if not self.allow_minimax:
+            return False
+        keys.prepare()
+        secret = (self._minimax_key or "").strip() or keys.get("minimax", required=False)
+        if not secret:
+            return False
+        try:
+            mp3_bytes = minimax_tts.synthesize_mp3(
+                text=text, api_key=secret, opener=self.minimax_opener, timeout=self.timeout)
+            self._play_temp_mp3(mp3_bytes)
+            return True
+        except (minimax_tts.MiniMaxError, subprocess.SubprocessError, OSError) as exc:
+            msg = str(exc) if isinstance(exc, minimax_tts.MiniMaxError) else exc.__class__.__name__
+            print("    [TTS] MiniMax unavailable (%s); falling back." % msg, file=sys.stderr)
+            return False
 
     def _try_macos_say(self, text: str) -> bool:
         if not self.allow_macos_say:
