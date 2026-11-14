@@ -6,3 +6,5 @@
 4. vibration haptics based on braille for sensory and accessibility for visually impaired
 5. light haptics flashlight pulses for hearing impaired as locations become closer or travel (based on settings)
 6. vibrations vary amongst "start location", "arrived at location", "travelling", "saved location".
+7. Buttons for favorite places & saved paths
+8. Google XR AR features for tracking the previous paths taken Anti-Gravity doodle drawing or arrows pointing and popping up in the direction of path planned for navigation or previously traversed terrains.
