@@ -36,8 +36,20 @@ struct BandView: View {
                 }
                 if guide.carryingBand {
                     Label(guide.bandStatus.isEmpty ? "Searching…" : guide.bandStatus,
-                          systemImage: "dot.radiowaves.left.and.right")
+                          systemImage: guide.bandConnectedOnPhone ? "checkmark.circle.fill" : "dot.radiowaves.left.and.right")
                         .font(.footnote)
+                        .foregroundStyle(guide.bandConnectedOnPhone ? .green : .primary)
+                    if guide.bandConnectedOnPhone {
+                        Button { guide.flashBand() } label: {
+                            Label("Flash \(BandConfig.name) (test link)", systemImage: "light.beacon.max.fill")
+                        }
+                        .font(.footnote)
+                    } else {
+                        Button { guide.resetBandBluetooth() } label: {
+                            Label("Reset Bluetooth & scan fresh", systemImage: "arrow.clockwise")
+                        }
+                        .font(.footnote)
+                    }
                     Button("Disconnect the band from this iPhone", role: .destructive) { guide.disconnectBandFromPhone() }
                         .font(.footnote)
                     Text("Bluetooth stays connected when you unplug a charging cable, and reconnects by itself if the link drops.")
@@ -47,10 +59,10 @@ struct BandView: View {
                         Label("Connect band (iPhone Bluetooth)", systemImage: "antenna.radiowaves.left.and.right")
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(guide.link != .on)
-                    Text(guide.phoneOnly ? "iPhone-only mode: tap Connect band, then double-tap the band." : guide.bridgeWanted
-                         ? "The laptop is waiting for this iPhone to carry the band. Double-tap the band, then connect."
-                         : "To let this iPhone carry the band, run the laptop with: python3 main.py --bridge --phone")
+                    Text(guide.phoneOnly ? "iPhone-only mode: double-tap \(BandConfig.name) so it blinks blue, then tap Connect band."
+                         : guide.bridgeWanted
+                         ? "The laptop is waiting for this iPhone to carry the band. Double-tap \(BandConfig.name), then tap Connect band."
+                         : "Double-tap \(BandConfig.name) so it blinks blue, then tap Connect band (starts iPhone-only mode automatically if no laptop is linked).")
                         .font(.footnote).foregroundStyle(.secondary)
                     Label("Tip: plug the band into this iPhone (USB-C) to charge it while you connect. Plugging in can wake it so it's findable for 60 s. Then unplug: the Bluetooth link stays. (iPhones can't use the band's USB data link, so the connection itself is Bluetooth.)",
                           systemImage: "cable.connector")

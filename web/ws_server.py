@@ -348,7 +348,8 @@ class MapWebSocketServer:
 
         # Another device (the phone) must present the phone token; this laptop needs none.
         try:
-            peer = sock.getpeername()[0]
+            peer_info = sock.getpeername()
+            peer = peer_info[0] if isinstance(peer_info, tuple) and peer_info else "127.0.0.1"
         except OSError:
             peer = ""
         if not _is_loopback(peer):

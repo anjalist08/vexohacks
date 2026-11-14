@@ -70,7 +70,8 @@ final class PhoneBrain {
             // what the laptop used to turn on: 50 motion samples/s, steps 10/s, taps, battery, temperature
             bandCommand(["op": "configure", "args": ["motion": 50, "activity": "fastest", "events": true,
                                                      "battery": true, "temperature": 5]])
-            led(routeActive ? "recording" : "idle")
+            // Flash white on connect (like the Vexo dashboard's identify), then return to route state.
+            led(routeActive ? "recording" : "connected_flash")
         }
     }
 
@@ -84,6 +85,7 @@ final class PhoneBrain {
         guide?.ledState = state
         let cues: [String: (String, String, Int, String?)] = [
             "idle": ("#000000", "off", 1000, nil),
+            "connected_flash": ("#ffffff", "flash", 400, "idle"),
             "route_started": ("#00ff00", "blink", 400, "recording"),
             "recording": ("#ffb000", "breathe", 2000, nil),
             "landmark_saved": ("#a020f0", "solid", 1000, "recording"),

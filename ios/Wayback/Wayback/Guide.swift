@@ -109,13 +109,35 @@ final class Guide: ObservableObject {
         phoneOnly = true
         _ = brain
         link = .on
-        big = "Ready"
-        sub = "Double-tap the band and say \"start route\"."
+        big = band?.verified == true ? "Ready" : "Connect \(BandConfig.name)"
+        sub = band?.verified == true
+            ? "Double-tap the band and say \"start route\"."
+            : "Double-tap \(BandConfig.name) so its light blinks blue."
         UIApplication.shared.isIdleTimerDisabled = true      // haptics only play while the app is on screen
         carryBand()
     }
 
     func runOnBand(_ cmd: [String: Any]) { band?.run(command: cmd) }
+
+    /// Flash Vexo-HACK-80 white so the user can visually confirm the iPhone Bluetooth link.
+    func flashBand() {
+        guard band?.verified == true else { return }
+        if phoneOnly {
+            brain.led(recording ? "route_started" : "connected_flash")
+        } else {
+            runOnBand(["op": "setLed", "args": ["color": "#ffffff", "brightness": 1.0, "pattern": "flash", "period": 400]])
+        }
+    }
+
+    /// Clear any cached CoreBluetooth peripheral identifier and scan fresh for Vexo-HACK-80.
+    func resetBandBluetooth() {
+        band?.stop()
+        band = nil
+        bandLinkStatus = "not connected"
+        BandLink.forgetRemembered()
+        if link != .on { startPhoneOnly(); return }
+        carryBand()
+    }
 
     func disconnect() {
         phoneMotion.stop()
@@ -188,24 +210,46 @@ final class Guide: ObservableObject {
     }
 
     /// The Band tab's button: connect the iPhone to the band over Bluetooth now.
-    func connectBandFromPhone() { carryBand() }
+    /// If neither laptop nor iPhone-only mode is active yet, enter iPhone-only mode automatically.
+    func connectBandFromPhone() {
+        if link != .on {
+            startPhoneOnly()
+            return
+        }
+        carryBand()
+    }
 
     func disconnectBandFromPhone() {
         band?.stop()
         band = nil
+        bandLinkStatus = "not connected"
         bandStatus = "Disconnected from the band"
     }
 
     var carryingBand: Bool { band != nil }
+    var bandConnectedOnPhone: Bool { band?.verified == true }
 
-    /// The laptop runs `main.py --bridge`: this phone connects to the band and carries its data.
+    /// The laptop runs `main.py --bridge` (or iPhone-only mode): this phone connects to the band and carries its data.
     private func carryBand() {
-        guard band == nil else { return }
+        if let existing = band {
+            if existing.verified && !phoneOnly {
+                send(["type": "band_status", "status": "connected", "name": BandConfig.name,
+                      "transport": "iPhone Bluetooth"])
+            }
+            return
+        }
         let link = BandLink()
         link.onStatus = { [weak self] text in Task { @MainActor in self?.bandStatus = text } }
         link.onMessage = { [weak self] msg in
             Task { @MainActor in
                 guard let self else { return }
+                if msg["type"] as? String == "band_status", let status = msg["status"] as? String {
+                    self.bandLinkStatus = status
+                    if status == "connected" && self.phoneOnly && self.state == "idle" {
+                        self.big = "Ready"
+                        self.sub = "Double-tap the band and say \"start route\"."
+                    }
+                }
                 if self.phoneOnly { self.brain.band(msg) } else { self.send(msg) }   // phone brain, or the laptop
             }
         }
