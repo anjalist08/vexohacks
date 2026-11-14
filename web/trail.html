@@ -38,6 +38,19 @@
   ol, ul { margin:0; padding-left:20px; }
   li.now { font-weight:600; color:var(--blue); }
   [hidden] { display:none !important; }
+  /* voice: Talk / Stop and live status */
+  .talk { display:flex; gap:10px; align-items:center; }
+  #talkBtn { flex:none; width:64px; height:64px; border-radius:50%; background:var(--blue); border-color:var(--blue); color:#fff; font-weight:600; padding:0; }
+  #talkBtn.listening { background:#0b57d0; animation:talkpulse 1s ease-in-out infinite; }
+  @keyframes talkpulse { 0%,100% { box-shadow:0 0 0 0 rgba(26,115,232,.5); } 50% { box-shadow:0 0 0 10px rgba(26,115,232,0); } }
+  @media (prefers-reduced-motion: reduce) { #talkBtn.listening { animation:none; } }
+  #vStatus { font-weight:500; }
+  #vStatus.warn { color:var(--red); }
+  #vHeard { color:var(--muted); font-size:12.5px; overflow-wrap:anywhere; }
+  #vHeard q { color:var(--fg); font-style:italic; }
+  .try { color:var(--muted); font-size:12px; }
+  #bridgeBtn[data-level="ok"] { color:var(--green); border-color:var(--green); }
+  #bridgeBtn[data-level="err"] { color:var(--red); border-color:var(--red); }
 </style>
 </head>
 <body>
@@ -51,7 +64,7 @@
   </label>
   <span id="backendOpts"><label>WS port <input id="wsPort" type="number" value="8790"></label></span>
   <span id="directOpts" hidden>
-    <label>Band <input id="band" type="number" min="1" max="999" value="12"></label>
+    <label>Band <input id="band" type="number" min="1" max="999" value="80"></label>
     <label><input id="pretend" type="checkbox"> Pretend band</label>
   </span>
   <button id="connect" class="primary">Connect</button>
@@ -59,6 +72,7 @@
   <button id="stop" disabled>Stop</button>
   <button id="clear">Clear view</button>
   <button id="save" disabled>Download log</button>
+  <button id="bridgeBtn" hidden title="main.py --bridge: connect the band from this Chrome tab"><span id="bridgeLabel">Connect band (Chrome)</span></button>
   <span id="link" class="pill">not connected</span>
   <span id="modePill" class="pill" hidden></span>
   <span id="simbtns" hidden>
@@ -83,16 +97,20 @@
 
     <section class="card" id="voiceCard">
       <div class="stat"><h2>Voice &amp; landmarks</h2><span id="ledPill" class="pill">LED idle</span></div>
-      <div id="say" class="say">Double-tap the band and speak, or type below.</div>
+      <div class="talk">
+        <button id="talkBtn" type="button" title="Same as a double-tap: tap to listen, tap again to stop">Talk</button>
+        <div>
+          <div id="vStatus" role="status" aria-live="polite">Double-tap the band (or press Talk), speak, then double-tap again.</div>
+          <div id="vHeard"></div>
+        </div>
+      </div>
+      <div id="say" class="say">The answer is spoken from the laptop and shown here.</div>
       <form id="cmdForm" class="row">
         <input id="cmd" type="text" placeholder='e.g. "remember this as the elevator"' autocomplete="off">
         <button type="submit">Send</button>
       </form>
-      <div class="row chips">
-        <button data-cmd="remember this as the entrance">remember entrance</button>
-        <button data-cmd="where was the entrance">where is entrance?</button>
-        <button data-cmd="take me back to the start">back to start</button>
-      </div>
+      <div class="try">Try saying (or click):</div>
+      <div id="tryChips" class="row chips"></div>
       <div><b>Landmarks</b> <span id="lmCount" class="pill">0</span></div>
       <ul id="lmList"><li class="hint">None yet.</li></ul>
       <div><b>Way back</b> <span id="guideState" class="pill">inactive</span></div>
@@ -130,5 +148,6 @@
     'Opened by double-click, so the page cannot load its code. Open it through the web server instead (see the README).';
 </script>
 <script type="module" src="trail.js"></script>
+<script type="module" src="trail-voice.js"></script>
 </body>
 </html>

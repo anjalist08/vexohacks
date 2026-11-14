@@ -116,7 +116,14 @@ function command(text) {
 $('cmdForm').addEventListener('submit', (e) => { e.preventDefault(); const t = $('cmd').value.trim(); if (t) { command(t); $('cmd').value = ''; } });
 document.querySelectorAll('.chips button').forEach((b) => { b.onclick = () => command(b.dataset.cmd); });
 
+// Voice controls live in trail-voice.js: it hears every backend message and can send its own.
+window.trailBackend = {
+  send: (msg) => { if (socket && socket.readyState === 1) { socket.send(JSON.stringify(msg)); return true; } return false; },
+  command: (text) => command(text),
+};
+
 function onBackend(m) {
+  window.dispatchEvent(new CustomEvent('trail-backend', { detail: m }));
   switch (m.type) {
     case 'mode': {
       const pill = $('modePill');

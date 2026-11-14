@@ -649,7 +649,7 @@ class VoiceLoopTests(unittest.TestCase):
         # Interrupted Deepgram stream after partial transcript -> mic turned off before keyword fallback
         class FakeSpeechModule:
             @staticmethod
-            def listen(b, _seconds, on_text=None):
+            def listen(b, _seconds, on_text=None, **options):   # the kit's listen takes options too
                 b.configure(audio=True)
                 if on_text:
                     on_text("remember this as the fountain", False)
