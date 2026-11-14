@@ -22,5 +22,18 @@
    "Desert and Antarctica removed; all other scenes unchanged",
    "ElevenLabs narration in the team's River voice, captions timed to the real clips, ending on \"This is the Wayback Trail.\""
   ]
+ },
+ {
+  "version": 3,
+  "file": "v3-app-buzzes-turn-you.mp4",
+  "date": "2026-11-14",
+  "commit": "553195e",
+  "title": "App buzzes turn you",
+  "changes": [
+   "Every buzz now comes from the Wayback iPhone app: the app card shakes and the phone in the pocket ripples; the band only listens and glows",
+   "Walk scene: you ask \"Take me back to the elevator\", the app buzzes 2 short soft pulses (wrong_left) with a turn-left arrow until you face the route, then one long buzz (on_track, locked on), then light ticks guide you back",
+   "Narration: \"Every time you ask, the Wayback app buzzes until you face the right way.\" and \"Can't hear? The band glows, and the app buzzes.\"",
+   "Cards, the Deaf walker and the end card say the buzzes come from the app"
+  ]
  }
 ]
