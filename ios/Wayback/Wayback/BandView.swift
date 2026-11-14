@@ -40,6 +40,8 @@ struct BandView: View {
                         .font(.footnote)
                     Button("Disconnect the band from this iPhone", role: .destructive) { guide.disconnectBandFromPhone() }
                         .font(.footnote)
+                    Text("Bluetooth stays connected when you unplug a charging cable, and reconnects by itself if the link drops.")
+                        .font(.footnote).foregroundStyle(.secondary)
                 } else {
                     Button { guide.connectBandFromPhone() } label: {
                         Label("Connect band (iPhone Bluetooth)", systemImage: "antenna.radiowaves.left.and.right")
@@ -49,6 +51,9 @@ struct BandView: View {
                     Text(guide.phoneOnly ? "iPhone-only mode: tap Connect band, then double-tap the band." : guide.bridgeWanted
                          ? "The laptop is waiting for this iPhone to carry the band. Double-tap the band, then connect."
                          : "To let this iPhone carry the band, run the laptop with: python3 main.py --bridge --phone")
+                        .font(.footnote).foregroundStyle(.secondary)
+                    Label("Tip: plug the band into this iPhone (USB-C) to charge it while you connect. Plugging in can wake it so it's findable for 60 s. Then unplug: the Bluetooth link stays. (iPhones can't use the band's USB data link, so the connection itself is Bluetooth.)",
+                          systemImage: "cable.connector")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             } header: { Text("Connection") }

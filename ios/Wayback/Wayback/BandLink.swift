@@ -24,9 +24,30 @@ final class BandLink: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         central = CBCentralManager(delegate: self, queue: .main)
     }
 
+    /// This iPhone's identifier for the team's band, saved after its number was checked, so the
+    /// app can reconnect to it directly (no scan, no double-tap while it can be found).
+    private static let savedKey = "waybackBandIdentifier"
+    private static let reconnect: [String: Any] = {
+        if #available(iOS 17.0, *) { return [CBConnectPeripheralOptionEnableAutoReconnect: true] }
+        return [:]
+    }()
+
     func start() {
         wantConnected = true
+        connectRemembered()
         scanIfReady()
+    }
+
+    /// Ask iOS to connect to the remembered band. The request never times out: it completes as
+    /// soon as the band can be found (after a double-tap, a restart, or for 2 min after a drop).
+    private func connectRemembered() {
+        guard wantConnected, central.state == .poweredOn, peripheral == nil,
+              let s = UserDefaults.standard.string(forKey: BandLink.savedKey), let id = UUID(uuidString: s),
+              let p = central.retrievePeripherals(withIdentifiers: [id]).first else { return }
+        peripheral = p
+        p.delegate = self
+        onStatus?("Reconnecting to \(BandConfig.name)…")
+        central.connect(p, options: BandLink.reconnect)
     }
 
     func stop() {
@@ -45,7 +66,7 @@ final class BandLink: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
 
     func centralManagerDidUpdateState(_ c: CBCentralManager) {
         switch c.state {
-        case .poweredOn: scanIfReady()
+        case .poweredOn: connectRemembered(); scanIfReady()
         case .unauthorized: onStatus?("Bluetooth not allowed: Settings → Wayback → Bluetooth")
         case .poweredOff: onStatus?("Turn Bluetooth on")
         default: break
@@ -62,7 +83,7 @@ final class BandLink: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         peripheral = p
         p.delegate = self
         onStatus?("Connecting to \(BandConfig.name)…")
-        c.connect(p, options: nil)
+        c.connect(p, options: BandLink.reconnect)
     }
 
     func centralManager(_ c: CBCentralManager, didConnect p: CBPeripheral) {
@@ -76,10 +97,19 @@ final class BandLink: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     func centralManager(_ c: CBCentralManager, didDisconnectPeripheral p: CBPeripheral, error: Error?) {
         let was = verified
         reset()
-        if was { onMessage?(["type": "band_status", "status": "disconnected"]) }
-        onStatus?("Disconnected")
-        // The band can be found again for 2 minutes after a dropped link: look again.
-        scanIfReady()
+        if was { onMessage?(["type": "band_status", "status": "reconnecting"]) }
+        guard wantConnected else { onStatus?("Disconnected"); return }
+        // Keep the link: the band can be found again for 2 minutes after a drop. Reconnect to the
+        // same band directly; it is checked again (GET_INFO) and set up again when it answers.
+        if was {
+            peripheral = p
+            p.delegate = self
+            onStatus?("Link lost, reconnecting to \(BandConfig.name)…")
+            c.connect(p, options: BandLink.reconnect)
+        } else {
+            onStatus?("Disconnected")
+            scanIfReady()
+        }
     }
 
     private func reset() {
@@ -137,6 +167,7 @@ final class BandLink: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
                     return
                 }
                 verified = true
+                UserDefaults.standard.set(p.identifier.uuidString, forKey: BandLink.savedKey)   // checked: remember it
                 onStatus?("\(BandConfig.name) connected (iPhone Bluetooth)")
                 onMessage?(["type": "band_status", "status": "connected", "name": BandConfig.name,
                             "transport": "iPhone Bluetooth"])
