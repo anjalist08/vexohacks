@@ -303,7 +303,8 @@ def run_bridge(ws_port=8765, http_port=8000):
         ws.send_link(status)
         if status in ("connected", "reconnected"):
             band.connected = True
-            ws.send_metric("info", {"name": msg.get("name") or band.name, "transport": "Chrome Bluetooth",
+            ws.send_metric("info", {"name": msg.get("name") or band.name,
+                                    "transport": msg.get("transport") or "Chrome Bluetooth",
                                     "firmware": msg.get("firmware")})
             bridge_band.configure_streams(band)
             led.reapply()

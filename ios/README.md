@@ -20,3 +20,16 @@ tracking, routes and voice; the phone receives buzz cues over Wi-Fi.
 3. Keep the app open (screen on): iOS only plays haptics for the app on screen.
 
 Buzz patterns match `store/haptics.py`. Left cues feel softer, right cues crisper.
+
+## Let the iPhone carry the band (no Bluetooth on the laptop)
+The app can connect to the band itself (CoreBluetooth) and relay it to the laptop, like the
+Chrome bridge. Then the laptop only needs to be on the same Wi-Fi, not near the band.
+
+1. On the laptop: `python3 main.py --bridge --phone` (no band connection on the laptop).
+2. Double-tap the band, then open Wayback, paste the phone link and Connect.
+3. Allow Bluetooth when asked. The app finds **only Vexo-HACK-80** (exact name or the number
+   in its advertising packet), checks the band's own number, and then relays motion, steps,
+   taps, battery, temperature and microphone audio. Voice, guidance and buzzing work as before.
+
+The band number is in one place: `BandConfig.number` in `Wayback/BandProtocol.swift`.
+The decoder was checked against the worked frame examples in `vexo-open-kit/docs/bluetooth-contract.md`.

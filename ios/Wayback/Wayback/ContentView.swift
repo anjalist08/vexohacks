@@ -94,6 +94,10 @@ struct ContentView: View {
                     .buttonStyle(.borderedProminent)
                     .disabled(phoneLink.isEmpty)
                 }
+                if !guide.bandStatus.isEmpty {
+                    Label(guide.bandStatus, systemImage: "dot.radiowaves.left.and.right")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
                 if !guide.voice.isEmpty {
                     Text(guide.voice).font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 }

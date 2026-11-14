@@ -16,6 +16,9 @@ final class Guide: ObservableObject {
     @Published var voice = ""
     @Published var lastCue = ""
     @Published var buzzing = true
+    @Published var bandStatus = ""          // the iPhone's own Bluetooth link to the band (bridge mode)
+
+    private var band: BandLink?             // made only when the laptop asks the phone to carry the band
 
     let haptics = Haptics()
     private var task: URLSessionWebSocketTask?
@@ -49,6 +52,9 @@ final class Guide: ObservableObject {
     }
 
     func disconnect() {
+        band?.stop()
+        band = nil
+        bandStatus = ""
         wanted = nil
         task?.cancel(with: .goingAway, reason: nil)
         task = nil
@@ -91,6 +97,23 @@ final class Guide: ObservableObject {
         task?.send(.string(#"{"type":"talk"}"#)) { _ in }
     }
 
+    /// Send one JSON message to the laptop app.
+    func send(_ message: [String: Any]) {
+        guard let data = try? JSONSerialization.data(withJSONObject: message),
+              let text = String(data: data, encoding: .utf8) else { return }
+        task?.send(.string(text)) { _ in }
+    }
+
+    /// The laptop runs `main.py --bridge`: this phone connects to the band and carries its data.
+    private func carryBand() {
+        guard band == nil else { return }
+        let link = BandLink()
+        link.onStatus = { [weak self] text in Task { @MainActor in self?.bandStatus = text } }
+        link.onMessage = { [weak self] msg in Task { @MainActor in self?.send(msg) } }
+        band = link
+        link.start()
+    }
+
     func tryCue(_ cue: String) {
         haptics.play(cue)
         lastCue = cue
@@ -121,6 +144,10 @@ final class Guide: ObservableObject {
             }
         case "say":
             voice = m["text"] as? String ?? ""
+        case "band_number":
+            if let n = m["band"] as? Int, n == BandConfig.number { carryBand() }   // only our band
+        case "band_cmd":
+            band?.run(command: m)
         default:
             break
         }
