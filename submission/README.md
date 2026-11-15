@@ -29,7 +29,8 @@ with burned-in captions. It is the same video as [demo-versions v3](../demo-vers
 - The scenes are a dramatization. This is an experimental navigation aid, not a safety-critical
   system. The end card says both.
 
-## Source
+## Source & Filming Guide
 
+- **[DEMO_VIDEO_GUIDE.md](DEMO_VIDEO_GUIDE.md)**: step-by-step live hackathon demo filming script, hardware & iPhone pre-flight checklist, sponsor track shot list, backup replay/demo modes, and `ffmpeg` Picture-in-Picture assembly commands
 - [commercial/](../commercial/README.md): the page, the renderer and `build.py` (narration and video)
 - [demo-versions/](../demo-versions/README.md): every cut, with what changed
