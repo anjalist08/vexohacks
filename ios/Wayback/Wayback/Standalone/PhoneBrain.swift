@@ -318,17 +318,28 @@ final class Navigation {
 
     init?(route: [TrailPoint], target: String, targetIndex: Int, facing: Double, stepLength: Double) {
         self.target = target; self.targetIndex = targetIndex; self.stepLength = stepLength
-        // merge the walked points into straight legs (within 30°), dropping legs under 0.5 m
+        // Clean the walked line first (wobble under 1 m is not a turn), drop corners that would make
+        // a leg shorter than about 3 steps, then merge what is left into straight legs (within 30°).
+        var line = Navigation.simplify(route.map { ($0.x, $0.y) }, tolerance: 1.0)
+        var i = 0
+        while line.count > 2 && i < line.count - 1 {
+            if hypot(line[i + 1].0 - line[i].0, line[i + 1].1 - line[i].1) < 2.0 {
+                line.remove(at: i + 1 == line.count - 1 ? i : i + 1)       // keep both ends of the route
+                i = max(0, i - 1)
+            } else {
+                i += 1
+            }
+        }
         var legs: [(h: Double, dx: Double, dy: Double, sx: Double, sy: Double)] = []
-        for (a, b) in zip(route, route.dropFirst()) {
-            let dx = b.x - a.x, dy = b.y - a.y
+        for (a, b) in zip(line, line.dropFirst()) {
+            let dx = b.0 - a.0, dy = b.1 - a.1
             guard hypot(dx, dy) > 1e-6 else { continue }
             let h = atan2(dx, dy) * 180 / .pi
             if var last = legs.last, abs(PhoneTracker.wrap(h - last.h)) <= 30 {
                 last.dx += dx; last.dy += dy; last.h = atan2(last.dx, last.dy) * 180 / .pi
                 legs[legs.count - 1] = last
             } else {
-                legs.append((h, dx, dy, a.x, a.y))
+                legs.append((h, dx, dy, a.0, a.1))
             }
         }
         legs = legs.filter { hypot($0.dx, $0.dy) >= 0.5 }
@@ -346,12 +357,29 @@ final class Navigation {
             let n = max(1, Int((dist / stepLength).rounded()))
             let delta = PhoneTracker.wrap(h - face)
             let turn = abs(delta) < 45 ? "straight" : abs(delta) > 135 ? "around" : delta > 0 ? "right" : "left"
-            let text = turn == "straight" ? "Walk straight \(n) steps." :
+            let text = turn == "straight" ? "Continue straight for \(n) steps." :
                        turn == "around" ? "Turn around, walk \(n) steps." : "Turn \(turn), walk \(n) steps."
             steps.append(Step(turn: turn, count: n, text: text))
             face = h
         }
         steps.append(Step(turn: "arrive", count: 0, text: "You have reached the \(target)."))
+    }
+
+    /// Douglas-Peucker: keep only the points that bend the line by more than the tolerance (metres).
+    static func simplify(_ pts: [(Double, Double)], tolerance: Double) -> [(Double, Double)] {
+        guard pts.count > 2, let first = pts.first, let last = pts.last else { return pts }
+        let dx = last.0 - first.0, dy = last.1 - first.1
+        let len = hypot(dx, dy)
+        var worst = 0.0, at = 0
+        for (i, p) in pts.enumerated() where i > 0 && i < pts.count - 1 {
+            let d = len < 1e-9 ? hypot(p.0 - first.0, p.1 - first.1)
+                               : abs(dy * (p.0 - first.0) - dx * (p.1 - first.1)) / len
+            if d > worst { worst = d; at = i }
+        }
+        guard worst > tolerance else { return [first, last] }
+        let left = simplify(Array(pts[...at]), tolerance: tolerance)
+        let right = simplify(Array(pts[at...]), tolerance: tolerance)
+        return left.dropLast() + right
     }
 
     func heading(ofLeg i: Int) -> Double { headings[min(max(i, 0), headings.count - 1)] }
@@ -387,7 +415,12 @@ final class Navigation {
             let n = ahead / stepLength
             let turn = steps[k].turn
             let verb = turn == "around" ? "Turn around" : "Turn \(turn)"
-            if n <= 1.5 && !turned.contains(k) {
+            if turn == "straight" {                       // no turn here: say it once, plainly
+                if n <= 1.5 && !turned.contains(k) {
+                    turned.insert(k); warned.insert(k)
+                    out.append(.say("Continue straight for \(steps[k].count) steps.", "navigating", nil))
+                }
+            } else if n <= 1.5 && !turned.contains(k) {
                 turned.insert(k); warned.insert(k)
                 out.append(.say("\(verb) now, then walk \(steps[k].count) steps.", "turn_now", 150))
             } else if n <= 5 && !warned.contains(k) {
