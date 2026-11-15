@@ -272,9 +272,7 @@ final class PhoneBrain {
         guide?.waypoints = n.corners.map { CGPoint(x: $0.0, y: $0.1) }
         guide?.directions = n.steps.enumerated().map { DirectionStep(id: $0.offset, turn: $0.element.turn, steps: $0.element.count, text: $0.element.text) }
         guide?.directionIndex = 0
-        let texts = n.steps.map(\.text)
-        say(texts.count == 1 ? texts[0] : ([texts[0]] + texts.dropFirst().map { "then " + $0.prefix(1).lowercased() + $0.dropFirst() }).joined(separator: " "),
-            led: "navigating")
+        say(n.steps.first?.text ?? "Follow the pulse.", led: "navigating")   // one direction at a time; the rest come at each corner
     }
 
     private func follow(_ n: Navigation, x: Double, y: Double) {
@@ -450,24 +448,17 @@ struct Coach {
         var hint: [String: Any] = ["active": true, "error_deg": error, "target": nav.target]
         if let s = stepsLeft { hint["steps_left"] = s }
         if let t = nextTurn, t != "straight" { hint["next_turn"] = t }
-        if leg != nav.segment {
-            leg = nav.segment; aligned = false
-            let turn = nav.steps[nav.segment].turn
-            if ["left", "right", "around"].contains(turn) { return (hint, "turn_" + turn) }
-        }
-        if abs(error) > 50 || (!aligned && abs(error) > 30) {
+        if leg != nav.segment { leg = nav.segment; aligned = false }
+        // One rule: a steady pulse while the phone points along the way to walk; silence when it
+        // does not. Turn until the pulse comes back. (Corners are spoken; arrival is three long buzzes.)
+        if abs(error) > 35 || (!aligned && abs(error) > 22) {
             aligned = false
-            let cue = error > 0 ? "wrong_right" : "wrong_left"
-            hint["state"] = cue
-            return (hint, due("wrong", 2.5) ? cue : nil)
+            hint["state"] = error > 0 ? "wrong_right" : "wrong_left"
+            return (hint, nil)
         }
+        aligned = true
         hint["state"] = "on_track"
-        if !aligned { aligned = true; last["tick"] = Date().timeIntervalSince1970; return (hint, "on_track") }
-        if let t = nextTurn, t != "straight", let s = stepsLeft, (1...4).contains(s) {
-            hint["state"] = "turn_soon"
-            return (hint, due("turn_soon", 0.35 * Double(s)) ? "turn_soon" : nil)
-        }
-        return (hint, due("tick", 1.5) ? "tick" : nil)
+        return (hint, due("tick", 0.6) ? "tick" : nil)
     }
 }
 

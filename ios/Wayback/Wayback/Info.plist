@@ -7,6 +7,8 @@
 		<string>bluetooth-central</string>
 		<string>audio</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Wayback uses the camera only to follow how the phone moves, so your route is accurate. Nothing is shown, recorded or sent.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>Wayback uses the iPhone's step counter and turning to draw your route more accurately, together with the Vexo band.</string>
 	<key>NSAppTransportSecurity</key>

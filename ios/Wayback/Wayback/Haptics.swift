@@ -8,7 +8,7 @@ final class Haptics {
         "wrong_left": [120, 120, 120],
         "wrong_right": [120, 120, 120, 120, 120],
         "on_track": [600],
-        "tick": [50],
+        "tick": [70],
         "turn_soon": [80],
         "turn_left": [500, 150, 150],
         "turn_right": [500, 150, 150, 150, 150],
@@ -57,7 +57,7 @@ final class Haptics {
         let sharp = Haptics.sharpness(for: cue)
         for (i, ms) in pattern.enumerated() {
             if i % 2 == 0 {
-                let intensity: Float = cue == "tick" ? 0.45 : 1.0
+                let intensity: Float = cue == "tick" ? 0.9 : 1.0
                 events.append(CHHapticEvent(
                     eventType: .hapticContinuous,
                     parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: intensity),

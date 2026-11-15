@@ -1,3 +1,4 @@
+import ARKit
 import CoreMotion
 import Foundation
 
@@ -44,7 +45,7 @@ final class PhoneTracker {
     /// Ready to track: at once with the phone's sensors, else when the band's gyro is calibrated.
     var calibrated: Bool { phoneActive || bandCalibrated }
     var level: Int { Int((altitude / 3.2).rounded()) }
-    var source: String { phoneActive ? (handling ? "band (phone moving)" : "iPhone + band") : "band" }
+    var source: String { cameraActive ? "camera" : phoneActive ? (handling ? "band (phone moving)" : "motion") : "band" }
 
     var onPoint: ((Double, Double, Double, Int, Double) -> Void)?   // x, y, heading, steps, time
 
@@ -87,12 +88,24 @@ final class PhoneTracker {
     private var altitudeBase: Double?
     private var log = WalkLog()
 
+    // camera (ARKit visual-inertial tracking): position to a few centimetres while the camera can see
+    private let camera = CameraTracker()
+    private var camWall = -1e9
+    private var camRot: Double?              // route heading = camera heading + camRot (set when it locks on)
+    private var camShift = (0.0, 0.0)
+    private var camLast = (0.0, 0.0)
+    private var camLogged = -1e9
+    private var pdrOffset = 0                // keeps the step count continuous between camera and footfalls
+    var cameraActive: Bool { Date().timeIntervalSince1970 - camWall < 0.5 }
+
     private var phoneActive: Bool { Date().timeIntervalSince1970 - lastPhoneWall < 1.0 }
 
     init() {
         sensors.onMotion = { [weak self] t, stamp, turned, rate, g, up in self?.phone(t: t, stamp: stamp, turned: turned, gyroRate: rate, gravity: g, up: up) }
         sensors.onPedometer = { [weak self] n, d in self?.pedometer(steps: n, distance: d) }
         sensors.onAltitude = { [weak self] m in self?.barometer(m) }
+        camera.onPose = { [weak self] t, e, n, h in self?.cameraPose(t: t, east: e, north: n, heading: h) }
+        camera.onLost = { [weak self] in self?.camRot = nil }
     }
 
     static func wrap(_ a: Double) -> Double {
@@ -118,14 +131,16 @@ final class PhoneTracker {
         fused = 0; phoneOffset = nil; fusedWindow = []; history = []; tiltSlow = nil; handling = false; stableSince = nil
         upFast = 0; upSlow = 0; stepArmed = true; lastPeak = -1e9; pending = []; walking = false
         detected = 0; pedSince = 0; pedAlive = CMPedometer.isStepCountingAvailable(); altitudeBase = nil; altitude = 0
+        camRot = nil; pdrOffset = 0; camLast = (0, 0); camWall = -1e9
         log.open()
         sensors.start()
+        camera.start()
         sensors.restartPedometer()
         onPoint?(0, 0, 0, 0, t)
     }
 
     func stop() { running = false; log.flush() }
-    func resume() { running = true; lastMotion = nil; lastPhoneStamp = nil; sensors.start() }
+    func resume() { running = true; lastMotion = nil; lastPhoneStamp = nil; sensors.start(); camera.start() }
 
     // MARK: the iPhone's sensors (50 a second)
 
@@ -139,6 +154,8 @@ final class PhoneTracker {
         guard running else { return }
         log.add("p,\(f3(t)),\(f2(turned)),\(f3(gv[0])),\(f3(gv[1])),\(f3(gv[2])),\(f3(up)),\(f2(gyroRate))")
 
+        camera.gravity = gv
+        if !cameraActive {
         // Is the phone being handled? Its tilt (the direction of gravity in its own frame) moves a
         // lot when it leaves a pocket or is turned over, and hardly at all when the body turns.
         var slow = tiltSlow ?? gv
@@ -178,6 +195,8 @@ final class PhoneTracker {
         while let first = fusedWindow.first, t - first.0 > 1.0 { fusedWindow.removeFirst() }
         smooth = PhoneTracker.median(fusedWindow.map(\.1))
         updateGrid(t)
+
+        }
 
         // footfalls: the bounce in the vertical acceleration
         upFast += (1 - exp(-dt / 0.06)) * (up - upFast)
@@ -220,9 +239,44 @@ final class PhoneTracker {
     private func reconcile(_ t: Double) {
         let bandAlive = t - lastBandActivity < 3
         let agreed = (bandAlive && pedAlive) ? min(pedSince, bandSince) : (pedAlive ? pedSince : (bandAlive ? bandSince : 0))
-        var target = max(detected, agreed)
-        if pedAlive { target = min(target, max(pedSince, bandAlive ? bandSince : 0) + 16) }
+        var counted = max(detected, agreed)
+        if pedAlive { counted = min(counted, max(pedSince, bandAlive ? bandSince : 0) + 16) }
+        if cameraActive { pdrOffset = steps - counted; return }      // the camera moves the map; footfalls wait
+        let target = counted + pdrOffset
         if target > steps { advance(target - steps, t) }
+    }
+
+    // MARK: the camera (ARKit): real position while it can see the room
+
+    /// east / north: metres in the camera's own level frame. heading: where the phone points, clockwise.
+    private func cameraPose(t: Double, east: Double, north: Double, heading h: Double) {
+        guard running else { return }
+        func turnedPoint(_ r: Double) -> (Double, Double) {            // rotate clockwise by r degrees
+            let a = r * .pi / 180
+            return (east * cos(a) + north * sin(a), -east * sin(a) + north * cos(a))
+        }
+        if camRot == nil {                                             // locked on: line it up with where we are now
+            camRot = facingRaw - h
+            let p = turnedPoint(camRot!)
+            camShift = (x - p.0, y - p.1)
+            camLast = (x, y)
+        }
+        let p = turnedPoint(camRot!)
+        let nx = p.0 + camShift.0, ny = p.1 + camShift.1
+        let d = ((nx - camLast.0) * (nx - camLast.0) + (ny - camLast.1) * (ny - camLast.1)).squareRoot()
+        if d > 3 { camRot = nil; return }                              // the camera jumped: line up again
+        camWall = t
+        facingRaw += PhoneTracker.wrap(h + camRot! - facingRaw)
+        fused = facingRaw; smooth = facingRaw; heading = facingRaw
+        phoneOffset = phoneHeading - fused; handling = false; awaySince = nil
+        uncertainty = max(0, uncertainty - 0.2)
+        if t - camLogged > 0.2 { camLogged = t; log.add("ar,\(f3(t)),\(f2(nx)),\(f2(ny)),\(f2(facingRaw))") }
+        if d >= 0.6 {
+            x = nx; y = ny; camLast = (nx, ny)
+            steps += max(1, Int((d / stepLength).rounded()))
+            log.add("s,\(f3(t)),\(steps),\(f2(x)),\(f2(y)),\(f2(heading)),\(detected),\(bandSince),\(pedSince),cam")
+            onPoint?(x, y, PhoneTracker.wrap(heading), steps, t)
+        }
     }
 
     // MARK: the band (50 motion samples a second, steps 10 a second)
@@ -434,4 +488,47 @@ struct WalkLog {
         try? handle.write(contentsOf: Data(buffer.utf8))
         buffer = ""
     }
+}
+
+
+/// The iPhone's camera as a motion sensor (ARKit world tracking: camera + gyro + accelerometer).
+/// Nothing is shown or recorded: only where the phone is and where it points. Works while the
+/// camera can see the room (phone in the hand); in a pocket it reports "lost" and the footfall
+/// tracker takes over.
+final class CameraTracker: NSObject, ARSessionDelegate {
+    var onPose: ((_ t: Double, _ east: Double, _ north: Double, _ heading: Double) -> Void)?
+    var onLost: (() -> Void)?
+    var gravity: [Double] = [0, 0, -1]          // from Core Motion, in the phone's frame (y = towards its top)
+
+    private let session = ARSession()
+    private var started = false
+    private var miss = [0.0, 0.0, 0.0, 0.0]     // which camera axis is the phone's top: -x, +x, +y, -y
+
+    func start() {
+        guard ARWorldTrackingConfiguration.isSupported, !started else { return }
+        let config = ARWorldTrackingConfiguration()
+        config.worldAlignment = .gravity        // y is up
+        session.delegate = self
+        session.run(config)
+        started = true
+    }
+
+    func session(_ session: ARSession, didUpdate frame: ARFrame) {
+        guard case .normal = frame.camera.trackingState else { onLost?(); return }
+        let m = frame.camera.transform
+        let cx = m.columns.0, cy = m.columns.1, cz = m.columns.2, p = m.columns.3
+        // The phone's top is one of the camera's sideways axes; find which by how high it points,
+        // which Core Motion's gravity also tells us (top pointing up = gravity.y of -1).
+        let candidates = [-cx, cx, cy, -cy]
+        let want = Float(-gravity[1])
+        for i in 0..<4 { miss[i] = miss[i] * 0.995 + Double((candidates[i].y - want) * (candidates[i].y - want)) }
+        let top = candidates[miss.indices.min { miss[$0] < miss[$1] } ?? 0]
+        var hx = Double(top.x), hz = Double(top.z)
+        if (hx * hx + hz * hz).squareRoot() < 0.5 { hx = Double(-cz.x); hz = Double(-cz.z) }   // upright: where the camera looks
+        let heading = atan2(hx, -hz) * 180 / .pi                    // clockwise from the frame's north (-z)
+        onPose?(Date().timeIntervalSince1970, Double(p.x), Double(-p.z), heading)
+    }
+
+    func session(_ session: ARSession, didFailWithError error: Error) { started = false; onLost?() }
+    func sessionWasInterrupted(_ session: ARSession) { onLost?() }
 }

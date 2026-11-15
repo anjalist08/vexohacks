@@ -174,7 +174,8 @@ struct ContentView: View {
         if !guide.voice.isEmpty { return guide.voice }
         if guide.recording {
             let floor = guide.level == 0 ? "" : " · floor \(guide.level > 0 ? "+" : "")\(guide.level)"
-            return "Recording · \(guide.steps) steps\(floor)\nDouble-tap the band and say \u{201C}remember this as\u{2026}\u{201D}"
+            let how = guide.trackSource == "camera" ? "" : "\nHold the phone in front of you for the best tracking"
+            return "Recording · \(guide.steps) steps\(floor) · \(guide.trackSource)\(how)"
         }
         if !bandConnected { return "Double-tap your band so the iPhone can find it." }
         return "Tap Start route, or double-tap the band and say \u{201C}start route\u{201D}."
