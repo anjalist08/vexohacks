@@ -45,7 +45,7 @@ final class PhoneTracker {
     /// Ready to track: at once with the phone's sensors, else when the band's gyro is calibrated.
     var calibrated: Bool { phoneActive || bandCalibrated }
     var level: Int { Int((altitude / 3.2).rounded()) }
-    var source: String { cameraActive ? "camera" : phoneActive ? (handling ? "band (phone moving)" : "motion") : "band" }
+    var source: String { cameraActive ? (strideLearned ? "camera + band" : "camera") : phoneActive ? (handling ? "band (phone moving)" : "motion") : "band" }
 
     var onPoint: ((Double, Double, Double, Int, Double) -> Void)?   // x, y, heading, steps, time
 
@@ -96,6 +96,10 @@ final class PhoneTracker {
     private var camLast = (0.0, 0.0)
     private var camLogged = -1e9
     private var pdrOffset = 0                // keeps the step count continuous between camera and footfalls
+    // stride learned live: metres from the camera / steps felt by the band and the phone
+    private var strideMetres = 0.0
+    private var strideBand0: Int?, stridePhone0 = 0
+    private(set) var strideLearned = false
     var cameraActive: Bool { Date().timeIntervalSince1970 - camWall < 0.5 }
 
     private var phoneActive: Bool { Date().timeIntervalSince1970 - lastPhoneWall < 1.0 }
@@ -132,6 +136,7 @@ final class PhoneTracker {
         upFast = 0; upSlow = 0; stepArmed = true; lastPeak = -1e9; pending = []; walking = false
         detected = 0; pedSince = 0; pedAlive = CMPedometer.isStepCountingAvailable(); altitudeBase = nil; altitude = 0
         camRot = nil; pdrOffset = 0; camLast = (0, 0); camWall = -1e9
+        strideMetres = 0; strideBand0 = nil; stridePhone0 = 0; strideLearned = false
         log.open()
         sensors.start()
         camera.start()
@@ -219,7 +224,7 @@ final class PhoneTracker {
         guard running else { return }
         pedAlive = true
         pedSince = n
-        if let d = distance, n >= 15, d > 0 { stepLength = max(0.5, min(0.95, d / Double(n))) }
+        if !strideLearned, let d = distance, n >= 15, d > 0 { stepLength = max(0.5, min(0.95, d / Double(n))) }
         let t = Date().timeIntervalSince1970
         log.add("ped,\(f3(t)),\(n),\(f2(distance ?? 0))")
         reconcile(t)
@@ -248,6 +253,30 @@ final class PhoneTracker {
 
     // MARK: the camera (ARKit): real position while it can see the room
 
+    /// Camera + band + phone: the camera measures the metres walked, the band's step counter and the
+    /// phone's footfalls count the steps. Metres / steps is this person's stride, learned while they
+    /// walk. The spoken "walk 12 steps" and the pocket tracking both use it.
+    private func learnStride(moved d: Double, t: Double) {
+        let bandAlive = t - lastBandActivity < 3
+        if strideBand0 == nil { strideBand0 = bandSince; stridePhone0 = detected; strideMetres = 0; return }
+        strideMetres += d
+        let band = Double(bandSince - (strideBand0 ?? bandSince)), phone = Double(detected - stridePhone0)
+        guard strideMetres >= 8 else { return }
+        var counted = phone
+        if bandAlive && band >= 10 {
+            // both felt the walk: average them when they agree, else trust the one nearer a human stride
+            if phone < 10 { counted = band }
+            else if abs(band - phone) <= 0.25 * max(band, phone) { counted = (band + phone) / 2 }
+            else { counted = abs(strideMetres / band - 0.7) < abs(strideMetres / phone - 0.7) ? band : phone }
+        }
+        guard counted >= 10 else { return }
+        let stride = strideMetres / counted
+        guard stride > 0.4 && stride < 1.1 else { return }
+        stepLength = stride
+        strideLearned = true
+        log.add("stride,\(f3(t)),\(f2(stride)),\(f2(strideMetres)),\(Int(band)),\(Int(phone))")
+    }
+
     /// east / north: metres in the camera's own level frame. heading: where the phone points, clockwise.
     private func cameraPose(t: Double, east: Double, north: Double, heading h: Double) {
         guard running else { return }
@@ -273,6 +302,7 @@ final class PhoneTracker {
         if t - camLogged > 0.2 { camLogged = t; log.add("ar,\(f3(t)),\(f2(nx)),\(f2(ny)),\(f2(facingRaw))") }
         if d >= 0.6 {
             x = nx; y = ny; camLast = (nx, ny)
+            learnStride(moved: d, t: t)
             steps += max(1, Int((d / stepLength).rounded()))
             log.add("s,\(f3(t)),\(steps),\(f2(x)),\(f2(y)),\(f2(heading)),\(detected),\(bandSince),\(pedSince),cam")
             onPoint?(x, y, PhoneTracker.wrap(heading), steps, t)
