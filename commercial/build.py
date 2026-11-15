@@ -175,7 +175,7 @@ VERSIONS = os.path.join(os.path.dirname(HERE), "demo-versions")
 
 def write_versions_readme(versions):
     lines = ["# Demo versions", "",
-             "Every rendered cut of the 60-second Wayback Trail x Vexo commercial, so each iteration",
+             "Every rendered cut of the 60-second Wayback Trail x Vexo commercial and the working demo, so each iteration",
              "can be tracked and watched. Open the `.mp4` files directly, or serve this folder and",
              "open `index.html` to see them all with their change notes:", "",
              "    cd demo-versions && python3 -m http.server 8090   # then http://localhost:8090", "",
@@ -185,8 +185,8 @@ def write_versions_readme(versions):
              "`versions.json` and this file.", "",
              "| Version | Date | Commit | File | What changed |", "| --- | --- | --- | --- | --- |"]
     for v in sorted(versions, key=lambda v: -v["version"]):
-        lines.append("| v%d: %s | %s | `%s` | [%s](%s) | %s |" % (
-            v["version"], v["title"], v["date"], v["commit"], v["file"], v["file"].replace(" ", "%20"),
+        lines.append("| %s: %s | %s | `%s` | [%s](%s) | %s |" % (
+            v.get("label") or "v%d" % v["version"], v["title"], v["date"], v["commit"], v["file"], v["file"].replace(" ", "%20"),
             "<br>".join(c.replace("|", "\\|") for c in v["changes"])))
     with open(os.path.join(VERSIONS, "README.md"), "w") as f:
         f.write("\n".join(lines) + "\n")

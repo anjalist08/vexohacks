@@ -28,7 +28,7 @@
 <body>
 <main>
   <h1>Wayback Trail demo versions</h1>
-  <p class="sub">Every rendered cut of the 60-second commercial, newest first. Serve this folder (for example <code>python3 -m http.server</code>) so the list loads.</p>
+  <p class="sub">Every rendered cut of the 60-second commercial and the working demo, newest first. Serve this folder (for example <code>python3 -m http.server</code>) so the list loads.</p>
   <div id="list"></div>
 </main>
 <script>
@@ -38,7 +38,7 @@ fetch("versions.json").then(r => r.json()).then(vs => {
   vs.slice().sort((a, b) => b.version - a.version).forEach(v => {
     const el = document.createElement("section"); el.className = "v";
     const head = document.createElement("div"); head.className = "head";
-    const tag = document.createElement("span"); tag.className = "tag" + (v.version === latest ? " latest" : ""); tag.textContent = "v" + v.version + (v.version === latest ? " · latest" : "");
+    const tag = document.createElement("span"); tag.className = "tag" + (v.version === latest ? " latest" : ""); tag.textContent = (v.label || "v" + v.version) + (v.version === latest ? " · latest" : "");
     const h = document.createElement("h2"); h.textContent = v.title;
     const meta = document.createElement("span"); meta.className = "meta"; meta.textContent = v.date + " · commit " + v.commit;
     head.append(tag, h, meta);
