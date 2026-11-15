@@ -1,0 +1,8 @@
+out/frames/
+out/still-*.png
+out/s*.png
+out/render.log
+audio/music.wav
+audio/sfx.wav
+__pycache__/
+.sim-routes.json

@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wayback Working Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#000; --fg:#f5f5f7; --muted:#86868b; --line:rgba(255,255,255,.14); --blue:#0a84ff; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--fg); font-family:"Montserrat", system-ui, sans-serif; }
+  body { display:grid; grid-template-rows:1fr auto; min-height:100vh; overflow:hidden; }
+  .stage { display:grid; place-items:center; min-height:0; padding:16px; }
+  canvas { width:min(100%, calc((100vh - 110px) * 16 / 9)); aspect-ratio:16/9; height:auto; display:block; border-radius:14px; background:#000; }
+  .bar { display:flex; gap:12px; align-items:center; padding:12px 16px 18px; max-width:1100px; width:100%; margin:0 auto; }
+  button { font:600 14px "Montserrat", sans-serif; color:var(--fg); background:rgba(28,28,30,.8); border:1px solid var(--line); border-radius:999px; padding:9px 16px; cursor:pointer; }
+  button.primary { background:var(--blue); border-color:var(--blue); }
+  input[type=range] { flex:1; accent-color:var(--blue); min-width:0; }
+  .time { font:500 13px "Montserrat", sans-serif; color:var(--muted); font-variant-numeric:tabular-nums; min-width:84px; text-align:right; }
+  body.render { display:block; }
+  body.render .bar { display:none; }
+  body.render .stage { padding:0; }
+  body.render canvas { width:1920px; height:1080px; border-radius:0; }
+</style>
+</head>
+<body>
+<div class="stage"><canvas id="c" width="1920" height="1080" role="img" aria-label="Wayback working demo, 60 seconds: a simulated iPhone screen recording beside the walker and the live app updates"></canvas></div>
+<div class="bar">
+  <button id="play" class="primary" type="button">Play</button>
+  <input id="scrub" type="range" min="0" max="60" step="0.01" value="0" aria-label="Position in the demo">
+  <span class="time" id="time">0:00 / 1:00</span>
+</div>
+<audio id="track" src="audio/demo-audio.mp3" preload="auto"></audio>
+<script>
+"use strict";
+/* Wayback working demo. Every state on screen comes from plan.json, which build.py makes from
+   simulate.py: the real Wayback code (app.py, tracker/wrist.py, store/guidance.py,
+   store/haptics.py) run on a synthetic walk. Labelled on screen as a simulation. */
+const W = 1920, H = 1080, DURATION = 60;
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+const MF = '"Montserrat", sans-serif', IF = '"Inter", system-ui, sans-serif';
+const C = { blue: "#0A84FF", green: "#30D158", orange: "#FF9F0A", purple: "#BF5AF2", pink: "#FF375F", teal: "#64D2FF",
+  indigo: "#5E5CE6", red: "#FF453A", white: "#F5F5F7", gray: "#86868B", yellow: "#FFD60A",
+  route: "#147AFA", guide: "#1FC275", landmark: "#9E47F0", iosGray: "#8E8E93", iosBlue: "#007AFF", iosGreen: "#34C759",
+  iosOrange: "#FF9500", iosIndigo: "#5856D6", iosPurple: "#AF52DE", iosRed: "#FF3B30", iosCyan: "#32ADE6" };
+const GLOW = [C.orange, C.pink, C.purple, C.indigo, C.blue, C.teal];
+const PAT = { wrong_left: [120, 120, 120], wrong_right: [120, 120, 120, 120, 120], on_track: [600], tick: [50], turn_soon: [80],
+  turn_left: [500, 150, 150], turn_right: [500, 150, 150, 150, 150], turn_around: [500, 150, 500], arrived: [700, 200, 700, 200, 700],
+  lost: [100, 60, 100, 60, 100, 60, 100, 60, 100] };
+// store/haptics.py names -> the iPhone app's feed labels (ios/Wayback/Wayback/Guide.swift, logBuzz)
+const BUZZ_LABEL = { wrong_left: ["Turn left (buzz ••)", "Facing right of route"], wrong_right: ["Turn right (buzz •••)", "Facing left of route"],
+  on_track: ["Facing the right way (buzz ━━━)", "Locked onto current leg"], turn_soon: ["Turn coming up (buzz ····)", "Approaching corner"],
+  turn_left: ["Turn left now (buzz ━•)", "Corner reached"], turn_right: ["Turn right now (buzz ━••)", "Corner reached"],
+  turn_around: ["Turn around now (buzz ━━)", "Reverse direction"], arrived: ["Arrived at destination (buzz ━━━)", "Guidance complete"],
+  lost: ["Position uncertain (buzz •••••)", "Say \"I'm at the …\" to re-anchor"] };
+const LED = { idle: ["Off", "#3a3a3c"], route_started: ["Route started · green blink", C.green], recording: ["Recording · amber breathe", C.orange],
+  landmark_saved: ["Place saved · purple", C.purple], navigating: ["Guiding · white breathe", C.white], turn_now: ["Turn coming · white blink", C.white],
+  arrived: ["Arrived · green, then rainbow", C.green], uncertain: ["Lost · red blink", C.red], listening: ["Listening · solid blue", C.blue], flash: ["Connected · white flash", C.white] };
+
+// ---------------------------------------------------------------- helpers
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const eio = k => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+const eout = k => 1 - Math.pow(1 - k, 4);
+const espring = k => k <= 0 ? 0 : k >= 1 ? 1 : 1 - Math.exp(-6 * k) * Math.cos(9 * k);
+function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return "rgba(" + (n >> 16 & 255) + "," + (n >> 8 & 255) + "," + (n & 255) + "," + a + ")"; }
+function rrect(c, x, y, w, h, r) { c.beginPath(); c.roundRect(x, y, w, h, r); }
+function T(c, s, x, y, o = {}) {
+  c.save(); c.font = (o.w || 600) + " " + (o.size || 24) + "px " + (o.f || MF);
+  c.textAlign = o.align || "left"; c.textBaseline = o.base || "alphabetic";
+  if (o.ls != null) c.letterSpacing = o.ls + "px";
+  c.globalAlpha *= o.a == null ? 1 : o.a;
+  if (o.grad) { const wd = c.measureText(s).width, x0 = o.align === "center" ? x - wd / 2 : o.align === "right" ? x - wd : x;
+    const g = c.createLinearGradient(x0, 0, x0 + wd, 0); o.grad.forEach((col, i) => g.addColorStop(i / (o.grad.length - 1), col)); c.fillStyle = g; }
+  else c.fillStyle = o.color || C.white;
+  if (o.max) { let str = s; while (c.measureText(str).width > o.max && str.length > 3) str = str.slice(0, -2); if (str !== s) s = str.trimEnd() + "…"; }
+  c.fillText(s, x, y); const w = c.measureText(s).width; c.restore(); return w;
+}
+function wrapLines(c, s, maxW, font) { c.save(); c.font = font; const out = []; let line = "";
+  s.split(" ").forEach(w => { const t2 = line ? line + " " + w : w; if (c.measureText(t2).width > maxW && line) { out.push(line); line = w; } else line = t2; });
+  out.push(line); c.restore(); return out; }
+function glowBlob(c, x, y, r, col, a = 1) { const g = c.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, hexA(col, .55 * a)); g.addColorStop(.4, hexA(col, .18 * a)); g.addColorStop(1, hexA(col, 0)); c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); }
+function glass(c, x, y, w, h, r, o = {}) {
+  c.save(); c.shadowColor = "rgba(0,0,0,.45)"; c.shadowBlur = 40; c.shadowOffsetY = 14;
+  rrect(c, x, y, w, h, r); c.fillStyle = o.fill || "rgba(28,28,30,.82)"; c.fill(); c.shadowColor = "transparent";
+  c.lineWidth = 1.5; c.strokeStyle = o.stroke || "rgba(255,255,255,.12)"; c.stroke();
+  const g = c.createLinearGradient(x, y, x, y + h * .5); g.addColorStop(0, "rgba(255,255,255,.06)"); g.addColorStop(1, "rgba(255,255,255,0)");
+  rrect(c, x, y, w, h, r); c.fillStyle = g; c.fill(); c.restore();
+}
+function pill(c, s, x, y, o = {}) {
+  c.save(); c.font = (o.w || 600) + " " + (o.size || 22) + "px " + (o.f || MF);
+  const w = c.measureText(s).width + (o.dot ? 54 : 36), h = (o.size || 22) * 1.85, x0 = o.align === "right" ? x - w : o.align === "center" ? x - w / 2 : x;
+  c.globalAlpha *= o.a == null ? 1 : o.a;
+  rrect(c, x0, y - h / 2, w, h, h / 2); c.fillStyle = o.fill || "rgba(44,44,46,.9)"; c.fill();
+  c.lineWidth = 1.2; c.strokeStyle = o.stroke || "rgba(255,255,255,.12)"; c.stroke();
+  if (o.dot) { c.beginPath(); c.arc(x0 + 24, y, 7, 0, 7); c.fillStyle = o.dot; c.shadowColor = o.dot; c.shadowBlur = 12; c.fill(); c.shadowBlur = 0; }
+  c.fillStyle = o.color || C.white; c.textBaseline = "middle"; c.fillText(s, x0 + (o.dot ? 40 : 18), y + 1); c.restore(); return w;
+}
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let x = Math.imul(seed ^ seed >>> 15, 1 | seed); x = x + Math.imul(x ^ x >>> 7, 61 | x) ^ x; return ((x ^ x >>> 14) >>> 0) / 4294967296; }; }
+
+// ---------------------------------------------------------------- data
+let P = null; const logo = new Image(); logo.src = "assets/WaybackLogo.png";
+function simOf(t) { for (const [v0, v1, s0, s1] of P.segments) if (t >= v0 && t <= v1) return v1 > v0 ? lerp(s0, s1, (t - v0) / (v1 - v0)) : s0; return P.segments[P.segments.length - 1][3]; }
+function rateAt(t) { for (const [v0, v1, s0, s1] of P.segments) if (t >= v0 && t < v1) return s1 > s0 ? (s1 - s0) / (v1 - v0) : 0; return 0; }
+function sampleAt(s) { const S = P.samples; let lo = 0, hi = S.length - 1; if (s <= S[0].t) return S[0]; if (s >= S[hi].t) return S[hi];
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (S[m].t <= s) lo = m; else hi = m; }
+  const a = S[lo], b = S[hi], k = (s - a.t) / (b.t - a.t);
+  return Object.assign({}, a, { x: lerp(a.x, b.x, k), y: lerp(a.y, b.y, k), facing: a.facing + wrap(b.facing - a.facing) * k, steps: Math.round(lerp(a.steps, b.steps, k)) }); }
+function wrap(a) { return ((a + 180) % 360 + 360) % 360 - 180; }
+const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
+function listening(t) { return P.listen.some(([a, b]) => t >= a && t <= b); }
+function clipAt(t) { return P.clips.find(c => t >= c.t - .02 && t < c.t + c.d + .25); }
+
+function stateAt(t) {
+  const s = simOf(t), samp = sampleAt(s);
+  const st = { s, samp, recording: false, places: [], feed: [], stream: [], led: { state: "idle", t: -9 }, guidance: null, navT: null, arrivedT: null, lastBuzz: null, steps0: null };
+  let lastFeedBuzz = {};
+  const push = (arr, item) => arr.unshift(item);
+  for (const e of P.events) {
+    if (e.vt == null || e.vt > t) break;
+    if (e.kind === "user") {
+      push(st.feed, { kind: "YOU", title: "You: “" + e.text + "”", tint: C.iosBlue, icon: "mic", t: e.vt });
+      push(st.stream, { badge: "YOU · Deepgram", col: C.blue, text: "“" + cap(e.text) + "”", t: e.vt });
+      const args = Object.entries(e.args || {}).map(([k, v]) => k + '="' + (k === "target" ? "entrance" : v) + '"').join(", ");
+      push(st.stream, { badge: "TOOL", col: C.teal, text: e.tool + "(" + args + ")", t: e.vt + .5, mono: true });
+    } else if (e.kind === "tool") {
+      if (e.data && e.data.instructions) { /* navigate */ }
+    } else if (e.kind === "say") {
+      push(st.stream, { badge: "WAYBACK · ElevenLabs River", col: C.purple, text: e.text, t: e.vt });
+    } else if (e.kind === "led") {
+      st.led = { state: e.state, period: e.period, t: e.vt };
+      if (e.state === "route_started") { st.recording = true; st.steps0 = 0; push(st.feed, { kind: "WAYBACK", title: "Started route", tint: C.iosGreen, icon: "play", t: e.vt }); }
+      if (!st.stream.length || st.stream[0].badge !== "BAND LIGHT" || st.stream[0].text !== LED[e.state][0])
+        push(st.stream, { badge: "BAND LIGHT", col: LED[e.state][1] === C.white ? "#d1d1d6" : LED[e.state][1], text: LED[e.state][0], t: e.vt });
+    } else if (e.kind === "landmark") {
+      st.places.push({ label: e.label, x: e.x, y: e.y });
+      push(st.feed, { kind: "WAYBACK", title: "Added landmark: " + cap(e.label), tint: C.iosPurple, icon: "pin", t: e.vt });
+    } else if (e.kind === "guidance") {
+      if (e.active) { if (!st.guidance) { st.navT = e.vt; push(st.feed, { kind: "WAYBACK", title: "Guiding to " + e.target, tint: C.iosCyan, icon: "walk", t: e.vt }); } st.guidance = e; }
+      else if (st.guidance && e.index >= e.instructions.length - 1) { st.guidance = e; st.arrivedT = e.vt; }
+    } else if (e.kind === "buzz") {
+      st.lastBuzz = { cue: e.cue, t: e.vt };
+      if (e.cue !== "tick" && !(lastFeedBuzz[e.cue] != null && e.vt - lastFeedBuzz[e.cue] < 8)) {
+        lastFeedBuzz[e.cue] = e.vt;
+        push(st.feed, { kind: "BUZZ", title: BUZZ_LABEL[e.cue][0], tint: e.cue === "arrived" ? C.iosPurple : e.cue === "on_track" ? C.iosGreen : C.iosOrange, icon: "buzz", t: e.vt });
+        push(st.stream, { badge: "BUZZ · iPhone", col: e.cue === "on_track" ? C.green : e.cue === "arrived" ? C.purple : C.orange, text: BUZZ_LABEL[e.cue][0], t: e.vt });
+      }
+    }
+  }
+  if (t >= P.connect[0]) st.feed.push({ kind: "VEXO", title: "Vexo-HACK-80 connected", tint: C.iosIndigo, icon: "band", t: P.connect[0] });
+  st.feed.sort((a, b) => b.t - a.t);
+  st.guiding = !!(st.guidance && st.guidance.active);
+  st.done = st.arrivedT != null;
+  // banner, exactly as Guide.showHint builds it
+  const h = samp.hint || {};
+  if (st.done) st.banner = { state: "done", big: "Arrived", sub: "You reached the entrance.", arrow: 0 };
+  else if (st.guiding && h.active) {
+    const err = h.error_deg || 0, hs = h.state || "";
+    if (hs === "wrong_left" || hs === "wrong_right") st.banner = { state: "wrong", big: Math.abs(err) >= 150 ? "Turn around" : (hs === "wrong_left" ? "Turn left" : "Turn right"), sub: Math.round(Math.abs(err)) + "° off, to the entrance", arrow: err };
+    else st.banner = { state: "on", big: hs === "turn_soon" && h.next_turn && h.steps_left != null ? "Turn " + h.next_turn + " in " + h.steps_left + " step" + (h.steps_left === 1 ? "" : "s") : "Straight ahead",
+      sub: h.steps_left != null ? h.steps_left + " steps on this stretch, to the entrance" : "to the entrance", arrow: err };
+  } else if (st.guiding) st.banner = { state: "on", big: "Straight ahead", sub: "to the entrance", arrow: 0 };
+  st.listening = listening(t);
+  // band LED as shown on the wrist
+  let led = st.led.state, age = t - st.led.t;
+  if (led === "route_started" && age > 1.6) led = "recording";
+  if (led === "landmark_saved" && age > 1.5) led = st.guiding ? "navigating" : "recording";
+  if (t >= P.connect[0] && t < P.connect[1]) led = "flash";
+  if (st.listening) led = "listening";
+  st.ledShown = led; st.ledAge = led === st.led.state ? age : 0;
+  return st;
+}
+function ledColor(st, t) {
+  const L = st.ledShown, age = t - st.led.t;
+  if (L === "idle") return [LED.idle[1], .15];
+  if (L === "arrived") { if (age < 1.2) return [C.green, 1]; const hue = ((t * 220) % 360); return ["hsl", hue]; }
+  if (L === "route_started") return [C.green, Math.floor(t * 4) % 2 ? 1 : .2];
+  if (L === "recording") return [C.orange, .45 + .55 * (.5 + .5 * Math.sin(t * 3.2))];
+  if (L === "navigating") return [C.white, .45 + .55 * (.5 + .5 * Math.sin(t * 3))];
+  if (L === "turn_now") { const per = (st.led.period || 300) / 1000; return [C.white, (t % per) < per / 2 ? 1 : .15]; }
+  if (L === "flash") return [C.white, Math.floor(t * 6) % 2 ? 1 : .3];
+  if (L === "uncertain") return [C.red, Math.floor(t * 4) % 2 ? 1 : .2];
+  return [LED[L] ? LED[L][1] : C.white, 1];
+}
+function buzzOn(st, t) { const b = st.lastBuzz; if (!b) return null; const ms = (t - b.t) * 1000; let acc = 0, on = false;
+  const p = PAT[b.cue]; p.forEach((d, i) => { if (ms >= acc && ms < acc + d && i % 2 === 0) on = true; acc += d; });
+  return ms >= 0 && ms < acc + 450 ? { cue: b.cue, on, k: clamp(ms / (acc + 450)) } : null; }
+
+/* ============================================================ the iPhone (simulated screen) */
+const PW = 390, PH = 844;                // iPhone points
+function icon(c, name, x, y, s, col) {    // tiny SF-Symbol-like glyphs
+  c.save(); c.translate(x, y); c.scale(s / 24, s / 24); c.fillStyle = col; c.strokeStyle = col; c.lineWidth = 2.4; c.lineCap = "round"; c.lineJoin = "round";
+  if (name === "mic") { rrect(c, -4, -10, 8, 13, 4); c.fill(); c.beginPath(); c.arc(0, 0, 7, .1, Math.PI - .1); c.stroke(); c.beginPath(); c.moveTo(0, 7); c.lineTo(0, 10); c.stroke(); }
+  else if (name === "wave") { [-8, -4, 0, 4, 8].forEach((dx, i) => { const hh = [5, 10, 14, 10, 5][i]; c.beginPath(); c.moveTo(dx, -hh / 2); c.lineTo(dx, hh / 2); c.stroke(); }); }
+  else if (name === "pin") { c.beginPath(); c.arc(0, -3, 6.5, 0, 7); c.fill(); c.beginPath(); c.moveTo(-4, 1); c.lineTo(0, 10); c.lineTo(4, 1); c.fill(); c.fillStyle = "#fff"; c.beginPath(); c.arc(0, -3, 2.4, 0, 7); c.fill(); }
+  else if (name === "walk") { c.beginPath(); c.arc(1, -9, 2.6, 0, 7); c.fill(); c.beginPath(); c.moveTo(0, -5); c.lineTo(-1, 3); c.lineTo(-5, 10); c.moveTo(-1, 3); c.lineTo(4, 9); c.moveTo(0, -4); c.lineTo(-5, 0); c.moveTo(0, -4); c.lineTo(5, -1); c.stroke(); }
+  else if (name === "stop") { rrect(c, -6, -6, 12, 12, 2.5); c.fill(); }
+  else if (name === "play") { c.beginPath(); c.moveTo(-4, -7); c.lineTo(7, 0); c.lineTo(-4, 7); c.closePath(); c.fill(); }
+  else if (name === "buzz") { rrect(c, -4, -8, 8, 16, 2.5); c.stroke(); c.beginPath(); c.moveTo(-8, -4); c.lineTo(-8, 4); c.moveTo(8, -4); c.lineTo(8, 4); c.stroke(); }
+  else if (name === "band") { rrect(c, -5, -9, 10, 18, 4); c.stroke(); c.beginPath(); c.arc(0, 0, 2, 0, 7); c.fill(); }
+  else if (name === "gear") { c.beginPath(); for (let i = 0; i < 16; i++) { const a = i * Math.PI / 8, r = i % 2 ? 6.5 : 9; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); } c.closePath(); c.fill(); c.fillStyle = "#fff"; c.beginPath(); c.arc(0, 0, 3, 0, 7); c.fill(); }
+  else if (name === "list") { [-5, 0, 5].forEach(dy => { c.beginPath(); c.arc(-6, dy, 1.3, 0, 7); c.fill(); c.beginPath(); c.moveTo(-2, dy); c.lineTo(8, dy); c.stroke(); }); }
+  else if (name === "uturn") { c.beginPath(); c.moveTo(5, 8); c.lineTo(5, -2); c.arc(0, -2, 5, 0, Math.PI, true); c.lineTo(-5, 4); c.stroke(); c.beginPath(); c.moveTo(-9, 1); c.lineTo(-5, 6); c.lineTo(-1, 1); c.stroke(); }
+  else if (name === "arrow") { c.beginPath(); c.moveTo(0, -11); c.lineTo(8, 9); c.lineTo(0, 4); c.lineTo(-8, 9); c.closePath(); c.fill(); }
+  else if (name === "check") { c.beginPath(); c.arc(0, 0, 10, 0, 7); c.fill(); c.strokeStyle = "#fff"; c.beginPath(); c.moveTo(-4.5, 0); c.lineTo(-1, 4); c.lineTo(5, -4); c.stroke(); }
+  c.restore();
+}
+function card(c, x, y, w, h, r) { c.save(); c.shadowColor = "rgba(0,0,0,.10)"; c.shadowBlur = 14; c.shadowOffsetY = 5; rrect(c, x, y, w, h, r); c.fillStyle = "rgba(255,255,255,.93)"; c.fill(); c.shadowColor = "transparent"; c.strokeStyle = "rgba(0,0,0,.06)"; c.lineWidth = .8; c.stroke(); c.restore(); }
+function phoneScreen(c, st, t) {
+  // map
+  c.fillStyle = "#EEF0F3"; c.fillRect(0, 0, PW, PH);
+  const topIn = st.guiding || st.done ? 248 : 136;
+  const bottomIn = 240 + (st.places.length || st.recording ? 50 : 0) + (st.feed.length ? 108 : 0);
+  const kNav = st.navT != null ? eio(seg(t, st.navT, st.navT + .5)) : 0;
+  const mapTop = lerp(136, topIn, kNav), mapBot = PH - bottomIn;
+  const bx0 = -3, bx1 = 8.5, by0 = -2, by1 = 10.5;
+  const sc = Math.min((PW - 40) / (bx1 - bx0), (mapBot - mapTop - 20) / (by1 - by0));
+  const cx = PW / 2 - ((bx0 + bx1) / 2) * sc, cy = (mapTop + mapBot) / 2 + ((by0 + by1) / 2) * sc;
+  const M = (x, y) => [cx + x * sc, cy - y * sc];
+  c.strokeStyle = "rgba(60,60,67,.07)"; c.lineWidth = 1;
+  for (let gx = -10; gx <= 20; gx++) { const [a] = M(gx, 0); c.beginPath(); c.moveTo(a, 0); c.lineTo(a, PH); c.stroke(); }
+  for (let gy = -10; gy <= 25; gy++) { const [, b] = M(0, gy); c.beginPath(); c.moveTo(0, b); c.lineTo(PW, b); c.stroke(); }
+  // trail (recorded while not guiding)
+  const S = P.samples, trail = [];
+  const sNav = P.segments[2][2];   // the return walk is not recorded (app.on_pose)
+  if (st.recording) for (const q of S) { if (q.t > st.s || q.t > sNav) break; if (!q.guiding) trail.push(q); }
+  const line = (pts, col, w, halo, dash) => { if (pts.length < 2) return; c.save(); c.lineCap = "round"; c.lineJoin = "round"; if (dash) c.setLineDash(dash);
+    if (halo) { c.strokeStyle = "#fff"; c.lineWidth = w + 4; c.beginPath(); pts.forEach((q, i) => { const m = M(q[0], q[1]); i ? c.lineTo(m[0], m[1]) : c.moveTo(m[0], m[1]); }); c.stroke(); }
+    c.strokeStyle = col; c.lineWidth = w; c.beginPath(); pts.forEach((q, i) => { const m = M(q[0], q[1]); i ? c.lineTo(m[0], m[1]) : c.moveTo(m[0], m[1]); }); c.stroke(); c.restore(); };
+  line(trail.map(q => [q.x, q.y]), st.guiding || st.done ? "#C7C7CC" : C.route, 6, !(st.guiding || st.done));
+  if (st.guidance && st.guidance.waypoints && (st.guiding || st.done)) {
+    const wp = st.guidance.waypoints.slice(); const left = st.done ? [] : [[st.samp.x, st.samp.y]].concat(wp.slice(Math.min(wp.length - 1, (st.guidance.index || 0) + 1)));
+    line(left, C.guide, 6, true, [1, 11]);
+  }
+  // start + places
+  if (st.recording) { const m = M(0, 0); c.beginPath(); c.arc(m[0], m[1], 5, 0, 7); c.fillStyle = "#fff"; c.fill(); c.strokeStyle = C.iosGray; c.lineWidth = 2; c.stroke(); }
+  st.places.forEach(pl => { const m = M(pl.x, pl.y); c.save(); c.shadowColor = "rgba(0,0,0,.2)"; c.shadowBlur = 6; c.beginPath(); c.arc(m[0], m[1], 11, 0, 7); c.fillStyle = C.landmark; c.fill(); c.restore();
+    c.beginPath(); c.arc(m[0], m[1], 11, 0, 7); c.strokeStyle = "#fff"; c.lineWidth = 2.5; c.stroke(); icon(c, "pin", m[0], m[1] - .5, 13, "#fff");
+    c.save(); c.font = "600 12px " + IF; const lw = c.measureText(cap(pl.label)).width + 14; rrect(c, m[0] - lw / 2, m[1] + 15, lw, 20, 10); c.fillStyle = "rgba(255,255,255,.95)"; c.fill(); c.fillStyle = "#1c1c1e"; c.textAlign = "center"; c.fillText(cap(pl.label), m[0], m[1] + 29); c.restore(); });
+  // you + facing cone
+  if (st.recording) {
+    const m = M(st.samp.x, st.samp.y), f = st.samp.facing * Math.PI / 180, ang = f - Math.PI / 2;
+    const g = c.createRadialGradient(m[0], m[1], 0, m[0], m[1], 52); g.addColorStop(0, hexA(C.iosBlue, .45)); g.addColorStop(1, hexA(C.iosBlue, 0));
+    c.fillStyle = g; c.beginPath(); c.moveTo(m[0], m[1]); c.arc(m[0], m[1], 52, ang - .42, ang + .42); c.closePath(); c.fill();
+    c.beginPath(); c.arc(m[0], m[1], 15, 0, 7); c.fillStyle = hexA(C.iosBlue, .18 + .08 * Math.sin(t * 4)); c.fill();
+    c.save(); c.shadowColor = "rgba(0,0,0,.25)"; c.shadowBlur = 5; c.beginPath(); c.arc(m[0], m[1], 8.5, 0, 7); c.fillStyle = "#fff"; c.fill(); c.restore();
+    c.beginPath(); c.arc(m[0], m[1], 6.5, 0, 7); c.fillStyle = C.iosBlue; c.fill();
+  }
+  // status bar
+  T(c, "9:41", 50, 34, { size: 17, w: 600, f: IF, color: "#000", align: "center" });
+  rrect(c, PW / 2 - 62, 11, 124, 36, 18); c.fillStyle = "#000"; c.fill();
+  [0, 1, 2, 3].forEach(i => { rrect(c, 286 + i * 5.5, 30 - i * 3, 3.6, 4 + i * 3, 1); c.fillStyle = "#000"; c.fill(); });
+  c.save(); c.translate(318, 27); c.strokeStyle = "#000"; c.lineWidth = 2; [9, 6, 3].forEach(r => { c.beginPath(); c.arc(0, 4, r, -2.4, -.75); c.stroke(); }); c.restore();
+  rrect(c, 334, 21, 25, 12, 3.5); c.strokeStyle = "rgba(0,0,0,.45)"; c.lineWidth = 1; c.stroke(); rrect(c, 336, 23, 19, 8, 2); c.fillStyle = "#000"; c.fill();
+  // top bar
+  const tb = 56;
+  c.save(); c.shadowColor = "rgba(0,0,0,.08)"; c.shadowBlur = 10; c.shadowOffsetY = 3; rrect(c, 16, tb, 252, 46, 23); c.fillStyle = "rgba(255,255,255,.93)"; c.fill(); c.restore();
+  c.save(); rrect(c, 24, tb + 9, 28, 28, 7); c.clip(); if (logo.complete) c.drawImage(logo, 24, tb + 9, 28, 28); c.restore();
+  const conn = t >= P.connect[0];
+  c.beginPath(); c.arc(64, tb + 17, 3.8, 0, 7); c.fillStyle = conn ? C.iosGreen : C.iosOrange; c.fill();
+  T(c, conn ? "Vexo-HACK-80" : "Scanning for Vexo-HACK-80…", 72, tb + 21, { size: 13, w: 600, f: IF, color: "#000", max: conn ? 200 : 186 });
+  if (conn) { T(c, "iPhone + band", 60, tb + 36, { size: 10, w: 500, f: IF, color: C.iosGray });
+    rrect(c, 196, tb + 12, 60, 22, 11); c.fillStyle = "rgba(0,0,0,.06)"; c.fill(); T(c, "▮ 82%", 226, tb + 27, { size: 11, w: 600, f: IF, color: C.iosGray, align: "center" }); }
+  [[294, "list"], [342, "gear"]].forEach(([x, n]) => { if (n === "list" && !st.feed.length) return; c.save(); c.shadowColor = "rgba(0,0,0,.08)"; c.shadowBlur = 10; c.beginPath(); c.arc(x + 20, tb + 23, 20, 0, 7); c.fillStyle = "rgba(255,255,255,.93)"; c.fill(); c.restore(); icon(c, n, x + 20, tb + 23, 17, "#1c1c1e"); });
+  // guidance banner
+  if (st.banner) {
+    const bk = eout(seg(t, st.navT, st.navT + .45)), by = tb + 56 - (1 - bk) * 30;
+    c.save(); c.globalAlpha = bk;
+    card(c, 16, by, PW - 32, 98, 24);
+    const acc = st.banner.state === "done" ? C.landmark : st.banner.state === "wrong" ? C.iosOrange : C.guide;
+    c.beginPath(); c.arc(59, by + 49, 29, 0, 7); c.fillStyle = hexA(acc, .16); c.fill(); c.strokeStyle = hexA(acc, .35); c.lineWidth = 1.5; c.stroke();
+    if (st.banner.state === "done") icon(c, "check", 59, by + 49, 26, acc);
+    else { c.save(); c.translate(59, by + 49); c.rotate(st.banner.arrow * Math.PI / 180); icon(c, "arrow", 0, 0, 30, acc); c.restore(); }
+    const lab = st.banner.state === "done" ? "ARRIVED" : st.banner.state === "wrong" ? "ADJUST HEADING" : "GUIDING";
+    const lw = T(c, lab, 102, by + 30, { size: 10, w: 700, f: IF, color: acc, ls: .6 });
+    if (st.banner.state !== "done") T(c, "· entrance", 108 + lw, by + 30, { size: 11, w: 600, f: IF, color: C.iosGray });
+    T(c, st.banner.big, 102, by + 55, { size: 20, w: 700, f: IF, color: "#000", max: 220 });
+    T(c, st.banner.sub, 102, by + 75, { size: 12, w: 400, f: IF, color: C.iosGray, max: 220 });
+    c.beginPath(); c.arc(PW - 52, by + 49, 18, 0, 7); c.fillStyle = "rgba(0,0,0,.05)"; c.fill(); icon(c, "buzz", PW - 52, by + 49, 17, acc);
+    c.restore();
+  }
+  // bottom stack: feed, chips, dock
+  let y = PH - 26 - 172;
+  const dockY = y;
+  if (st.places.length || st.recording) {
+    y -= 46;
+    let x = 16;
+    const chips = [["Back to start", "uturn", C.guide]].concat(st.places.map(p => [cap(p.label), "pin", C.landmark]));
+    chips.forEach(([s, ic, col]) => { c.save(); c.font = "500 14px " + IF; const w = c.measureText(s).width + 48; c.shadowColor = "rgba(0,0,0,.08)"; c.shadowBlur = 8; rrect(c, x, y, w, 36, 18); c.fillStyle = "rgba(255,255,255,.93)"; c.fill(); c.restore();
+      icon(c, ic, x + 19, y + 18, 15, col); T(c, s, x + 33, y + 23, { size: 14, w: 500, f: IF, color: "#000" }); x += w + 8; });
+    y -= 10;
+  }
+  if (st.feed.length) {
+    y -= 92;
+    card(c, 16, y, PW - 32, 88, 18);
+    icon(c, "wave", 33, y + 18, 12, C.iosGray);
+    T(c, "Live Activity", 44, y + 22, { size: 12, w: 700, f: IF, color: C.iosGray });
+    rrect(c, 130, y + 11, 22, 15, 7.5); c.fillStyle = "rgba(0,0,0,.07)"; c.fill(); T(c, String(st.feed.length), 141, y + 22.5, { size: 10, w: 700, f: IF, color: C.iosGray, align: "center" });
+    if (st.feed.length > 2) T(c, "All ⌃", PW - 76, y + 22, { size: 11, w: 600, f: IF, color: C.iosGray, align: "right" });
+    T(c, "Clear", PW - 30, y + 22, { size: 11, w: 600, f: IF, color: "#c7c7cc", align: "right" });
+    st.feed.slice(0, 2).forEach((it, i) => {
+      const ry = y + 46 + i * 30, a = clamp((t - it.t) / .3);
+      c.save(); c.globalAlpha = a;
+      rrect(c, 30, ry - 12, 24, 24, 7); c.fillStyle = hexA(it.tint, .15); c.fill(); icon(c, it.icon, 42, ry, 13, it.tint);
+      c.font = "700 9px " + IF; const bw = c.measureText(it.kind).width + 10; rrect(c, 62, ry - 8, bw, 16, 8); c.fillStyle = hexA(it.tint, .13); c.fill();
+      T(c, it.kind, 67, ry + 3.5, { size: 9, w: 700, f: IF, color: it.tint, ls: .4 });
+      T(c, it.title, 70 + bw, ry + 4.5, { size: 12, w: 500, f: IF, color: "#000", max: PW - 70 - bw - 96 });
+      const sec = Math.floor(it.t), clock = "14:32:" + String(10 + sec).padStart(2, "0").slice(-2);
+      T(c, "14:" + String(32 + Math.floor((10 + sec) / 60)).padStart(2, "0") + ":" + String((10 + sec) % 60).padStart(2, "0"), PW - 30, ry + 4, { size: 10, w: 400, f: IF, color: "#c7c7cc", align: "right" });
+      c.restore();
+    });
+  }
+  // dock
+  card(c, 16, dockY, PW - 32, 172, 30);
+  const lis = st.listening;
+  const steps = st.recording ? Math.max(0, st.samp.steps - (P.samples[0].steps || 0)) : 0;
+  const calibrating = st.recording && !st.guiding && !st.done && st.s < 2.5 && t < P.segments[1][0] + 2;
+  const status = lis ? "Listening…" : st.done ? "You reached the entrance" : st.guiding ? "Guiding to the entrance · follow the buzzes" : calibrating ? "Hold your arm still for a moment…"
+    : st.recording ? "Recording · " + steps + " steps — double-tap band to name a spot" : t >= P.connect[0] ? "Tap Start route, or double-tap the band and say “start route”" : "Double-tap Vexo-HACK-80 so its blue light blinks";
+  const sw = T(c, status, PW / 2 + 6, dockY + 30, { size: 12.5, w: 500, f: IF, color: lis ? "#000" : C.iosGray, align: "center", max: PW - 80, a: 0 });
+  if (lis) icon(c, "wave", PW / 2 - sw / 2 - 8, dockY + 26, 13, C.iosIndigo);
+  else if (st.recording) { c.beginPath(); c.arc(PW / 2 - sw / 2 - 6, dockY + 26, 3.3, 0, 7); c.fillStyle = calibrating ? C.iosOrange : C.iosGreen; c.fill(); }
+  T(c, status, PW / 2 + 6, dockY + 30, { size: 12.5, w: 500, f: IF, color: lis ? "#000" : C.iosGray, align: "center", max: PW - 80 });
+  const side = (x, title, sub, ic, col, a = 1) => { c.save(); c.globalAlpha = a; c.beginPath(); c.arc(x, dockY + 82, 25, 0, 7); c.fillStyle = hexA(col, .14); c.fill(); icon(c, ic, x, dockY + 82, 20, col);
+    T(c, title, x, dockY + 126, { size: 12, w: 600, f: IF, color: "#000", align: "center" }); if (sub) T(c, sub, x, dockY + 141, { size: 10, w: 400, f: IF, color: C.iosGray, align: "center" }); c.restore(); };
+  side(80, st.recording ? "Stop" : "Start route", st.recording ? steps + " steps" : null, st.recording ? "stop" : "walk", st.recording ? C.iosRed : C.route);
+  side(PW - 80, "Save place", st.places.length ? st.places.length + " saved" : null, "pin", C.landmark, st.recording ? 1 : .42);
+  const mx = PW / 2, my = dockY + 88;
+  if (lis) { const k = (t * .87) % 1; c.beginPath(); c.arc(mx, my, 39 * (.96 + .18 * k), 0, 7); c.strokeStyle = hexA(C.iosIndigo, .85 * (1 - k)); c.lineWidth = 3; c.stroke(); }
+  c.save(); c.shadowColor = hexA(lis ? C.iosIndigo : C.teal, .34); c.shadowBlur = 12; c.shadowOffsetY = 6;
+  const g = c.createLinearGradient(mx - 39, my - 39, mx + 39, my + 39);
+  if (lis) { g.addColorStop(0, C.iosIndigo); g.addColorStop(1, C.iosPurple); } else { g.addColorStop(0, "#0F85FA"); g.addColorStop(1, "#00ADEB"); }
+  c.beginPath(); c.arc(mx, my, 39, 0, 7); c.fillStyle = g; c.fill(); c.restore();
+  icon(c, lis ? "wave" : "mic", mx, my, 30, "#fff");
+  rrect(c, PW / 2 - 67, PH - 13, 134, 5, 2.5); c.fillStyle = "#000"; c.fill();
+}
+function drawPhone(c, st, t, x, y, s) {
+  const bw = PW * s, bh = PH * s, pad = 14;
+  c.save();
+  c.shadowColor = "rgba(0,0,0,.6)"; c.shadowBlur = 60; c.shadowOffsetY = 24;
+  rrect(c, x - pad, y - pad, bw + pad * 2, bh + pad * 2, 66); c.fillStyle = "#1b1b1d"; c.fill(); c.restore();
+  rrect(c, x - pad, y - pad, bw + pad * 2, bh + pad * 2, 66); c.strokeStyle = "#4a4a4f"; c.lineWidth = 3; c.stroke();
+  rrect(c, x - pad + 4, y - pad + 4, bw + pad * 2 - 8, bh + pad * 2 - 8, 62); c.strokeStyle = "#0b0b0c"; c.lineWidth = 4; c.stroke();
+  c.save(); rrect(c, x, y, bw, bh, 52); c.clip(); c.translate(x, y); c.scale(s, s);
+  phoneScreen(c, st, t);
+  c.restore();
+  // buzz: the phone shakes, rings ripple
+  const b = buzzOn(st, t);
+  if (b) { for (let r = 0; r < 2; r++) { const k = clamp(b.k * 1.25 - r * .25); if (k > 0 && k < 1) { rrect(c, x - pad - k * 30, y - pad - k * 30, bw + pad * 2 + k * 60, bh + pad * 2 + k * 60, 66 + k * 20);
+    c.strokeStyle = hexA(b.cue === "on_track" ? C.green : b.cue === "arrived" ? C.purple : C.orange, (1 - k) * .55); c.lineWidth = 3; c.stroke(); } } }
+}
+
+/* ============================================================ the walker */
+function walker(c, x, y, s, phase, o = {}) {
+  c.save(); c.translate(x, y); c.scale(s * (o.sx == null ? 1 : o.sx), s);
+  c.lineCap = "round"; c.lineJoin = "round"; c.strokeStyle = o.color || "#e9e9ee"; c.fillStyle = o.color || "#e9e9ee";
+  const sw = Math.sin(phase) * (o.amp == null ? 1 : o.amp), bob = Math.abs(Math.cos(phase)) * 3 * (o.amp == null ? 1 : o.amp); c.translate(0, -bob);
+  const hip = [0, -95], sh = [4, -175];
+  function limb(b, a1, a2, l1, l2, w) { const k = [b[0] + Math.sin(a1) * l1, b[1] + Math.cos(a1) * l1], e = [k[0] + Math.sin(a1 + a2) * l2, k[1] + Math.cos(a1 + a2) * l2];
+    c.lineWidth = w; c.beginPath(); c.moveTo(b[0], b[1]); c.lineTo(k[0], k[1]); c.lineTo(e[0], e[1]); c.stroke(); return e; }
+  c.globalAlpha *= .55; limb(hip, -sw * .5, Math.max(0, sw) * -.6, 50, 50, 19);
+  const backHand = o.tap ? limb(sh, .9, -1.9, 40, 38, 14) : limb(sh, sw * .55, -.35, 40, 38, 14); c.globalAlpha /= .55;
+  c.lineWidth = 30; c.beginPath(); c.moveTo(hip[0], hip[1]); c.lineTo(sh[0], sh[1]); c.stroke();
+  limb(hip, sw * .5, Math.max(0, -sw) * -.6, 50, 50, 20);
+  const hand = o.tap ? limb(sh, .55, -1.2, 40, 38, 15) : limb(sh, -sw * .55, -.35, 40, 38, 15);
+  c.beginPath(); c.arc(8, -205, 21, 0, 7); c.fill();
+  // band on the front wrist, phone in the back pocket
+  c.fillStyle = "#111"; c.beginPath(); c.arc(hand[0], hand[1] - 9, 8, 0, 7); c.fill();
+  c.fillStyle = "#1c1c1e"; rrect(c, -16, -112, 13, 22, 3); c.fill(); c.strokeStyle = "rgba(255,255,255,.7)"; c.lineWidth = 1.5; c.stroke();
+  c.restore();
+  const sx = o.sx == null ? 1 : o.sx;
+  return { wrist: [x + hand[0] * s * sx, y + (hand[1] - 9 - bob) * s], pocket: [x - 9.5 * s * sx, y + (-101 - bob) * s], head: [x + 8 * s * sx, y + (-205 - bob) * s], back: [x + backHand[0] * s * sx, y + (backHand[1] - bob) * s] };
+}
+function personPanel(c, st, t, X, Y, Wd, Hd) {
+  glass(c, X, Y, Wd, Hd, 30, { fill: "rgba(18,18,20,.9)" });
+  c.save(); rrect(c, X, Y, Wd, Hd, 30); c.clip();
+  const s = st.s, rate = rateAt(t);
+  // moving? (steps rising in the last half second of sim time)
+  const prev = sampleAt(Math.max(0, s - .5));
+  const moving = st.samp.steps > prev.steps && !st.done;
+  // turned around after "take me back": the synthetic walk turns 180° at about sim 19.4 s
+  const turnK = eio(seg(s, 19.38, 20.98)), sx = Math.cos(Math.PI * turnK);
+  const fwd = s < 20.2 ? 1 : -1;
+  // floor
+  const hz = Y + 150, vx = X + Wd / 2;
+  const g = c.createLinearGradient(0, Y, 0, Y + Hd); g.addColorStop(0, "#17181c"); g.addColorStop(1, "#08080a"); c.fillStyle = g; c.fillRect(X, Y, Wd, Hd);
+  c.strokeStyle = "rgba(255,255,255,.06)"; c.lineWidth = 2;
+  for (let i = -14; i <= 14; i++) { c.beginPath(); c.moveTo(vx, hz); c.lineTo(vx + i * 200, Y + Hd); c.stroke(); }
+  const dist = st.samp.steps * .45 * 1;
+  const off = (((dist * fwd) % 1) + 1) % 1;
+  for (let j = 0; j < 12; j++) { const z = (j + off) / 12, yy = hz + Math.pow(z, 2.2) * (Y + Hd - hz); c.globalAlpha = z * .9; c.beginPath(); c.moveTo(X, yy); c.lineTo(X + Wd, yy); c.stroke(); }
+  c.globalAlpha = 1;
+  c.save(); c.globalCompositeOperation = "lighter";
+  for (let j = 0; j < 5; j++) { const z = ((((j / 5) + dist * .08 * fwd) % 1) + 1) % 1; glowBlob(c, vx - z * 520 * fwd, hz - 20 - z * z * 120, 30 + z * 90, C.white, .25); }
+  c.restore();
+  // the walker
+  const wx = X + Wd * .6, wy = Y + Hd - 26;
+  const tapping = st.listening && P.listen.some(([a]) => t >= a && t < a + .55);
+  const wk = walker(c, wx, wy, 1.42, moving ? s * 6.4 : .9, { sx, amp: moving ? 1 : .3, tap: tapping });
+  // band light
+  const [lc, la] = ledColor(st, t);
+  const col = lc === "hsl" ? "hsl(" + la + ",100%,60%)" : lc;
+  c.save(); c.globalCompositeOperation = "lighter";
+  const r = 46 * (lc === "hsl" ? 1 : la);
+  const gg = c.createRadialGradient(wk.wrist[0], wk.wrist[1], 0, wk.wrist[0], wk.wrist[1], 70); gg.addColorStop(0, lc === "hsl" ? "hsla(" + la + ",100%,60%,.8)" : hexA(lc, .8 * (lc === "hsl" ? 1 : la))); gg.addColorStop(1, "rgba(0,0,0,0)");
+  c.fillStyle = gg; c.fillRect(wk.wrist[0] - 70, wk.wrist[1] - 70, 140, 140); c.restore();
+  c.beginPath(); c.arc(wk.wrist[0], wk.wrist[1], 6, 0, 7); c.fillStyle = col; c.globalAlpha = lc === "hsl" ? 1 : Math.max(.3, la); c.fill(); c.globalAlpha = 1;
+  if (tapping) { const k = ((t * 3) % 1); [0, .5].forEach(o => { const kk = (k + o) % 1; c.beginPath(); c.arc(wk.wrist[0], wk.wrist[1], 12 + kk * 34, 0, 7); c.strokeStyle = hexA(C.blue, 1 - kk); c.lineWidth = 2.5; c.stroke(); });
+    pill(c, "double-tap", wk.wrist[0] + 30, wk.wrist[1] + 36, { size: 16, dot: C.blue }); }
+  // buzz in the pocket
+  const b = buzzOn(st, t);
+  if (b) for (let i = 0; i < 3; i++) { const k = clamp(b.k * 1.3 - i * .18); if (k <= 0 || k >= 1) continue;
+    c.beginPath(); c.arc(wk.pocket[0], wk.pocket[1], 14 + k * 70, 0, 7); c.strokeStyle = hexA(b.cue === "on_track" ? C.green : b.cue === "arrived" ? C.purple : C.orange, (1 - k) * .85); c.lineWidth = 3; c.stroke(); }
+  // what the walker says / what the app says
+  const clip = clipAt(t);
+  if (clip && (clip.voice === "walker" || clip.voice === "app")) {
+    const k = espring(seg(t, clip.t, clip.t + .45)) * (1 - seg(t, clip.t + clip.d, clip.t + clip.d + .25));
+    const lines = wrapLines(c, clip.voice === "walker" ? "“" + clip.text + "”" : clip.text, 520, "600 26px " + MF);
+    const bw = Math.max(...lines.map(l => { c.font = "600 26px " + MF; return c.measureText(l).width; })) + 48, bh = lines.length * 34 + 54;
+    const bx = clip.voice === "walker" ? Math.min(X + Wd - bw - 24, wk.head[0] + 40) : X + Wd - bw - 24, by = Y + 24;
+    c.save(); c.globalAlpha = clamp(k); c.translate(bx + bw / 2, by + bh / 2); c.scale(.85 + .15 * k, .85 + .15 * k); c.translate(-(bx + bw / 2), -(by + bh / 2));
+    glass(c, bx, by, bw, bh, 22, { fill: clip.voice === "walker" ? "rgba(10,132,255,.92)" : "rgba(44,44,46,.95)" });
+    T(c, clip.voice === "walker" ? "THE WALKER SAYS" : "WAYBACK SAYS · ElevenLabs River", bx + 24, by + 30, { size: 13, w: 700, ls: 1.5, color: clip.voice === "walker" ? "rgba(255,255,255,.8)" : C.purple });
+    lines.forEach((l, i) => T(c, l, bx + 24, by + 64 + i * 34, { size: 26, w: 600 }));
+    c.restore();
+  }
+  // labels
+  T(c, "The walker", X + 30, Y + Hd - 64, { size: 15, w: 700, color: C.gray, ls: 2 });
+  T(c, "Vexo band on the wrist · iPhone in the pocket", X + 30, Y + Hd - 36, { size: 20, w: 600, color: "#d1d1d6" });
+  const spd = rate > 0 ? (rate > 1.15 ? "▶▶ " + rate.toFixed(1) + "× walk" : "▶ 1× walk") : (st.done ? "■ arrived" : "■ standing");
+  pill(c, spd, X + Wd - 24, Y + Hd - 44, { size: 18, align: "right" });
+  c.restore();
+}
+
+/* ============================================================ the update panels */
+function directionsCard(c, st, t, X, Y, Wd, Hd) {
+  glass(c, X, Y, Wd, Hd, 28);
+  T(c, "DIRECTIONS", X + 28, Y + 42, { size: 15, w: 700, color: C.gray, ls: 2 });
+  let big, sub, col = C.white, arrow = null;
+  if (st.banner) { const b = st.banner; col = b.state === "done" ? C.purple : b.state === "wrong" ? C.orange : C.green; big = b.big; sub = b.sub; arrow = b.state === "done" ? null : b.arrow;
+    const tag = b.state === "done" ? "ARRIVED" : b.state === "wrong" ? "ADJUST HEADING" : "GUIDING"; pill(c, tag, X + Wd - 28, Y + 36, { size: 15, align: "right", color: col, fill: hexA(col, .14), stroke: hexA(col, .35) }); }
+  else if (st.recording) { big = st.s < 2.5 ? "Hold still…" : "Recording your trail"; const steps = Math.max(0, st.samp.steps - P.samples[0].steps);
+    sub = steps + " steps · " + (steps * .7).toFixed(1) + " m · " + st.places.length + " place" + (st.places.length === 1 ? "" : "s") + " saved"; col = C.orange; }
+  else { big = t >= P.connect[0] ? "Ready" : "Finding the band…"; sub = t >= P.connect[0] ? "Double-tap the band and speak" : "Bluetooth, inside the app"; }
+  const maxW = Wd - (arrow != null ? 190 : 56); let fs = 38; c.save(); while (fs > 24) { c.font = "800 " + fs + "px " + MF; if (c.measureText(big).width <= maxW) break; fs -= 2; } c.restore();
+  T(c, big, X + 28, Y + 110, { size: fs, w: 800, color: col, max: maxW });
+  T(c, sub, X + 28, Y + 150, { size: 20, w: 500, color: "#d1d1d6", max: Wd - (arrow != null ? 190 : 56) });
+  if (arrow != null) { const ax = X + Wd - 90, ay = Y + 128; c.beginPath(); c.arc(ax, ay, 56, 0, 7); c.fillStyle = hexA(col, .16); c.fill(); c.strokeStyle = hexA(col, .4); c.lineWidth = 2; c.stroke();
+    c.save(); c.translate(ax, ay); c.rotate(arrow * Math.PI / 180); icon(c, "arrow", 0, 0, 62, col); c.restore(); }
+  if (st.guidance) {   // the spoken plan, computed by store/guidance.py
+    const ins = st.guidance.instructions, idx = st.done ? ins.length : st.guidance.index;
+    ins.forEach((s, i) => { const yy = Y + 196 + i * 30, done = i < idx || st.done, now = i === idx && !st.done;
+      c.beginPath(); c.arc(X + 38, yy - 7, 7, 0, 7); c.fillStyle = done ? C.green : now ? C.white : "rgba(255,255,255,.25)"; c.fill();
+      T(c, s, X + 56, yy, { size: 19, w: now ? 700 : 500, color: done ? C.gray : now ? C.white : "#8e8e93", max: Wd - 80 }); });
+  }
+}
+function lightBuzzCard(c, st, t, X, Y, Wd, Hd) {
+  glass(c, X, Y, Wd, Hd, 28);
+  const half = Wd / 2;
+  T(c, "BAND LIGHT", X + 28, Y + 40, { size: 15, w: 700, color: C.gray, ls: 2 });
+  const [lc, la] = ledColor(st, t), col = lc === "hsl" ? "hsl(" + la + ",100%,60%)" : lc;
+  c.save(); c.globalCompositeOperation = "lighter"; if (lc !== "hsl") glowBlob(c, X + 64, Y + 100, 70, lc, la); c.restore();
+  c.beginPath(); c.arc(X + 64, Y + 100, 22, 0, 7); c.fillStyle = col; c.globalAlpha = lc === "hsl" ? 1 : Math.max(.25, la); c.fill(); c.globalAlpha = 1;
+  const nm = (st.ledShown === "arrived" && t - st.led.t > 1.2 ? "Arrived · rainbow" : (LED[st.ledShown] || LED.idle)[0]).split(" · ");
+  T(c, nm[0], X + 100, Y + 96, { size: 20, w: 700, max: half - 112 });
+  if (nm[1]) T(c, nm[1], X + 100, Y + 122, { size: 16, w: 500, color: C.gray, max: half - 112 });
+  c.fillStyle = "rgba(255,255,255,.1)"; c.fillRect(X + half, Y + 24, 1.5, Hd - 48);
+  T(c, "IPHONE BUZZ", X + half + 28, Y + 40, { size: 15, w: 700, color: C.gray, ls: 2 });
+  if (st.lastBuzz) {
+    const cue = st.lastBuzz.cue, ms = (t - st.lastBuzz.t) * 1000, recent = ms < 2600;
+    T(c, cue, X + half + 28, Y + 88, { size: 22, w: 700, color: recent ? C.white : C.gray, f: "ui-monospace, Menlo, monospace" });
+    let bx = X + half + 28, acc = 0;
+    PAT[cue].forEach((d, i) => { const w = Math.max(8, d / 15); if (i % 2 === 0) { const live = ms >= acc && ms < acc + d; rrect(c, bx, Y + 108, w, 16, 8);
+      c.fillStyle = live ? (cue === "on_track" ? C.green : cue === "arrived" ? C.purple : C.orange) : "rgba(255,255,255,.28)"; c.fill(); } bx += w + 6; acc += d; });
+    T(c, cue === "tick" ? "light keep-alive tick" : (BUZZ_LABEL[cue] || [""])[1], X + half + 28, Y + 156, { size: 17, w: 500, color: C.gray, max: half - 50 });
+  } else T(c, "No buzz yet", X + half + 28, Y + 92, { size: 22, w: 600, color: C.gray });
+}
+function streamCard(c, st, t, X, Y, Wd, Hd) {
+  glass(c, X, Y, Wd, Hd, 28);
+  T(c, "WHAT'S HAPPENING", X + 28, Y + 42, { size: 15, w: 700, color: C.gray, ls: 2 });
+  c.save(); rrect(c, X, Y + 60, Wd, Hd - 70, 0); c.clip();
+  let y = Y + 70;
+  st.stream.filter(r => r.t <= t).slice(0, 7).forEach((r, i) => {
+    const a = clamp((t - r.t) / .35), slide = (1 - eout(a)) * -20;
+    const lines = wrapLines(c, r.text, Wd - 70, (r.mono ? "600 19px ui-monospace, Menlo, monospace" : "600 20px " + MF)).slice(0, 2);
+    const h = 30 + lines.length * 26;
+    c.save(); c.globalAlpha = i === 0 ? a : Math.max(.35, 1 - i * .11); c.translate(0, slide);
+    rrect(c, X + 22, y, 4, h - 12, 2); c.fillStyle = r.col; c.fill();
+    T(c, r.badge, X + 40, y + 14, { size: 13, w: 700, color: r.col, ls: 1.2 });
+    lines.forEach((l, j) => T(c, l, X + 40, y + 42 + j * 26, { size: r.mono ? 19 : 20, w: 600, f: r.mono ? "ui-monospace, Menlo, monospace" : MF, color: r.mono ? C.teal : C.white }));
+    c.restore();
+    y += h + 8;
+  });
+  c.restore();
+}
+function captions(c, t, X, Wd) {
+  const clip = clipAt(t); if (!clip) return;
+  const who = clip.voice === "walker" ? "The walker" : clip.voice === "app" ? "Wayback (River)" : "Narrator";
+  const a = Math.min(seg(t, clip.t, clip.t + .15), 1 - seg(t, clip.t + clip.d, clip.t + clip.d + .25));
+  const s = who + ":  " + clip.text;
+  c.save(); c.font = "600 24px " + MF; let txt = s; while (c.measureText(txt).width > Wd - 40 && txt.length > 10) txt = txt.slice(0, -2); if (txt !== s) txt = txt.trimEnd() + "…";
+  const w = c.measureText(txt).width + 40; c.globalAlpha = a; rrect(c, X + Wd / 2 - w / 2, 1022, w, 44, 14); c.fillStyle = "rgba(0,0,0,.7)"; c.fill();
+  c.fillStyle = "#fff"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(txt, X + Wd / 2, 1045); c.restore();
+}
+
+/* ============================================================ scenes */
+function sceneMain(c, t) {
+  const st = stateAt(t);
+  c.fillStyle = "#050506"; c.fillRect(0, 0, W, H);
+  c.save(); c.globalCompositeOperation = "lighter"; glowBlob(c, 400, 540, 700, C.blue, .22); glowBlob(c, 1400, 300, 800, C.purple, .14); c.restore();
+  // left: the phone
+  pill(c, "● SIMULATED SCREEN RECORDING", 400, 34, { size: 16, align: "center", color: "#ff6961", fill: "rgba(255,69,58,.14)", stroke: "rgba(255,69,58,.4)" });
+  drawPhone(c, st, t, 400 - PW * 1.12 / 2, 72, 1.12);
+  // right: header, walker, panels
+  const X = 800, Wd = 1080;
+  T(c, "Wayback · working demo", X, 52, { size: 30, w: 800, grad: GLOW });
+  T(c, "A synthetic walk run through the real Wayback code: tracker, route graph, guidance and buzz coach", X, 84, { size: 16, w: 500, color: C.gray });
+  personPanel(c, st, t, X, 104, Wd, 420);
+  directionsCard(c, st, t, X, 544, 530, 300);
+  lightBuzzCard(c, st, t, X, 862, 530, 152);
+  streamCard(c, st, t, X + 550, 544, 530, 470);
+  captions(c, t, X, Wd);
+}
+function sceneIntro(c, t) {
+  c.fillStyle = "#000"; c.fillRect(0, 0, W, H);
+  c.save(); c.globalCompositeOperation = "lighter";
+  GLOW.forEach((col, i) => { const a = t * .4 + i; glowBlob(c, W / 2 + Math.cos(a) * 380, H / 2 + Math.sin(a) * 150, 480, col, .35 * seg(t, 0, 1.2)); }); c.restore();
+  const k = eout(seg(t, .2, 1.1));
+  c.save(); c.globalAlpha = k; c.translate(W / 2, 360); c.scale(.8 + .2 * k, .8 + .2 * k);
+  c.save(); rrect(c, -90, -90, 180, 180, 44); c.clip(); if (logo.complete) c.drawImage(logo, -90, -90, 180, 180); c.restore(); c.restore();
+  T(c, "Wayback", W / 2, 580, { size: 120, w: 800, align: "center", grad: GLOW, a: eout(seg(t, .5, 1.3)), ls: -3 });
+  T(c, "Working demo · Vexo band + iPhone app", W / 2, 650, { size: 36, w: 600, align: "center", color: "#d1d1d6", a: seg(t, .9, 1.5) });
+  pill(c, "Simulated screen recording, driven by the real app code on a synthetic walk", W / 2, 740, { size: 22, align: "center", color: "#d1d1d6", a: seg(t, 1.3, 1.9) });
+}
+function sceneOutro(c, t, lt) {
+  c.fillStyle = "#000"; c.fillRect(0, 0, W, H);
+  c.save(); c.globalCompositeOperation = "lighter"; GLOW.forEach((col, i) => { const a = t * .3 + i; glowBlob(c, W / 2 + Math.cos(a) * 420, H / 2 + Math.sin(a) * 160, 460, col, .3); }); c.restore();
+  const nodes = [["Vexo band mic", "double-tap, speak", C.blue], ["Deepgram", "speech to text", C.teal], ["Gemini 4", "picks the tool", C.indigo], ["Wayback code", "steps, turns, route", C.orange], ["ElevenLabs + buzz", "voice and haptics", C.purple]];
+  const nw = 300, gap = 52, x0 = (W - (nodes.length * nw + (nodes.length - 1) * gap)) / 2, y = 300;
+  nodes.forEach(([a, b, col], i) => { const k = espring(seg(lt, .1 + i * .18, .8 + i * .18)); if (k <= 0) return; const x = x0 + i * (nw + gap);
+    c.save(); c.globalAlpha = clamp(k); c.translate(x + nw / 2, y + 70); c.scale(k, k); c.translate(-(x + nw / 2), -(y + 70));
+    glass(c, x, y, nw, 140, 28, { stroke: hexA(col, .5) }); T(c, a, x + nw / 2, y + 62, { size: 26, w: 700, align: "center", color: col, max: nw - 24 }); T(c, b, x + nw / 2, y + 100, { size: 19, w: 500, align: "center", color: "#d1d1d6" }); c.restore();
+    if (i < nodes.length - 1 && k > .5) T(c, "→", x + nw + gap / 2, y + 82, { size: 34, w: 700, align: "center", color: C.gray }); });
+  T(c, "This is the", W / 2, 600, { size: 52, w: 500, align: "center", color: "#d1d1d6", a: seg(lt, 2.4, 3.0) });
+  T(c, "Wayback Trail.", W / 2, 720, { size: 120, w: 800, align: "center", grad: GLOW, a: eout(seg(lt, 2.7, 3.4)), ls: -3 });
+  T(c, "Simulated screen recording: a synthetic walk driven through the real Wayback code (app.py, tracker, route graph, guidance, buzz coach). Not live sensing.", W / 2, 990, { size: 18, w: 500, align: "center", color: C.gray, a: seg(lt, 1, 1.6) });
+  T(c, "Commands here use the app's keyword fallback; live, Gemini 4 picks the same tools. Experimental navigation aid, not a safety-critical system.", W / 2, 1020, { size: 18, w: 500, align: "center", color: C.gray, a: seg(lt, 1, 1.6) });
+}
+const layer = document.createElement("canvas"); layer.width = W; layer.height = H; const lc = layer.getContext("2d");
+function render(t) {
+  if (!P) return;
+  t = clamp(t, 0, DURATION);
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+  const I1 = 3.9, O0 = P.outro;
+  if (t < I1 + .8) { lc.clearRect(0, 0, W, H); sceneIntro(lc, t); }
+  if (t < I1) ctx.drawImage(layer, 0, 0);
+  else if (t < I1 + .8) {   // Apple-style zoom-through into the split screen
+    const k = eio((t - I1) / .8);
+    ctx.save(); ctx.globalAlpha = 1 - k; ctx.filter = "blur(" + k * 18 + "px)"; ctx.translate(W / 2, H / 2); ctx.scale(1 + k * .3, 1 + k * .3); ctx.drawImage(layer, -W / 2, -H / 2); ctx.restore();
+    lc.clearRect(0, 0, W, H); sceneMain(lc, t);
+    ctx.save(); ctx.globalAlpha = k; ctx.filter = "blur(" + (1 - k) * 18 + "px)"; ctx.translate(W / 2, H / 2); ctx.scale(.9 + .1 * k, .9 + .1 * k); ctx.drawImage(layer, -W / 2, -H / 2); ctx.restore();
+  } else if (t < O0) { sceneMain(ctx, t); }
+  else if (t < O0 + .8) {
+    const k = eio((t - O0) / .8);
+    lc.clearRect(0, 0, W, H); sceneMain(lc, t);
+    ctx.save(); ctx.globalAlpha = 1 - k; ctx.filter = "blur(" + k * 20 + "px)"; ctx.drawImage(layer, 0, 0); ctx.restore();
+    lc.clearRect(0, 0, W, H); sceneOutro(lc, t, t - O0);
+    ctx.save(); ctx.globalAlpha = k; ctx.filter = "blur(" + (1 - k) * 20 + "px)"; ctx.drawImage(layer, 0, 0); ctx.restore();
+  } else sceneOutro(ctx, t, t - O0);
+  if (t < O0 && t >= I1) {} // captions drawn inside sceneMain
+  else captionsFull(t);
+  const edge = Math.max(1 - seg(t, 0, .4), seg(t, 59.4, 60));
+  if (edge > 0) { ctx.fillStyle = "rgba(0,0,0," + edge + ")"; ctx.fillRect(0, 0, W, H); }
+}
+function captionsFull(t) { const clip = clipAt(t); if (!clip) return; const a = Math.min(seg(t, clip.t, clip.t + .15), 1 - seg(t, clip.t + clip.d, clip.t + clip.d + .25));
+  ctx.save(); ctx.font = "600 30px " + MF; const s = clip.text, w = ctx.measureText(s).width + 48; ctx.globalAlpha = a; rrect(ctx, W / 2 - w / 2, H - 196, w, 54, 16); ctx.fillStyle = "rgba(0,0,0,.65)"; ctx.fill();
+  ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(s, W / 2, H - 169); ctx.restore(); }
+
+/* ============================================================ playback */
+const params = new URLSearchParams(location.search), renderMode = params.has("render");
+if (renderMode) document.body.classList.add("render");
+const track = document.getElementById("track"), playBtn = document.getElementById("play"), scrub = document.getElementById("scrub"), timeEl = document.getElementById("time");
+let playing = false, t0 = 0, startAt = 0, now = 0;
+function fmt(s) { return Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0"); }
+function frame(ts) { if (playing) { now = !track.paused ? track.currentTime : startAt + (ts - t0) / 1000; if (now >= DURATION) { now = DURATION; stop(); } }
+  render(now); scrub.value = now; timeEl.textContent = fmt(now) + " / 1:00"; if (!renderMode) requestAnimationFrame(frame); }
+function start() { playing = true; playBtn.textContent = "Pause"; if (now >= DURATION) now = 0; startAt = now; t0 = performance.now(); track.currentTime = now; track.play().catch(() => {}); }
+function stop() { playing = false; playBtn.textContent = "Play"; track.pause(); }
+playBtn.onclick = () => playing ? stop() : start();
+scrub.oninput = () => { now = +scrub.value; if (playing) start(); };
+addEventListener("keydown", e => { if (e.code === "Space") { e.preventDefault(); playBtn.click(); } });
+window.__render = t => render(t);
+window.__ready = Promise.all([fetch("plan.json").then(r => r.json()).then(j => { P = j; }), document.fonts.ready,
+  document.fonts.load("800 40px Montserrat"), document.fonts.load("600 20px Inter"), new Promise(r => { if (logo.complete) r(); else { logo.onload = r; logo.onerror = r; } })]).then(() => true);
+window.__ready.then(() => { render(0); if (!renderMode) requestAnimationFrame(frame); });
+</script>
+</body>
+</html>

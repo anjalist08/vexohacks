@@ -1,0 +1,5974 @@
+{
+"note": "Synthetic walk driven through the real Wayback code (app.py, tracker/wrist.py, store/guidance.py, store/haptics.py). Not live sensing.",
+"t0": 1700000000.0,
+"samples": [
+{
+"t": 0.0,
+"x": 0.0,
+"y": 0.0,
+"heading": 0.0,
+"facing": 0.0,
+"steps": 0,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 0.12,
+"x": 0.0,
+"y": 0.0,
+"heading": 0.0,
+"facing": 0.0,
+"steps": 0,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 0.24,
+"x": 0.0,
+"y": 0.0,
+"heading": 0.0,
+"facing": 0.0,
+"steps": 0,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 0.36,
+"x": 0.0,
+"y": 0.0,
+"heading": 0.0,
+"facing": 0.0,
+"steps": 0,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 0.48,
+"x": 0.0,
+"y": 0.0,
+"heading": 0.0,
+"facing": 0.0,
+"steps": 0,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 0.6,
+"x": 0.0,
+"y": 0.0,
+"heading": 0.0,
+"facing": -0.0,
+"steps": 0,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 0.72,
+"x": 0.0,
+"y": 0.0,
+"heading": 0.0,
+"facing": 0.0,
+"steps": 0,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 0.84,
+"x": 0.0,
+"y": 0.0,
+"heading": 0.0,
+"facing": 0.0,
+"steps": 0,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 0.96,
+"x": 0.0,
+"y": 0.0,
+"heading": 0.0,
+"facing": 0.1,
+"steps": 0,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 1.08,
+"x": 0.0,
+"y": 0.0,
+"heading": 0.0,
+"facing": 0.1,
+"steps": 0,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 1.2,
+"x": 0.0,
+"y": 0.0,
+"heading": 0.0,
+"facing": 0.1,
+"steps": 0,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 1.32,
+"x": 0.0,
+"y": 0.0,
+"heading": 0.0,
+"facing": 0.0,
+"steps": 0,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 1.44,
+"x": 0.0,
+"y": 0.0,
+"heading": 0.0,
+"facing": -0.1,
+"steps": 0,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 1.56,
+"x": 0.0,
+"y": 0.0,
+"heading": 0.0,
+"facing": -0.1,
+"steps": 0,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 1.68,
+"x": 0.0,
+"y": 0.0,
+"heading": 0.0,
+"facing": -0.1,
+"steps": 0,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 1.8,
+"x": 0.0,
+"y": 0.0,
+"heading": 0.0,
+"facing": -0.1,
+"steps": 0,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 1.92,
+"x": 0.0,
+"y": 0.0,
+"heading": 0.0,
+"facing": -0.1,
+"steps": 0,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 2.04,
+"x": 0.0,
+"y": 0.0,
+"heading": 0.0,
+"facing": -0.2,
+"steps": 0,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 2.16,
+"x": 0.0,
+"y": 0.0,
+"heading": 0.0,
+"facing": -0.2,
+"steps": 0,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 2.28,
+"x": 0.0,
+"y": 0.0,
+"heading": 0.0,
+"facing": -0.3,
+"steps": 0,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 2.4,
+"x": 0.0,
+"y": 0.0,
+"heading": 0.0,
+"facing": -0.3,
+"steps": 0,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 2.52,
+"x": 0.0,
+"y": 0.0,
+"heading": 0.0,
+"facing": -0.4,
+"steps": 0,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 2.64,
+"x": 0.0,
+"y": 0.0,
+"heading": 0.0,
+"facing": -0.3,
+"steps": 0,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 2.76,
+"x": 0.0,
+"y": 0.0,
+"heading": 0.0,
+"facing": -0.3,
+"steps": 0,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 2.88,
+"x": 0.0,
+"y": 0.0,
+"heading": 0.0,
+"facing": -0.3,
+"steps": 0,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 3.0,
+"x": 0.0,
+"y": 0.0,
+"heading": 0.0,
+"facing": -0.3,
+"steps": 0,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 3.12,
+"x": 0.0,
+"y": 0.7,
+"heading": 0.0,
+"facing": -0.2,
+"steps": 1,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 3.24,
+"x": 0.0,
+"y": 0.7,
+"heading": 0.0,
+"facing": -0.2,
+"steps": 1,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 3.36,
+"x": 0.0,
+"y": 0.7,
+"heading": 0.0,
+"facing": -0.2,
+"steps": 1,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 3.48,
+"x": 0.0,
+"y": 0.7,
+"heading": 0.0,
+"facing": -0.2,
+"steps": 1,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 3.6,
+"x": 0.0,
+"y": 0.7,
+"heading": 0.0,
+"facing": -0.1,
+"steps": 1,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 3.72,
+"x": 0.0,
+"y": 1.4,
+"heading": 0.0,
+"facing": 0.0,
+"steps": 2,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 3.84,
+"x": 0.0,
+"y": 1.4,
+"heading": 0.0,
+"facing": 0.0,
+"steps": 2,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 3.96,
+"x": 0.0,
+"y": 1.4,
+"heading": 0.0,
+"facing": 0.1,
+"steps": 2,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 4.08,
+"x": 0.0,
+"y": 1.4,
+"heading": 0.0,
+"facing": 0.1,
+"steps": 2,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 4.2,
+"x": 0.0,
+"y": 2.1,
+"heading": 0.0,
+"facing": 0.2,
+"steps": 3,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 4.32,
+"x": 0.0,
+"y": 2.1,
+"heading": 0.0,
+"facing": 0.2,
+"steps": 3,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 4.44,
+"x": 0.0,
+"y": 2.1,
+"heading": 0.0,
+"facing": 0.2,
+"steps": 3,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 4.56,
+"x": 0.0,
+"y": 2.1,
+"heading": 0.0,
+"facing": 0.2,
+"steps": 3,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 4.68,
+"x": 0.0,
+"y": 2.1,
+"heading": 0.0,
+"facing": 0.2,
+"steps": 3,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 4.8,
+"x": 0.0,
+"y": 2.8,
+"heading": 0.0,
+"facing": 0.2,
+"steps": 4,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 4.92,
+"x": 0.0,
+"y": 2.8,
+"heading": 0.0,
+"facing": 0.1,
+"steps": 4,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 5.04,
+"x": 0.0,
+"y": 2.8,
+"heading": 0.0,
+"facing": 0.1,
+"steps": 4,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 5.16,
+"x": 0.0,
+"y": 2.8,
+"heading": 0.0,
+"facing": 0.0,
+"steps": 4,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 5.28,
+"x": 0.0,
+"y": 3.5,
+"heading": 0.0,
+"facing": -0.0,
+"steps": 5,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 5.4,
+"x": 0.0,
+"y": 3.5,
+"heading": 0.0,
+"facing": -0.1,
+"steps": 5,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 5.52,
+"x": 0.0,
+"y": 3.5,
+"heading": 0.0,
+"facing": -0.2,
+"steps": 5,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 5.64,
+"x": 0.0,
+"y": 3.5,
+"heading": 0.0,
+"facing": -0.2,
+"steps": 5,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 5.76,
+"x": 0.0,
+"y": 4.2,
+"heading": 0.0,
+"facing": -0.1,
+"steps": 6,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 5.88,
+"x": 0.0,
+"y": 4.2,
+"heading": 0.0,
+"facing": -0.1,
+"steps": 6,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 6.0,
+"x": 0.0,
+"y": 4.2,
+"heading": 0.0,
+"facing": -0.1,
+"steps": 6,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 6.12,
+"x": 0.0,
+"y": 4.2,
+"heading": 0.0,
+"facing": -0.1,
+"steps": 6,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 6.24,
+"x": 0.0,
+"y": 4.2,
+"heading": 0.0,
+"facing": -0.1,
+"steps": 6,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 6.36,
+"x": 0.0,
+"y": 4.9,
+"heading": 0.0,
+"facing": -0.1,
+"steps": 7,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 6.48,
+"x": 0.0,
+"y": 4.9,
+"heading": 0.0,
+"facing": -0.1,
+"steps": 7,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 6.6,
+"x": 0.0,
+"y": 4.9,
+"heading": 0.0,
+"facing": -0.2,
+"steps": 7,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 6.72,
+"x": 0.0,
+"y": 4.9,
+"heading": 0.0,
+"facing": -0.3,
+"steps": 7,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 6.84,
+"x": 0.0,
+"y": 4.9,
+"heading": 0.0,
+"facing": -0.4,
+"steps": 7,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 6.96,
+"x": 0.0,
+"y": 5.6,
+"heading": 0.0,
+"facing": -0.4,
+"steps": 8,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 7.08,
+"x": 0.0,
+"y": 5.6,
+"heading": 0.0,
+"facing": -0.4,
+"steps": 8,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 7.2,
+"x": 0.0,
+"y": 5.6,
+"heading": 0.0,
+"facing": -0.3,
+"steps": 8,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 7.32,
+"x": 0.0,
+"y": 5.6,
+"heading": 0.0,
+"facing": -0.3,
+"steps": 8,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 7.44,
+"x": 0.0,
+"y": 6.3,
+"heading": 0.0,
+"facing": -0.2,
+"steps": 9,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 7.56,
+"x": 0.0,
+"y": 6.3,
+"heading": 0.0,
+"facing": -0.2,
+"steps": 9,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 7.68,
+"x": 0.0,
+"y": 6.3,
+"heading": 0.0,
+"facing": -0.3,
+"steps": 9,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 7.8,
+"x": 0.0,
+"y": 6.3,
+"heading": 0.0,
+"facing": -0.5,
+"steps": 9,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 7.92,
+"x": 0.0,
+"y": 6.3,
+"heading": 0.0,
+"facing": -0.5,
+"steps": 9,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 8.04,
+"x": 0.0,
+"y": 7.0,
+"heading": 0.0,
+"facing": -0.5,
+"steps": 10,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 8.16,
+"x": 0.0,
+"y": 7.0,
+"heading": 0.0,
+"facing": -0.5,
+"steps": 10,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 8.28,
+"x": 0.0,
+"y": 7.0,
+"heading": 0.0,
+"facing": -0.5,
+"steps": 10,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 8.4,
+"x": 0.0,
+"y": 7.0,
+"heading": 0.0,
+"facing": -0.4,
+"steps": 10,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 8.52,
+"x": 0.0,
+"y": 7.0,
+"heading": 0.0,
+"facing": -0.4,
+"steps": 10,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 8.64,
+"x": 0.0,
+"y": 7.7,
+"heading": 0.0,
+"facing": -0.5,
+"steps": 11,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 8.76,
+"x": 0.0,
+"y": 7.7,
+"heading": 0.0,
+"facing": -0.6,
+"steps": 11,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 8.88,
+"x": 0.0,
+"y": 7.7,
+"heading": 0.0,
+"facing": -0.7,
+"steps": 11,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 9.0,
+"x": 0.0,
+"y": 7.7,
+"heading": 0.0,
+"facing": -0.6,
+"steps": 11,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 9.12,
+"x": 0.0,
+"y": 8.4,
+"heading": 0.0,
+"facing": -0.5,
+"steps": 12,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 9.24,
+"x": 0.0,
+"y": 8.4,
+"heading": 0.0,
+"facing": 0.5,
+"steps": 12,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 9.36,
+"x": 0.0,
+"y": 8.4,
+"heading": 0.0,
+"facing": 3.1,
+"steps": 12,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 9.48,
+"x": 0.0,
+"y": 8.4,
+"heading": 0.0,
+"facing": 7.8,
+"steps": 12,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 9.6,
+"x": 0.0,
+"y": 8.4,
+"heading": 0.0,
+"facing": 14.3,
+"steps": 12,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 9.72,
+"x": 0.0,
+"y": 8.4,
+"heading": 0.0,
+"facing": 22.6,
+"steps": 12,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 9.84,
+"x": 0.0,
+"y": 8.4,
+"heading": 0.0,
+"facing": 32.2,
+"steps": 12,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 9.96,
+"x": 0.0,
+"y": 8.4,
+"heading": 0.0,
+"facing": 42.5,
+"steps": 12,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 10.08,
+"x": 0.0,
+"y": 8.4,
+"heading": 0.0,
+"facing": 52.9,
+"steps": 12,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 10.2,
+"x": 0.0,
+"y": 8.4,
+"heading": 0.0,
+"facing": 62.8,
+"steps": 12,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 10.32,
+"x": 0.0,
+"y": 8.4,
+"heading": 0.0,
+"facing": 71.5,
+"steps": 12,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 10.44,
+"x": 0.0,
+"y": 8.4,
+"heading": 0.0,
+"facing": 78.4,
+"steps": 12,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 10.56,
+"x": 0.0,
+"y": 8.4,
+"heading": 0.0,
+"facing": 83.2,
+"steps": 12,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 10.68,
+"x": 0.0,
+"y": 8.4,
+"heading": 0.0,
+"facing": 85.9,
+"steps": 12,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 10.8,
+"x": 0.0,
+"y": 8.4,
+"heading": 0.0,
+"facing": 87.5,
+"steps": 12,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 10.92,
+"x": 0.0,
+"y": 8.4,
+"heading": 0.0,
+"facing": 88.3,
+"steps": 12,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 11.04,
+"x": 0.0,
+"y": 8.4,
+"heading": 0.0,
+"facing": 88.7,
+"steps": 12,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 11.16,
+"x": 0.0,
+"y": 9.1,
+"heading": 0.0,
+"facing": 88.9,
+"steps": 13,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 11.28,
+"x": 0.0,
+"y": 9.1,
+"heading": 0.0,
+"facing": 89.1,
+"steps": 13,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 11.4,
+"x": 0.0,
+"y": 9.1,
+"heading": 0.0,
+"facing": 89.2,
+"steps": 13,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 11.52,
+"x": 0.0,
+"y": 9.1,
+"heading": 0.0,
+"facing": 89.3,
+"steps": 13,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 11.64,
+"x": 0.0,
+"y": 9.1,
+"heading": 0.0,
+"facing": 89.4,
+"steps": 13,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 11.76,
+"x": 0.7,
+"y": 9.1,
+"heading": 90.0,
+"facing": 89.4,
+"steps": 14,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 11.88,
+"x": 0.7,
+"y": 9.1,
+"heading": 90.0,
+"facing": 89.4,
+"steps": 14,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 12.0,
+"x": 0.7,
+"y": 9.1,
+"heading": 90.0,
+"facing": 89.4,
+"steps": 14,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 12.12,
+"x": 0.7,
+"y": 9.1,
+"heading": 90.0,
+"facing": 89.4,
+"steps": 14,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 12.24,
+"x": 1.4,
+"y": 9.1,
+"heading": 90.0,
+"facing": 89.3,
+"steps": 15,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 12.36,
+"x": 1.4,
+"y": 9.1,
+"heading": 90.0,
+"facing": 89.3,
+"steps": 15,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 12.48,
+"x": 1.4,
+"y": 9.1,
+"heading": 90.0,
+"facing": 89.3,
+"steps": 15,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 12.6,
+"x": 1.4,
+"y": 9.1,
+"heading": 90.0,
+"facing": 89.3,
+"steps": 15,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 12.72,
+"x": 1.4,
+"y": 9.1,
+"heading": 90.0,
+"facing": 89.3,
+"steps": 15,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 12.84,
+"x": 2.1,
+"y": 9.1,
+"heading": 90.0,
+"facing": 89.3,
+"steps": 16,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 12.96,
+"x": 2.1,
+"y": 9.1,
+"heading": 90.0,
+"facing": 89.3,
+"steps": 16,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 13.08,
+"x": 2.1,
+"y": 9.1,
+"heading": 90.0,
+"facing": 89.2,
+"steps": 16,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 13.2,
+"x": 2.1,
+"y": 9.1,
+"heading": 90.0,
+"facing": 89.1,
+"steps": 16,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 13.32,
+"x": 2.1,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.9,
+"steps": 16,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 13.44,
+"x": 2.8,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.8,
+"steps": 17,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 13.56,
+"x": 2.8,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.8,
+"steps": 17,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 13.68,
+"x": 2.8,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.9,
+"steps": 17,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 13.8,
+"x": 2.8,
+"y": 9.1,
+"heading": 90.0,
+"facing": 89.0,
+"steps": 17,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 13.92,
+"x": 3.5,
+"y": 9.1,
+"heading": 90.0,
+"facing": 89.0,
+"steps": 18,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 14.04,
+"x": 3.5,
+"y": 9.1,
+"heading": 90.0,
+"facing": 89.0,
+"steps": 18,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 14.16,
+"x": 3.5,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.9,
+"steps": 18,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 14.28,
+"x": 3.5,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.8,
+"steps": 18,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 14.4,
+"x": 3.5,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.8,
+"steps": 18,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 14.52,
+"x": 4.2,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.8,
+"steps": 19,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 14.64,
+"x": 4.2,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 19,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 14.76,
+"x": 4.2,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 19,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 14.88,
+"x": 4.2,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 19,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 15.0,
+"x": 4.9,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.7,
+"steps": 20,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 15.12,
+"x": 4.9,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.7,
+"steps": 20,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 15.24,
+"x": 4.9,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.7,
+"steps": 20,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 15.36,
+"x": 4.9,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.8,
+"steps": 20,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 15.48,
+"x": 4.9,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.8,
+"steps": 20,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 15.6,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.8,
+"steps": 21,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 15.72,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.8,
+"steps": 21,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 15.84,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.8,
+"steps": 21,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 15.96,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.8,
+"steps": 21,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 16.08,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.8,
+"steps": 21,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 16.2,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.8,
+"steps": 21,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 16.32,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.8,
+"steps": 21,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 16.44,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 21,
+"led": "landmark_saved",
+"hint": {
+"type": "haptic_hint",
+"active": false
+},
+"guiding": false
+},
+{
+"t": 16.56,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -178.6,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 16.68,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -178.6,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 16.8,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -178.6,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 16.92,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -178.6,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 17.04,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -178.6,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 17.16,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -178.6,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 17.28,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -178.6,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 17.4,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -178.6,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 17.52,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -178.6,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 17.64,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -178.6,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 17.76,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -178.6,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 17.88,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -178.6,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 18.0,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -178.6,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 18.12,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -178.6,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 18.24,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -178.6,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 18.36,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -178.6,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 18.48,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -178.6,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 18.6,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -178.6,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 18.72,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -178.6,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 18.84,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -178.6,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 18.96,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -178.6,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 19.08,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -178.6,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 19.2,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.6,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -178.6,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 19.32,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.5,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -178.6,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 19.44,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 88.5,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -178.5,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 19.56,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 87.5,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -178.5,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 19.68,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 84.0,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -175.5,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 19.8,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 77.0,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -175.5,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 19.92,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 66.3,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -160.3,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 20.04,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 52.3,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -160.3,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 20.16,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 35.5,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -131.3,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 20.28,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": 16.7,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -131.3,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 20.4,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": -3.1,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -93.5,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 20.52,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": -22.7,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -93.5,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 20.64,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": -41.2,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -54.8,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 20.76,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": -57.3,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -54.8,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 20.88,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": -70.4,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -23.5,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 21.0,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": -79.7,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -23.5,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 21.12,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": -85.1,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -6.4,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 21.24,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": -88.0,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -6.4,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 21.36,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": -89.6,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -0.9,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 21.48,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": -90.5,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -0.9,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 21.6,
+"x": 5.6,
+"y": 9.1,
+"heading": 90.0,
+"facing": -91.0,
+"steps": 21,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 0.9,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 21.72,
+"x": 5.6,
+"y": 9.8,
+"heading": 0.0,
+"facing": -91.3,
+"steps": 22,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 0.9,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 21.84,
+"x": 5.6,
+"y": 9.8,
+"heading": 0.0,
+"facing": -91.5,
+"steps": 22,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 1.4,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 21.96,
+"x": 5.6,
+"y": 9.8,
+"heading": 0.0,
+"facing": -91.6,
+"steps": 22,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 1.4,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 22.08,
+"x": 5.6,
+"y": 9.8,
+"heading": 0.0,
+"facing": -91.7,
+"steps": 22,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 1.7,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 22.2,
+"x": 4.9,
+"y": 9.8,
+"heading": -90.0,
+"facing": -91.8,
+"steps": 23,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 1.7,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": "left",
+"leg": 0,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 22.32,
+"x": 4.9,
+"y": 9.8,
+"heading": -90.0,
+"facing": -91.8,
+"steps": 23,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 1.8,
+"target": "entrance",
+"steps_left": 7,
+"next_turn": "left",
+"leg": 0,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 22.44,
+"x": 4.9,
+"y": 9.8,
+"heading": -90.0,
+"facing": -91.8,
+"steps": 23,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 1.8,
+"target": "entrance",
+"steps_left": 7,
+"next_turn": "left",
+"leg": 0,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 22.56,
+"x": 4.9,
+"y": 9.8,
+"heading": -90.0,
+"facing": -91.9,
+"steps": 23,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 1.9,
+"target": "entrance",
+"steps_left": 7,
+"next_turn": "left",
+"leg": 0,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 22.68,
+"x": 4.2,
+"y": 9.8,
+"heading": -90.0,
+"facing": -92.0,
+"steps": 24,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 1.9,
+"target": "entrance",
+"steps_left": 7,
+"next_turn": "left",
+"leg": 0,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 22.8,
+"x": 4.2,
+"y": 9.8,
+"heading": -90.0,
+"facing": -92.1,
+"steps": 24,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.0,
+"target": "entrance",
+"steps_left": 6,
+"next_turn": "left",
+"leg": 0,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 22.92,
+"x": 4.2,
+"y": 9.8,
+"heading": -90.0,
+"facing": -92.0,
+"steps": 24,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.0,
+"target": "entrance",
+"steps_left": 6,
+"next_turn": "left",
+"leg": 0,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 23.04,
+"x": 4.2,
+"y": 9.8,
+"heading": -90.0,
+"facing": -92.0,
+"steps": 24,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.0,
+"target": "entrance",
+"steps_left": 6,
+"next_turn": "left",
+"leg": 0,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 23.16,
+"x": 4.2,
+"y": 9.8,
+"heading": -90.0,
+"facing": -91.9,
+"steps": 24,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.0,
+"target": "entrance",
+"steps_left": 6,
+"next_turn": "left",
+"leg": 0,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 23.28,
+"x": 3.5,
+"y": 9.8,
+"heading": -90.0,
+"facing": -91.8,
+"steps": 25,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 1.8,
+"target": "entrance",
+"steps_left": 5,
+"next_turn": "left",
+"leg": 0,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 23.4,
+"x": 3.5,
+"y": 9.8,
+"heading": -90.0,
+"facing": -91.8,
+"steps": 25,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 1.8,
+"target": "entrance",
+"steps_left": 5,
+"next_turn": "left",
+"leg": 0,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 23.52,
+"x": 3.5,
+"y": 9.8,
+"heading": -90.0,
+"facing": -91.8,
+"steps": 25,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 1.8,
+"target": "entrance",
+"steps_left": 5,
+"next_turn": "left",
+"leg": 0,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 23.64,
+"x": 3.5,
+"y": 9.8,
+"heading": -90.0,
+"facing": -91.9,
+"steps": 25,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 1.8,
+"target": "entrance",
+"steps_left": 5,
+"next_turn": "left",
+"leg": 0,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 23.76,
+"x": 3.5,
+"y": 9.8,
+"heading": -90.0,
+"facing": -91.9,
+"steps": 25,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 1.9,
+"target": "entrance",
+"steps_left": 5,
+"next_turn": "left",
+"leg": 0,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 23.88,
+"x": 2.8,
+"y": 9.8,
+"heading": -90.0,
+"facing": -92.0,
+"steps": 26,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 1.9,
+"target": "entrance",
+"steps_left": 5,
+"next_turn": "left",
+"leg": 0,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 24.0,
+"x": 2.8,
+"y": 9.8,
+"heading": -90.0,
+"facing": -92.0,
+"steps": 26,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.0,
+"target": "entrance",
+"steps_left": 4,
+"next_turn": "left",
+"leg": 0,
+"state": "turn_soon"
+},
+"guiding": true
+},
+{
+"t": 24.12,
+"x": 2.8,
+"y": 9.8,
+"heading": -90.0,
+"facing": -92.0,
+"steps": 26,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.0,
+"target": "entrance",
+"steps_left": 4,
+"next_turn": "left",
+"leg": 0,
+"state": "turn_soon"
+},
+"guiding": true
+},
+{
+"t": 24.24,
+"x": 2.8,
+"y": 9.8,
+"heading": -90.0,
+"facing": -92.0,
+"steps": 26,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.0,
+"target": "entrance",
+"steps_left": 4,
+"next_turn": "left",
+"leg": 0,
+"state": "turn_soon"
+},
+"guiding": true
+},
+{
+"t": 24.36,
+"x": 2.1,
+"y": 9.8,
+"heading": -90.0,
+"facing": -92.0,
+"steps": 27,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.0,
+"target": "entrance",
+"steps_left": 4,
+"next_turn": "left",
+"leg": 0,
+"state": "turn_soon"
+},
+"guiding": true
+},
+{
+"t": 24.48,
+"x": 2.1,
+"y": 9.8,
+"heading": -90.0,
+"facing": -92.1,
+"steps": 27,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.1,
+"target": "entrance",
+"steps_left": 3,
+"next_turn": "left",
+"leg": 0,
+"state": "turn_soon"
+},
+"guiding": true
+},
+{
+"t": 24.6,
+"x": 2.1,
+"y": 9.8,
+"heading": -90.0,
+"facing": -92.2,
+"steps": 27,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.1,
+"target": "entrance",
+"steps_left": 3,
+"next_turn": "left",
+"leg": 0,
+"state": "turn_soon"
+},
+"guiding": true
+},
+{
+"t": 24.72,
+"x": 2.1,
+"y": 9.8,
+"heading": -90.0,
+"facing": -92.3,
+"steps": 27,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.2,
+"target": "entrance",
+"steps_left": 3,
+"next_turn": "left",
+"leg": 0,
+"state": "turn_soon"
+},
+"guiding": true
+},
+{
+"t": 24.84,
+"x": 1.4,
+"y": 9.8,
+"heading": -90.0,
+"facing": -92.3,
+"steps": 28,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.2,
+"target": "entrance",
+"steps_left": 3,
+"next_turn": "left",
+"leg": 0,
+"state": "turn_soon"
+},
+"guiding": true
+},
+{
+"t": 24.96,
+"x": 1.4,
+"y": 9.8,
+"heading": -90.0,
+"facing": -92.4,
+"steps": 28,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.4,
+"target": "entrance",
+"steps_left": 2,
+"next_turn": "left",
+"leg": 0,
+"state": "turn_soon"
+},
+"guiding": true
+},
+{
+"t": 25.08,
+"x": 1.4,
+"y": 9.8,
+"heading": -90.0,
+"facing": -92.4,
+"steps": 28,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.4,
+"target": "entrance",
+"steps_left": 2,
+"next_turn": "left",
+"leg": 0,
+"state": "turn_soon"
+},
+"guiding": true
+},
+{
+"t": 25.2,
+"x": 1.4,
+"y": 9.8,
+"heading": -90.0,
+"facing": -92.4,
+"steps": 28,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.4,
+"target": "entrance",
+"steps_left": 2,
+"next_turn": "left",
+"leg": 0,
+"state": "turn_soon"
+},
+"guiding": true
+},
+{
+"t": 25.32,
+"x": 1.4,
+"y": 9.8,
+"heading": -90.0,
+"facing": -92.4,
+"steps": 28,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.4,
+"target": "entrance",
+"steps_left": 2,
+"next_turn": "left",
+"leg": 0,
+"state": "turn_soon"
+},
+"guiding": true
+},
+{
+"t": 25.44,
+"x": 0.7,
+"y": 9.8,
+"heading": -90.0,
+"facing": -92.4,
+"steps": 29,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.4,
+"target": "entrance",
+"steps_left": 2,
+"next_turn": "left",
+"leg": 0,
+"state": "turn_soon"
+},
+"guiding": true
+},
+{
+"t": 25.56,
+"x": 0.7,
+"y": 9.8,
+"heading": -90.0,
+"facing": -92.4,
+"steps": 29,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.4,
+"target": "entrance",
+"steps_left": 2,
+"next_turn": "left",
+"leg": 0,
+"state": "turn_soon"
+},
+"guiding": true
+},
+{
+"t": 25.68,
+"x": 0.7,
+"y": 9.8,
+"heading": -90.0,
+"facing": -92.4,
+"steps": 29,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.4,
+"target": "entrance",
+"steps_left": 1,
+"next_turn": "left",
+"leg": 0,
+"state": "turn_soon"
+},
+"guiding": true
+},
+{
+"t": 25.8,
+"x": 0.7,
+"y": 9.8,
+"heading": -90.0,
+"facing": -92.4,
+"steps": 29,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.4,
+"target": "entrance",
+"steps_left": 1,
+"next_turn": "left",
+"leg": 0,
+"state": "turn_soon"
+},
+"guiding": true
+},
+{
+"t": 25.92,
+"x": -0.0,
+"y": 9.8,
+"heading": -90.0,
+"facing": -92.4,
+"steps": 30,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.4,
+"target": "entrance",
+"steps_left": 1,
+"next_turn": "left",
+"leg": 0,
+"state": "turn_soon"
+},
+"guiding": true
+},
+{
+"t": 26.04,
+"x": -0.0,
+"y": 9.8,
+"heading": -90.0,
+"facing": -92.5,
+"steps": 30,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.4,
+"target": "entrance",
+"steps_left": 1,
+"next_turn": "left",
+"leg": 0,
+"state": "turn_soon"
+},
+"guiding": true
+},
+{
+"t": 26.16,
+"x": -0.0,
+"y": 9.8,
+"heading": -90.0,
+"facing": -93.6,
+"steps": 30,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -86.9,
+"target": "entrance",
+"steps_left": 14,
+"next_turn": null,
+"leg": 1
+},
+"guiding": true
+},
+{
+"t": 26.28,
+"x": -0.0,
+"y": 9.8,
+"heading": -90.0,
+"facing": -96.4,
+"steps": 30,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -86.9,
+"target": "entrance",
+"steps_left": 14,
+"next_turn": null,
+"leg": 1
+},
+"guiding": true
+},
+{
+"t": 26.4,
+"x": -0.0,
+"y": 9.8,
+"heading": -90.0,
+"facing": -101.0,
+"steps": 30,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -80.7,
+"target": "entrance",
+"steps_left": 14,
+"next_turn": null,
+"leg": 1,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 26.52,
+"x": -0.0,
+"y": 9.8,
+"heading": -90.0,
+"facing": -107.4,
+"steps": 30,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -80.7,
+"target": "entrance",
+"steps_left": 14,
+"next_turn": null,
+"leg": 1,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 26.64,
+"x": -0.0,
+"y": 9.8,
+"heading": -90.0,
+"facing": -115.3,
+"steps": 30,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -67.5,
+"target": "entrance",
+"steps_left": 14,
+"next_turn": null,
+"leg": 1,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 26.76,
+"x": -0.0,
+"y": 9.8,
+"heading": -90.0,
+"facing": -124.4,
+"steps": 30,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -67.5,
+"target": "entrance",
+"steps_left": 14,
+"next_turn": null,
+"leg": 1,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 26.88,
+"x": -0.0,
+"y": 9.8,
+"heading": -90.0,
+"facing": -134.1,
+"steps": 30,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -49.1,
+"target": "entrance",
+"steps_left": 14,
+"next_turn": null,
+"leg": 1,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 27.0,
+"x": -0.0,
+"y": 9.8,
+"heading": -90.0,
+"facing": -143.9,
+"steps": 30,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -49.1,
+"target": "entrance",
+"steps_left": 14,
+"next_turn": null,
+"leg": 1,
+"state": "wrong_left"
+},
+"guiding": true
+},
+{
+"t": 27.12,
+"x": -0.0,
+"y": 9.8,
+"heading": -90.0,
+"facing": -153.4,
+"steps": 30,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -29.7,
+"target": "entrance",
+"steps_left": 14,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 27.24,
+"x": -0.0,
+"y": 9.8,
+"heading": -90.0,
+"facing": -162.0,
+"steps": 30,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -29.7,
+"target": "entrance",
+"steps_left": 14,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 27.36,
+"x": -0.0,
+"y": 9.8,
+"heading": -90.0,
+"facing": -169.1,
+"steps": 30,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -13.1,
+"target": "entrance",
+"steps_left": 14,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 27.48,
+"x": -0.0,
+"y": 9.8,
+"heading": -90.0,
+"facing": -174.4,
+"steps": 30,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -13.1,
+"target": "entrance",
+"steps_left": 14,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 27.6,
+"x": -0.0,
+"y": 9.8,
+"heading": -90.0,
+"facing": -177.7,
+"steps": 30,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -3.2,
+"target": "entrance",
+"steps_left": 14,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 27.72,
+"x": -0.0,
+"y": 9.8,
+"heading": -90.0,
+"facing": -179.6,
+"steps": 30,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": -3.2,
+"target": "entrance",
+"steps_left": 14,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 27.84,
+"x": -0.0,
+"y": 9.8,
+"heading": -90.0,
+"facing": -180.6,
+"steps": 30,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 0.4,
+"target": "entrance",
+"steps_left": 14,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 27.96,
+"x": -0.0,
+"y": 9.8,
+"heading": -90.0,
+"facing": -181.1,
+"steps": 30,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 0.4,
+"target": "entrance",
+"steps_left": 14,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 28.08,
+"x": -0.0,
+"y": 9.8,
+"heading": -90.0,
+"facing": -181.4,
+"steps": 30,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 1.3,
+"target": "entrance",
+"steps_left": 14,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 28.2,
+"x": -0.7,
+"y": 9.8,
+"heading": -90.0,
+"facing": -181.6,
+"steps": 31,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 1.3,
+"target": "entrance",
+"steps_left": 14,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 28.32,
+"x": -0.7,
+"y": 9.8,
+"heading": -90.0,
+"facing": -181.7,
+"steps": 31,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 1.7,
+"target": "entrance",
+"steps_left": 14,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 28.44,
+"x": -0.7,
+"y": 9.8,
+"heading": -90.0,
+"facing": -181.8,
+"steps": 31,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 1.7,
+"target": "entrance",
+"steps_left": 14,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 28.56,
+"x": -0.7,
+"y": 9.8,
+"heading": -90.0,
+"facing": -181.9,
+"steps": 31,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 1.8,
+"target": "entrance",
+"steps_left": 14,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 28.68,
+"x": -0.7,
+"y": 9.1,
+"heading": 180.0,
+"facing": -182.0,
+"steps": 32,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 1.8,
+"target": "entrance",
+"steps_left": 14,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 28.8,
+"x": -0.7,
+"y": 9.1,
+"heading": 180.0,
+"facing": -182.1,
+"steps": 32,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.0,
+"target": "entrance",
+"steps_left": 13,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 28.92,
+"x": -0.7,
+"y": 9.1,
+"heading": 180.0,
+"facing": -182.1,
+"steps": 32,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.0,
+"target": "entrance",
+"steps_left": 13,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 29.04,
+"x": -0.7,
+"y": 9.1,
+"heading": 180.0,
+"facing": -182.1,
+"steps": 32,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.1,
+"target": "entrance",
+"steps_left": 13,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 29.16,
+"x": -0.7,
+"y": 9.1,
+"heading": 180.0,
+"facing": -182.1,
+"steps": 32,
+"led": "turn_now",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.1,
+"target": "entrance",
+"steps_left": 13,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 29.28,
+"x": -0.7,
+"y": 8.4,
+"heading": 180.0,
+"facing": -182.2,
+"steps": 33,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.2,
+"target": "entrance",
+"steps_left": 12,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 29.4,
+"x": -0.7,
+"y": 8.4,
+"heading": 180.0,
+"facing": -182.2,
+"steps": 33,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.2,
+"target": "entrance",
+"steps_left": 12,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 29.52,
+"x": -0.7,
+"y": 8.4,
+"heading": 180.0,
+"facing": -182.2,
+"steps": 33,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.2,
+"target": "entrance",
+"steps_left": 12,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 29.64,
+"x": -0.7,
+"y": 8.4,
+"heading": 180.0,
+"facing": -182.2,
+"steps": 33,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.2,
+"target": "entrance",
+"steps_left": 12,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 29.76,
+"x": -0.7,
+"y": 7.7,
+"heading": 180.0,
+"facing": -182.2,
+"steps": 34,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.2,
+"target": "entrance",
+"steps_left": 11,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 29.88,
+"x": -0.7,
+"y": 7.7,
+"heading": 180.0,
+"facing": -182.2,
+"steps": 34,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.2,
+"target": "entrance",
+"steps_left": 11,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 30.0,
+"x": -0.7,
+"y": 7.7,
+"heading": 180.0,
+"facing": -182.2,
+"steps": 34,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.2,
+"target": "entrance",
+"steps_left": 11,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 30.12,
+"x": -0.7,
+"y": 7.7,
+"heading": 180.0,
+"facing": -182.2,
+"steps": 34,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.2,
+"target": "entrance",
+"steps_left": 11,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 30.24,
+"x": -0.7,
+"y": 7.7,
+"heading": 180.0,
+"facing": -182.2,
+"steps": 34,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.2,
+"target": "entrance",
+"steps_left": 11,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 30.36,
+"x": -0.7,
+"y": 7.0,
+"heading": 180.0,
+"facing": -182.2,
+"steps": 35,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.2,
+"target": "entrance",
+"steps_left": 11,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 30.48,
+"x": -0.7,
+"y": 7.0,
+"heading": 180.0,
+"facing": -182.3,
+"steps": 35,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.3,
+"target": "entrance",
+"steps_left": 10,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 30.6,
+"x": -0.7,
+"y": 7.0,
+"heading": 180.0,
+"facing": -182.3,
+"steps": 35,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.3,
+"target": "entrance",
+"steps_left": 10,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 30.72,
+"x": -0.7,
+"y": 7.0,
+"heading": 180.0,
+"facing": -182.3,
+"steps": 35,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.3,
+"target": "entrance",
+"steps_left": 10,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 30.84,
+"x": -0.7,
+"y": 6.3,
+"heading": 180.0,
+"facing": -182.3,
+"steps": 36,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.3,
+"target": "entrance",
+"steps_left": 10,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 30.96,
+"x": -0.7,
+"y": 6.3,
+"heading": 180.0,
+"facing": -182.4,
+"steps": 36,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.4,
+"target": "entrance",
+"steps_left": 9,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 31.08,
+"x": -0.7,
+"y": 6.3,
+"heading": 180.0,
+"facing": -182.4,
+"steps": 36,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.4,
+"target": "entrance",
+"steps_left": 9,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 31.2,
+"x": -0.7,
+"y": 6.3,
+"heading": 180.0,
+"facing": -182.4,
+"steps": 36,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.4,
+"target": "entrance",
+"steps_left": 9,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 31.32,
+"x": -0.7,
+"y": 6.3,
+"heading": 180.0,
+"facing": -182.4,
+"steps": 36,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.4,
+"target": "entrance",
+"steps_left": 9,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 31.44,
+"x": -0.7,
+"y": 5.6,
+"heading": 180.0,
+"facing": -182.4,
+"steps": 37,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.4,
+"target": "entrance",
+"steps_left": 9,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 31.56,
+"x": -0.7,
+"y": 5.6,
+"heading": 180.0,
+"facing": -182.4,
+"steps": 37,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.4,
+"target": "entrance",
+"steps_left": 9,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 31.68,
+"x": -0.7,
+"y": 5.6,
+"heading": 180.0,
+"facing": -182.3,
+"steps": 37,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.3,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 31.8,
+"x": -0.7,
+"y": 5.6,
+"heading": 180.0,
+"facing": -182.3,
+"steps": 37,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.3,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 31.92,
+"x": -0.7,
+"y": 4.9,
+"heading": 180.0,
+"facing": -182.2,
+"steps": 38,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.3,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 32.04,
+"x": -0.7,
+"y": 4.9,
+"heading": 180.0,
+"facing": -182.2,
+"steps": 38,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.3,
+"target": "entrance",
+"steps_left": 8,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 32.16,
+"x": -0.7,
+"y": 4.9,
+"heading": 180.0,
+"facing": -182.2,
+"steps": 38,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.2,
+"target": "entrance",
+"steps_left": 7,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 32.28,
+"x": -0.7,
+"y": 4.9,
+"heading": 180.0,
+"facing": -182.2,
+"steps": 38,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.2,
+"target": "entrance",
+"steps_left": 7,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 32.4,
+"x": -0.7,
+"y": 4.9,
+"heading": 180.0,
+"facing": -182.2,
+"steps": 38,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.2,
+"target": "entrance",
+"steps_left": 7,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 32.52,
+"x": -0.7,
+"y": 4.2,
+"heading": 180.0,
+"facing": -182.2,
+"steps": 39,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.2,
+"target": "entrance",
+"steps_left": 7,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 32.64,
+"x": -0.7,
+"y": 4.2,
+"heading": 180.0,
+"facing": -182.3,
+"steps": 39,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.2,
+"target": "entrance",
+"steps_left": 6,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 32.76,
+"x": -0.7,
+"y": 4.2,
+"heading": 180.0,
+"facing": -182.3,
+"steps": 39,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.2,
+"target": "entrance",
+"steps_left": 6,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 32.88,
+"x": -0.7,
+"y": 4.2,
+"heading": 180.0,
+"facing": -182.4,
+"steps": 39,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.4,
+"target": "entrance",
+"steps_left": 6,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 33.0,
+"x": -0.7,
+"y": 4.2,
+"heading": 180.0,
+"facing": -182.4,
+"steps": 39,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.4,
+"target": "entrance",
+"steps_left": 6,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 33.12,
+"x": -0.7,
+"y": 3.5,
+"heading": 180.0,
+"facing": -182.4,
+"steps": 40,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.4,
+"target": "entrance",
+"steps_left": 5,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 33.24,
+"x": -0.7,
+"y": 3.5,
+"heading": 180.0,
+"facing": -182.4,
+"steps": 40,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.4,
+"target": "entrance",
+"steps_left": 5,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 33.36,
+"x": -0.7,
+"y": 3.5,
+"heading": 180.0,
+"facing": -182.5,
+"steps": 40,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.5,
+"target": "entrance",
+"steps_left": 5,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 33.48,
+"x": -0.7,
+"y": 3.5,
+"heading": 180.0,
+"facing": -182.6,
+"steps": 40,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.5,
+"target": "entrance",
+"steps_left": 5,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 33.6,
+"x": -0.7,
+"y": 2.8,
+"heading": 180.0,
+"facing": -182.7,
+"steps": 41,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.6,
+"target": "entrance",
+"steps_left": 4,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 33.72,
+"x": -0.7,
+"y": 2.8,
+"heading": 180.0,
+"facing": -182.7,
+"steps": 41,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.6,
+"target": "entrance",
+"steps_left": 4,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 33.84,
+"x": -0.7,
+"y": 2.8,
+"heading": 180.0,
+"facing": -182.7,
+"steps": 41,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.7,
+"target": "entrance",
+"steps_left": 4,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 33.96,
+"x": -0.7,
+"y": 2.8,
+"heading": 180.0,
+"facing": -182.7,
+"steps": 41,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.7,
+"target": "entrance",
+"steps_left": 4,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 34.08,
+"x": -0.7,
+"y": 2.8,
+"heading": 180.0,
+"facing": -182.7,
+"steps": 41,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.7,
+"target": "entrance",
+"steps_left": 4,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 34.2,
+"x": -0.7,
+"y": 2.1,
+"heading": 180.0,
+"facing": -182.7,
+"steps": 42,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.7,
+"target": "entrance",
+"steps_left": 4,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 34.32,
+"x": -0.7,
+"y": 2.1,
+"heading": 180.0,
+"facing": -182.8,
+"steps": 42,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.8,
+"target": "entrance",
+"steps_left": 3,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 34.44,
+"x": -0.7,
+"y": 2.1,
+"heading": 180.0,
+"facing": -182.8,
+"steps": 42,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.8,
+"target": "entrance",
+"steps_left": 3,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 34.56,
+"x": -0.7,
+"y": 2.1,
+"heading": 180.0,
+"facing": -182.7,
+"steps": 42,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.7,
+"target": "entrance",
+"steps_left": 3,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 34.68,
+"x": -0.7,
+"y": 1.4,
+"heading": 180.0,
+"facing": -182.8,
+"steps": 43,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.7,
+"target": "entrance",
+"steps_left": 3,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 34.8,
+"x": -0.7,
+"y": 1.4,
+"heading": 180.0,
+"facing": -182.8,
+"steps": 43,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.8,
+"target": "entrance",
+"steps_left": 2,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 34.92,
+"x": -0.7,
+"y": 1.4,
+"heading": 180.0,
+"facing": -182.8,
+"steps": 43,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.8,
+"target": "entrance",
+"steps_left": 2,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 35.04,
+"x": -0.7,
+"y": 1.4,
+"heading": 180.0,
+"facing": -182.9,
+"steps": 43,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.8,
+"target": "entrance",
+"steps_left": 2,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 35.16,
+"x": -0.7,
+"y": 1.4,
+"heading": 180.0,
+"facing": -182.9,
+"steps": 43,
+"led": "navigating",
+"hint": {
+"type": "haptic_hint",
+"active": true,
+"error_deg": 2.8,
+"target": "entrance",
+"steps_left": 2,
+"next_turn": null,
+"leg": 1,
+"state": "on_track"
+},
+"guiding": true
+},
+{
+"t": 35.28,
+"x": 0.0,
+"y": 0.0,
+"heading": 180.0,
+"facing": 180.0,
+"steps": 44,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 35.4,
+"x": 0.0,
+"y": 0.0,
+"heading": 180.0,
+"facing": 180.1,
+"steps": 44,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 35.52,
+"x": 0.0,
+"y": 0.0,
+"heading": 180.0,
+"facing": 180.2,
+"steps": 44,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 35.64,
+"x": 0.0,
+"y": 0.0,
+"heading": 180.0,
+"facing": 180.3,
+"steps": 44,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 35.76,
+"x": 0.0,
+"y": -0.7,
+"heading": 180.0,
+"facing": 180.4,
+"steps": 45,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 35.88,
+"x": 0.0,
+"y": -0.7,
+"heading": 180.0,
+"facing": 180.4,
+"steps": 45,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 36.0,
+"x": 0.0,
+"y": -0.7,
+"heading": 180.0,
+"facing": 180.5,
+"steps": 45,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 36.12,
+"x": 0.0,
+"y": -0.7,
+"heading": 180.0,
+"facing": 180.6,
+"steps": 45,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 36.24,
+"x": 0.0,
+"y": -1.4,
+"heading": 180.0,
+"facing": 180.6,
+"steps": 46,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 36.36,
+"x": 0.0,
+"y": -1.4,
+"heading": 180.0,
+"facing": 180.7,
+"steps": 46,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 36.48,
+"x": 0.0,
+"y": -1.4,
+"heading": 180.0,
+"facing": 180.7,
+"steps": 46,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 36.6,
+"x": 0.0,
+"y": -1.4,
+"heading": 180.0,
+"facing": 180.7,
+"steps": 46,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 36.72,
+"x": 0.0,
+"y": -1.4,
+"heading": 180.0,
+"facing": 180.7,
+"steps": 46,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 36.84,
+"x": 0.0,
+"y": -1.4,
+"heading": 180.0,
+"facing": 180.7,
+"steps": 46,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 36.96,
+"x": 0.0,
+"y": -1.4,
+"heading": 180.0,
+"facing": 180.6,
+"steps": 46,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 37.08,
+"x": 0.0,
+"y": -1.4,
+"heading": 180.0,
+"facing": 180.7,
+"steps": 46,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 37.2,
+"x": 0.0,
+"y": -1.4,
+"heading": 180.0,
+"facing": 180.7,
+"steps": 46,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 37.32,
+"x": 0.0,
+"y": -1.4,
+"heading": 180.0,
+"facing": 180.7,
+"steps": 46,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 37.44,
+"x": 0.0,
+"y": -1.4,
+"heading": 180.0,
+"facing": 180.7,
+"steps": 46,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 37.56,
+"x": 0.0,
+"y": -1.4,
+"heading": 180.0,
+"facing": 180.7,
+"steps": 46,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 37.68,
+"x": 0.0,
+"y": -1.4,
+"heading": 180.0,
+"facing": 180.7,
+"steps": 46,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 37.8,
+"x": 0.0,
+"y": -1.4,
+"heading": 180.0,
+"facing": 180.7,
+"steps": 46,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 37.92,
+"x": 0.0,
+"y": -1.4,
+"heading": 180.0,
+"facing": 180.7,
+"steps": 46,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 38.04,
+"x": 0.0,
+"y": -1.4,
+"heading": 180.0,
+"facing": 180.7,
+"steps": 46,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 38.16,
+"x": 0.0,
+"y": -1.4,
+"heading": 180.0,
+"facing": 180.7,
+"steps": 46,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 38.28,
+"x": 0.0,
+"y": -1.4,
+"heading": 180.0,
+"facing": 180.7,
+"steps": 46,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 38.4,
+"x": 0.0,
+"y": -1.4,
+"heading": 180.0,
+"facing": 180.7,
+"steps": 46,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 38.52,
+"x": 0.0,
+"y": -1.4,
+"heading": 180.0,
+"facing": 180.7,
+"steps": 46,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 38.64,
+"x": 0.0,
+"y": -1.4,
+"heading": 180.0,
+"facing": 180.7,
+"steps": 46,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 38.76,
+"x": 0.0,
+"y": -1.4,
+"heading": 180.0,
+"facing": 180.7,
+"steps": 46,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 38.88,
+"x": 0.0,
+"y": -1.4,
+"heading": 180.0,
+"facing": 180.7,
+"steps": 46,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 39.0,
+"x": 0.0,
+"y": -1.4,
+"heading": 180.0,
+"facing": 180.7,
+"steps": 46,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+},
+{
+"t": 39.12,
+"x": 0.0,
+"y": -1.4,
+"heading": 180.0,
+"facing": 180.7,
+"steps": 46,
+"led": "arrived",
+"hint": {
+"type": "haptic_hint",
+"active": false,
+"arrived": true,
+"target": "entrance"
+},
+"guiding": false
+}
+],
+"events": [
+{
+"t": 0.0,
+"kind": "user",
+"text": "start route",
+"phase": "start",
+"tool": "start_route",
+"args": {}
+},
+{
+"t": 0.0,
+"kind": "guidance",
+"index": 0,
+"active": false,
+"instructions": [],
+"waypoints": [],
+"target": null
+},
+{
+"t": 0.0,
+"kind": "say",
+"text": "Route started. Stand still for a moment."
+},
+{
+"t": 0.0,
+"kind": "led",
+"state": "route_started",
+"period": null
+},
+{
+"t": 0.0,
+"kind": "tool",
+"ok": true,
+"say": "Route started. Stand still for a moment.",
+"led": "route_started",
+"data": {}
+},
+{
+"t": 0.0,
+"kind": "user",
+"text": "remember this as the entrance",
+"phase": "entrance",
+"tool": "remember_landmark",
+"args": {
+"label": "entrance"
+}
+},
+{
+"t": 0.0,
+"kind": "landmark",
+"label": "entrance",
+"x": 0.0,
+"y": 0.0
+},
+{
+"t": 0.0,
+"kind": "say",
+"text": "Saved: entrance."
+},
+{
+"t": 0.0,
+"kind": "led",
+"state": "landmark_saved",
+"period": null
+},
+{
+"t": 0.0,
+"kind": "tool",
+"ok": true,
+"say": "Saved: entrance.",
+"led": "landmark_saved",
+"data": {}
+},
+{
+"t": 0.0,
+"kind": "phase",
+"name": "walk_out:start"
+},
+{
+"t": 16.44,
+"kind": "phase",
+"name": "walk_out:end"
+},
+{
+"t": 16.44,
+"kind": "user",
+"text": "remember this as the elevator",
+"phase": "elevator",
+"tool": "remember_landmark",
+"args": {
+"label": "elevator"
+}
+},
+{
+"t": 16.44,
+"kind": "landmark",
+"label": "elevator",
+"x": 5.6000000000000005,
+"y": 9.1
+},
+{
+"t": 16.44,
+"kind": "say",
+"text": "Saved: elevator."
+},
+{
+"t": 16.44,
+"kind": "led",
+"state": "landmark_saved",
+"period": null
+},
+{
+"t": 16.44,
+"kind": "tool",
+"ok": true,
+"say": "Saved: elevator.",
+"led": "landmark_saved",
+"data": {}
+},
+{
+"t": 16.44,
+"kind": "user",
+"text": "take me back to the entrance",
+"phase": "navigate",
+"tool": "navigate_to",
+"args": {
+"target": "lm1"
+}
+},
+{
+"t": 16.44,
+"kind": "guidance",
+"index": 0,
+"active": true,
+"instructions": [
+"Turn around, walk 8 steps.",
+"Turn left, walk 13 steps.",
+"You have reached the entrance."
+],
+"waypoints": [
+[
+5.6,
+9.1
+],
+[
+0.0,
+9.1
+],
+[
+0.0,
+0.0
+]
+],
+"target": "entrance"
+},
+{
+"t": 16.44,
+"kind": "say",
+"text": "Turn around, walk 8 steps. Then turn left, walk 13 steps. Then you have reached the entrance."
+},
+{
+"t": 16.44,
+"kind": "led",
+"state": "navigating",
+"period": null
+},
+{
+"t": 16.44,
+"kind": "tool",
+"ok": true,
+"say": "Turn around, walk 8 steps. Then turn left, walk 13 steps. Then you have reached the entrance.",
+"led": "navigating",
+"data": {
+"instructions": [
+{
+"turn": "around",
+"steps": 8,
+"distance_m": 5.6,
+"text": "Turn around, walk 8 steps."
+},
+{
+"turn": "left",
+"steps": 13,
+"distance_m": 9.1,
+"text": "Turn left, walk 13 steps."
+},
+{
+"turn": "arrive",
+"steps": 0,
+"distance_m": 0.0,
+"text": "You have reached the entrance."
+}
+]
+}
+},
+{
+"t": 16.44,
+"kind": "phase",
+"name": "wrong_way:start"
+},
+{
+"t": 16.56,
+"kind": "buzz",
+"cue": "wrong_left",
+"error": -178.6
+},
+{
+"t": 19.04,
+"kind": "phase",
+"name": "wrong_way:end"
+},
+{
+"t": 19.04,
+"kind": "phase",
+"name": "walk_back:start"
+},
+{
+"t": 19.16,
+"kind": "buzz",
+"cue": "wrong_left",
+"error": -178.6
+},
+{
+"t": 20.84,
+"kind": "buzz",
+"cue": "on_track",
+"error": -23.5
+},
+{
+"t": 23.96,
+"kind": "buzz",
+"cue": "turn_soon",
+"error": 2.0
+},
+{
+"t": 24.28,
+"kind": "led",
+"state": "turn_now",
+"period": 345
+},
+{
+"t": 24.8,
+"kind": "led",
+"state": "turn_now",
+"period": 280
+},
+{
+"t": 24.92,
+"kind": "buzz",
+"cue": "turn_soon",
+"error": 2.4
+},
+{
+"t": 25.4,
+"kind": "led",
+"state": "turn_now",
+"period": 215
+},
+{
+"t": 25.64,
+"kind": "buzz",
+"cue": "turn_soon",
+"error": 2.4
+},
+{
+"t": 25.88,
+"kind": "say",
+"text": "Turn left, walk 13 steps."
+},
+{
+"t": 25.88,
+"kind": "led",
+"state": "turn_now",
+"period": 150
+},
+{
+"t": 25.88,
+"kind": "guidance",
+"index": 1,
+"active": true,
+"instructions": [
+"Turn around, walk 8 steps.",
+"Turn left, walk 13 steps.",
+"You have reached the entrance."
+],
+"waypoints": [
+[
+5.6,
+9.1
+],
+[
+0.0,
+9.1
+],
+[
+0.0,
+0.0
+]
+],
+"target": "entrance"
+},
+{
+"t": 26.12,
+"kind": "buzz",
+"cue": "turn_left",
+"error": -86.9
+},
+{
+"t": 26.36,
+"kind": "buzz",
+"cue": "wrong_left",
+"error": -80.7
+},
+{
+"t": 27.08,
+"kind": "buzz",
+"cue": "on_track",
+"error": -29.7
+},
+{
+"t": 29.2,
+"kind": "led",
+"state": "navigating",
+"period": null
+},
+{
+"t": 31.16,
+"kind": "buzz",
+"cue": "tick",
+"error": 2.4
+},
+{
+"t": 35.2,
+"kind": "say",
+"text": "You have reached the entrance."
+},
+{
+"t": 35.2,
+"kind": "led",
+"state": "arrived",
+"period": null
+},
+{
+"t": 35.2,
+"kind": "guidance",
+"index": 2,
+"active": false,
+"instructions": [
+"Turn around, walk 8 steps.",
+"Turn left, walk 13 steps.",
+"You have reached the entrance."
+],
+"waypoints": [
+[
+5.6,
+9.1
+],
+[
+0.0,
+9.1
+],
+[
+0.0,
+0.0
+]
+],
+"target": "entrance"
+},
+{
+"t": 35.24,
+"kind": "buzz",
+"cue": "arrived",
+"error": null
+},
+{
+"t": 37.2,
+"kind": "phase",
+"name": "walk_back:end"
+},
+{
+"t": 37.2,
+"kind": "phase",
+"name": "arrived:start"
+},
+{
+"t": 39.2,
+"kind": "phase",
+"name": "arrived:end"
+}
+]
+}
