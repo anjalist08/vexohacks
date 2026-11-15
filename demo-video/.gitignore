@@ -6,3 +6,5 @@ audio/music.wav
 audio/sfx.wav
 __pycache__/
 .sim-routes.json
+out/c_*.png
+out/h*.png
