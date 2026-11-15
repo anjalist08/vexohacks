@@ -7,6 +7,8 @@ struct ContentView: View {
     @State private var showSettings = false
     @State private var showSave = false
     @State private var newPlace = ""
+    @State private var cameraImage: CGImage?
+    @AppStorage("showCamera") private var showCamera = true
 
     private var bandConnected: Bool { guide.bandStatus.contains("connected (") }
     private var accent: Color {
@@ -25,6 +27,17 @@ struct ContentView: View {
 
             VStack(spacing: 12) {
                 topBar
+                if showCamera, let cameraImage, guide.recording || guide.guiding {
+                    HStack {
+                        Spacer()
+                        Image(decorative: cameraImage, scale: 1).resizable().scaledToFill()
+                            .frame(width: 96, height: 128)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(.white, lineWidth: 2))
+                            .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+                            .accessibilityLabel("What the camera sees")
+                    }
+                }
                 if guide.guiding || guide.state == "done" { guidanceCard }
                 Spacer()
                 if !guide.places.isEmpty || guide.trail.count > 3 { placeChips }
@@ -35,9 +48,14 @@ struct ContentView: View {
         }
         .onAppear {
             if !guide.phoneOnly { guide.startPhoneOnly() }
+            guide.brain.tracker.preview(showCamera) { image in cameraImage = image }
             if ProcessInfo.processInfo.arguments.contains("-demo") { loadDemo() }
         }
         .sheet(isPresented: $showSettings) { SettingsSheet(guide: guide) }
+        .onChange(of: showCamera) { _, on in
+            guide.brain.tracker.preview(on) { image in cameraImage = image }
+            if !on { cameraImage = nil }
+        }
         .alert("Name this place", isPresented: $showSave) {
             TextField("e.g. entrance", text: $newPlace)
             Button("Save") {
@@ -287,6 +305,7 @@ struct TrailCanvas: View {
 struct SettingsSheet: View {
     @ObservedObject var guide: Guide
     @AppStorage("bandNumber") private var bandNumber = 80
+    @AppStorage("showCamera") private var showCamera = true
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -310,6 +329,7 @@ struct SettingsSheet: View {
                 }
                 Section("Feedback") {
                     Toggle("Vibrate for directions", isOn: $guide.buzzing)
+                    Toggle("Show the camera view (for demo videos)", isOn: $showCamera)
                 }
                 Section("More") {
                     NavigationLink("Places and typed commands") { PlacesView(guide: guide) }

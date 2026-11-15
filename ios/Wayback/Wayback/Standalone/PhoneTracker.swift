@@ -1,4 +1,5 @@
 import ARKit
+import CoreImage
 import CoreMotion
 import Foundation
 
@@ -101,6 +102,11 @@ final class PhoneTracker {
     private var strideBand0: Int?, stridePhone0 = 0
     private(set) var strideLearned = false
     var cameraActive: Bool { Date().timeIntervalSince1970 - camWall < 0.5 }
+
+    /// A small live picture of what the camera sees (for demo videos). Off = nothing is ever shown.
+    func preview(_ on: Bool, handler: ((CGImage) -> Void)?) {
+        camera.onPreview = on ? handler : nil
+    }
 
     private var phoneActive: Bool { Date().timeIntervalSince1970 - lastPhoneWall < 1.0 }
 
@@ -530,6 +536,10 @@ final class CameraTracker: NSObject, ARSessionDelegate {
     var onLost: (() -> Void)?
     var gravity: [Double] = [0, 0, -1]          // from Core Motion, in the phone's frame (y = towards its top)
 
+    var onPreview: ((CGImage) -> Void)?         // a small picture a few times a second, only if asked for
+    private let ciContext = CIContext()
+    private var lastPreview = 0.0
+
     private let session = ARSession()
     private var started = false
     private var miss = [0.0, 0.0, 0.0, 0.0]     // which camera axis is the phone's top: -x, +x, +y, -y
@@ -544,6 +554,12 @@ final class CameraTracker: NSObject, ARSessionDelegate {
     }
 
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
+        if let onPreview, frame.timestamp - lastPreview > 0.2 {
+            lastPreview = frame.timestamp
+            let image = CIImage(cvPixelBuffer: frame.capturedImage).oriented(.right)
+                .transformed(by: CGAffineTransform(scaleX: 0.2, y: 0.2))
+            if let cg = ciContext.createCGImage(image, from: image.extent) { onPreview(cg) }
+        }
         guard case .normal = frame.camera.trackingState else { onLost?(); return }
         let m = frame.camera.transform
         let cx = m.columns.0, cy = m.columns.1, cz = m.columns.2, p = m.columns.3
