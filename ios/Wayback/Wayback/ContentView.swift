@@ -7,7 +7,6 @@ struct ContentView: View {
     @State private var showSettings = false
     @State private var showSave = false
     @State private var newPlace = ""
-    @State private var cameraImage: CGImage?
     @AppStorage("showCamera") private var showCamera = true
 
     private var bandConnected: Bool { guide.bandStatus.contains("connected (") }
@@ -27,10 +26,10 @@ struct ContentView: View {
 
             VStack(spacing: 12) {
                 topBar
-                if showCamera, let cameraImage, guide.recording || guide.guiding {
+                if showCamera, let cameraImage = guide.cameraImage {
                     HStack {
                         Spacer()
-                        Image(decorative: cameraImage, scale: 1).resizable().scaledToFill()
+                        Image(uiImage: cameraImage).resizable().scaledToFill()
                             .frame(width: 96, height: 128)
                             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                             .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(.white, lineWidth: 2))
@@ -48,13 +47,12 @@ struct ContentView: View {
         }
         .onAppear {
             if !guide.phoneOnly { guide.startPhoneOnly() }
-            guide.brain.tracker.preview(showCamera) { image in cameraImage = image }
+            startPreview(showCamera)
             if ProcessInfo.processInfo.arguments.contains("-demo") { loadDemo() }
         }
         .sheet(isPresented: $showSettings) { SettingsSheet(guide: guide) }
         .onChange(of: showCamera) { _, on in
-            guide.brain.tracker.preview(on) { image in cameraImage = image }
-            if !on { cameraImage = nil }
+            startPreview(on)
         }
         .alert("Name this place", isPresented: $showSave) {
             TextField("e.g. entrance", text: $newPlace)
@@ -65,6 +63,16 @@ struct ContentView: View {
             }
             Button("Cancel", role: .cancel) { newPlace = "" }
         }
+    }
+
+    private func startPreview(_ on: Bool) {
+        let g = guide
+        var announced = false
+        g.brain.tracker.preview(on) { image in
+            if !announced { announced = true; print("[preview] first camera picture \(image.width)x\(image.height)") }
+            g.cameraImage = UIImage(cgImage: image)
+        }
+        if !on { g.cameraImage = nil }
     }
 
     /// Sample data for screenshots in the simulator (launch argument -demo). Never shown otherwise.
