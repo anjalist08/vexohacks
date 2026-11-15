@@ -10,6 +10,7 @@ This guide covers everything needed to film, assemble, and submit a **working en
 | :--- | :--- | :--- | :--- |
 | **Part A — Vision Cold Open (Optional)** | `0:00–0:20` (or full `0:60`) | [`wayback-trail-commercial.mp4`](wayback-trail-commercial.mp4) | Sets up the problem & multimodal accessibility story (`🙈 🙉 🙊`) with captions + ElevenLabs *River* voiceover. |
 | **Part B — Live Working Hardware + iOS Demo** | `1:30–2:00` | Filmed in one hallway take + iPhone screen recording | Proves real **Vexo band BLE**, **wrist-mic Deepgram STT**, **Gemini 4 tool calling**, **fused indoor tracking**, **Core Haptics turn coaching**, and **ElevenLabs River TTS** working live. |
+| **Part C — Architecture Cutaways (Optional 5–8s slides)** | `0:05–0:08` | [`wayback-use-case-flow.png`](wayback-use-case-flow.png), [`wayback-vexo-architecture-calls.png`](wayback-vexo-architecture-calls.png), [`wayback-app-haptic-led-map.png`](wayback-app-haptic-led-map.png) | Ready-to-drop 16:9 visual cards showing the 4-step user flow, Vexo BLE byte opcodes + AI call pipeline, and haptic/LED cues. |
 
 > **Team Honesty Rule (`AGENTS.md`):** Any live walk segment uses real hardware sensing. If you include B-roll from `--replay` or `-demo`, keep its on-screen `REPLAY` / demo label visible and never present replayed data as live sensing.
 

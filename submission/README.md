@@ -34,6 +34,17 @@ with burned-in captions. It is the same video as [demo-versions v3](../demo-vers
 - The scenes are a dramatization. This is an experimental navigation aid, not a safety-critical
   system. The end card says both.
 
+## Architecture, Vexo BLE Calls & Usage Flow Diagrams
+
+### 1. End-to-End Indoor Usage Flow
+![Wayback Indoor Spatial Memory Usage Flow](wayback-use-case-flow.png)
+
+### 2. Vexo Band BLE Protocol (`0x02`–`0x50`) & Voice/AI Call Pipeline
+![Wayback Vexo BLE Protocol and AI Call Pipeline](wayback-vexo-architecture-calls.png)
+
+### 3. Single-Screen iPhone App, Core Haptics & Wrist LED Vocabulary
+![Wayback One-Screen App and Multimodal Cues](wayback-app-haptic-led-map.png)
+
 ## Source & Filming Guide
 
 - **[DEMO_VIDEO_GUIDE.md](DEMO_VIDEO_GUIDE.md)**: step-by-step live hackathon demo filming script, hardware & iPhone pre-flight checklist, sponsor track shot list, backup replay/demo modes, and `ffmpeg` Picture-in-Picture assembly commands
