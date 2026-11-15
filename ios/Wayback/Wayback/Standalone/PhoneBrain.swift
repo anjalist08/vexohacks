@@ -150,6 +150,9 @@ final class PhoneBrain {
         g.recording = tracker.running
         g.gyroBias = tracker.bias
         g.uncertain = tracker.uncertain
+        g.level = tracker.level
+        g.trackSource = tracker.source
+        g.stepLength = tracker.stepLength
         let out = coach.update(nav: nav, facing: tracker.facing, x: tracker.x, y: tracker.y,
                                stepLength: tracker.stepLength, uncertain: tracker.uncertain)
         g.showHint(out.hint)
@@ -175,8 +178,8 @@ final class PhoneBrain {
             guide?.backTrail = []; guide?.directions = []; guide?.guiding = false; guide?.waypoints = []
             tracker.start(at: t)
             publish()
-            guide?.logAction("Started route", detail: "Stand still briefly to calibrate gyro", icon: "play.circle.fill", tint: "green")
-            say("Route started. Stand still for a moment.", led: "route_started")
+            guide?.logAction("Started route", detail: tracker.calibrated ? "Fused sensors active" : "Hold still briefly to calibrate gyro", icon: "play.circle.fill", tint: "green")
+            say(tracker.calibrated ? "Route started." : "Route started. Hold still for a moment.", led: "route_started")
         case .stopRoute:
             routeActive = false; nav = nil; tracker.stop(); guide?.guiding = false
             publish()
@@ -191,7 +194,7 @@ final class PhoneBrain {
             let name = label.isEmpty ? "spot \(places.count + 1)" : label
             let p = points[points.count - 1]
             let id = "lm\(nextPlace)"; nextPlace += 1
-            places.append(Place(id: id, label: name, x: p.x, y: p.y, note: note, floor: nil))
+            places.append(Place(id: id, label: name, x: p.x, y: p.y, note: note, floor: tracker.level != 0 ? String(tracker.level) : nil))
             placeIndex[id] = points.count - 1
             publish()
             guide?.logAction("Added landmark: \(name.capitalized)", detail: note, icon: "mappin.circle.fill", tint: "purple")
@@ -505,7 +508,7 @@ struct Coach {
             hint["state"] = "turn_soon"
             return (hint, due("turn_soon", 0.35 * Double(s)) ? "turn_soon" : nil)
         }
-        return (hint, due("tick", 4) ? "tick" : nil)
+        return (hint, due("tick", 1.5) ? "tick" : nil)
     }
 }
 

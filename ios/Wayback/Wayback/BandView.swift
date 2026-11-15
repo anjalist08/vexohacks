@@ -36,9 +36,8 @@ struct BandView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            List {
-                // Hardware Link Hero Section
+        List {
+            // Hardware Link Hero Section
                 Section {
                     HStack(spacing: 12) {
                         ZStack {
@@ -175,7 +174,14 @@ struct BandView: View {
                 // Sensor Telemetry Section
                 Section {
                     LabeledContent("Tracker State", value: guide.recording ? (guide.calibrated ? "Recording" : "Calibrating") : "Idle")
+                    if !guide.trackSource.isEmpty {
+                        LabeledContent("Sensor Fusion", value: guide.trackSource)
+                    }
                     LabeledContent("Steps & Distance", value: "\(guide.steps) steps (\(String(format: "%.1f m", Double(guide.steps) * guide.stepLength)))")
+                    LabeledContent("Stride Estimate", value: String(format: "%.2f m", guide.stepLength))
+                    if guide.level != 0 {
+                        LabeledContent("Floor Offset", value: "\(guide.level > 0 ? "+" : "")\(guide.level)F")
+                    }
                     LabeledContent("Live Heading", value: String(format: "%.0f°", guide.facing))
                     LabeledContent("Wrist Activity", value: guide.activity.capitalized)
                     LabeledContent("Gyro Bias", value: String(format: "%.2f °/s", guide.gyroBias))
@@ -258,9 +264,14 @@ struct BandView: View {
                         }
                     }
                 }
-            }
-            .navigationTitle("Band #\(BandConfig.number)")
-            .navigationBarTitleDisplayMode(.inline)
         }
+        .navigationTitle("Band #\(BandConfig.number)")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+#Preview("Band") {
+    NavigationStack {
+        BandView(guide: Guide())
     }
 }

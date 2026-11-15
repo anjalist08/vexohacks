@@ -20,6 +20,7 @@
 		7E0C922EFEA8805AF3C07E06 /* PhoneTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCA5491E161A0C07586E31CB /* PhoneTracker.swift */; };
 		34BF756129940AE90E3581BB /* PhoneBrain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CFDF69B1B150710BB10FE8E /* PhoneBrain.swift */; };
 		723D1538883BD22DD5A59DD7 /* PhoneVoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = C55B6F043A7106569636D887 /* PhoneVoice.swift */; };
+		A1F48290C4B84E219D01E5A2 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2E593A1D5C94F32AE12F6B3 /* Theme.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -35,9 +36,10 @@
 		314BFE7A6DD5109288CB5C30 /* MapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapView.swift; sourceTree = "<group>"; };
 		0DA13F547FFE6F85CD104376 /* PlacesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacesView.swift; sourceTree = "<group>"; };
 		38AC5E76CA6A09EBA4BE9488 /* BandView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BandView.swift; sourceTree = "<group>"; };
-		DCA5491E161A0C07586E31CB /* PhoneTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Standalone/PhoneTracker.swift; sourceTree = "<group>"; };
-		6CFDF69B1B150710BB10FE8E /* PhoneBrain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Standalone/PhoneBrain.swift; sourceTree = "<group>"; };
-		C55B6F043A7106569636D887 /* PhoneVoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Standalone/PhoneVoice.swift; sourceTree = "<group>"; };
+		DCA5491E161A0C07586E31CB /* PhoneTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneTracker.swift; sourceTree = "<group>"; };
+		6CFDF69B1B150710BB10FE8E /* PhoneBrain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneBrain.swift; sourceTree = "<group>"; };
+		C55B6F043A7106569636D887 /* PhoneVoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneVoice.swift; sourceTree = "<group>"; };
+		B2E593A1D5C94F32AE12F6B3 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -51,23 +53,64 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		20F4BD606C0F6D1645AE4919 /* Wayback */ = {
+		C001AA11BB22CC33DD44EE01 /* App */ = {
 			isa = PBXGroup;
 			children = (
 				E86F70792C7CFA55F4EE04F9 /* WaybackApp.swift */,
-				28D04CCB41B0CCBEE07CE479 /* ContentView.swift */,
+				B2E593A1D5C94F32AE12F6B3 /* Theme.swift */,
 				EB8E280B369C429FAC49C1F7 /* Guide.swift */,
-				66E34AA2AD0A62AA3E9B748B /* Haptics.swift */,
+			);
+			name = App;
+			sourceTree = "<group>";
+		};
+		C001AA11BB22CC33DD44EE02 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				28D04CCB41B0CCBEE07CE479 /* ContentView.swift */,
+				0DA13F547FFE6F85CD104376 /* PlacesView.swift */,
+				38AC5E76CA6A09EBA4BE9488 /* BandView.swift */,
+				314BFE7A6DD5109288CB5C30 /* MapView.swift */,
+			);
+			name = Views;
+			sourceTree = "<group>";
+		};
+		C001AA11BB22CC33DD44EE03 /* Band */ = {
+			isa = PBXGroup;
+			children = (
 				CA16490661EC2385FA081002 /* BandLink.swift */,
-				C55B6F043A7106569636D887 /* PhoneVoice.swift */,
+				460FF1B89F1C9A1E5227457E /* BandProtocol.swift */,
+				66E34AA2AD0A62AA3E9B748B /* Haptics.swift */,
+			);
+			name = Band;
+			sourceTree = "<group>";
+		};
+		C001AA11BB22CC33DD44EE04 /* Standalone */ = {
+			isa = PBXGroup;
+			children = (
 				6CFDF69B1B150710BB10FE8E /* PhoneBrain.swift */,
 				DCA5491E161A0C07586E31CB /* PhoneTracker.swift */,
-				38AC5E76CA6A09EBA4BE9488 /* BandView.swift */,
-				0DA13F547FFE6F85CD104376 /* PlacesView.swift */,
-				314BFE7A6DD5109288CB5C30 /* MapView.swift */,
-				460FF1B89F1C9A1E5227457E /* BandProtocol.swift */,
+				C55B6F043A7106569636D887 /* PhoneVoice.swift */,
+			);
+			path = Standalone;
+			sourceTree = "<group>";
+		};
+		C001AA11BB22CC33DD44EE05 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
 				32BB636196F91ED59D7A4919 /* Assets.xcassets */,
 				BB5944C6515D6D2B678426AB /* Info.plist */,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+		};
+		20F4BD606C0F6D1645AE4919 /* Wayback */ = {
+			isa = PBXGroup;
+			children = (
+				C001AA11BB22CC33DD44EE01 /* App */,
+				C001AA11BB22CC33DD44EE02 /* Views */,
+				C001AA11BB22CC33DD44EE03 /* Band */,
+				C001AA11BB22CC33DD44EE04 /* Standalone */,
+				C001AA11BB22CC33DD44EE05 /* Resources */,
 			);
 			path = Wayback;
 			sourceTree = "<group>";
@@ -119,7 +162,7 @@
 				LastUpgradeCheck = 2700;
 			};
 			buildConfigurationList = 01076EBF22530E406F54B419 /* Build configuration list for PBXProject "Wayback" */;
-			compatibilityVersion = "Xcode 14.0";
+			compatibilityVersion = "Xcode 15.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -153,6 +196,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D9F90FA24742154394C6D79B /* WaybackApp.swift in Sources */,
+				A1F48290C4B84E219D01E5A2 /* Theme.swift in Sources */,
 				3D4A0FEB16060150BBD7C1F9 /* ContentView.swift in Sources */,
 				1D1BE4C0C81582670FC7B6F4 /* Guide.swift in Sources */,
 				D0503919F3E1E595D73B8A24 /* Haptics.swift in Sources */,
@@ -218,7 +262,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Wayback/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Wayback;
-				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Wayback connects to your Vexo band (Vexo-HACK-80) over Bluetooth to follow your steps and turns.";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Wayback connects to your Vexo band over Bluetooth to follow your steps, turns, and wrist voice commands.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Wayback connects to the Vexo app on your laptop over Wi-Fi to receive guidance and buzz cues.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -246,10 +290,11 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 95RYYMCQ6G;
+				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Wayback/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Wayback;
-				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Wayback connects to your Vexo band (Vexo-HACK-80) over Bluetooth to follow your steps and turns.";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Wayback connects to your Vexo band over Bluetooth to follow your steps, turns, and wrist voice commands.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Wayback connects to the Vexo app on your laptop over Wi-Fi to receive guidance and buzz cues.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -279,7 +324,7 @@
 				1B05A9D10F61E514E88AF240 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
+			defaultConfigurationName = Debug;
 		};
 		CE2BB50980DFD48FF547D497 /* Build configuration list for PBXNativeTarget "Wayback" */ = {
 			isa = XCConfigurationList;
@@ -288,7 +333,7 @@
 				8951287761002419191396D2 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
+			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
 	};

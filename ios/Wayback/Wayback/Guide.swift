@@ -76,6 +76,8 @@ final class Guide: ObservableObject {
     @Published var ledState = "idle"
     @Published var lastReply = ""
     @Published var bridgeWanted = false     // the laptop runs --bridge and wants this phone to carry the band
+    @Published var level = 0                // floors up or down since the route started (barometer)
+    @Published var trackSource = ""         // which sensors lead the tracking right now
     @Published var phoneOnly = false        // iPhone only: no laptop; the phone tracks, guides, listens and speaks
     @Published var feed: [FeedItem] = []    // newest-first live log shown on the Home (Guide) tab
 
@@ -152,6 +154,7 @@ final class Guide: ObservableObject {
     func resetBandBluetooth() {
         band?.stop()
         band = nil
+        bandName = BandConfig.name
         bandLinkStatus = "not connected"
         BandLink.forgetRemembered()
         if link != .on { startPhoneOnly(); return }
@@ -361,6 +364,7 @@ final class Guide: ObservableObject {
 
     /// The laptop runs `main.py --bridge` (or iPhone-only mode): this phone connects to the band and carries its data.
     private func carryBand() {
+        bandName = BandConfig.name
         if let existing = band {
             if existing.verified && !phoneOnly {
                 send(["type": "band_status", "status": "connected", "name": BandConfig.name,
@@ -369,7 +373,10 @@ final class Guide: ObservableObject {
             return
         }
         let link = BandLink()
-        link.onStatus = { [weak self] text in Task { @MainActor in self?.bandStatus = text } }
+        link.onStatus = { [weak self] text in
+            print("[band] \(text)")
+            Task { @MainActor in self?.bandStatus = text }
+        }
         link.onMessage = { [weak self] msg in
             Task { @MainActor in
                 guard let self else { return }

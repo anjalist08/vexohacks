@@ -242,3 +242,11 @@ struct MapView: View {
         ctx.fill(Path(ellipseIn: CGRect(x: me.x - 5, y: me.y - 5, width: 10, height: 10)), with: .color(.blue))
     }
 }
+
+#Preview("Map Inspector") {
+    NavigationStack {
+        MapView(guide: Guide())
+            .navigationTitle("Map Inspector")
+            .navigationBarTitleDisplayMode(.inline)
+    }
+}

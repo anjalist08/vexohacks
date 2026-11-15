@@ -19,9 +19,8 @@ struct PlacesView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            List {
-                // Route Recording Section
+        List {
+            // Route Recording Section
                 Section {
                     HStack(spacing: 12) {
                         Image(systemName: guide.recording ? "record.circle.fill" : "pause.circle.fill")
@@ -225,10 +224,9 @@ struct PlacesView: View {
                 } header: {
                     Text("Voice / Text Command")
                 }
-            }
-            .navigationTitle("Places")
-            .navigationBarTitleDisplayMode(.inline)
         }
+        .navigationTitle("Places")
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     private func save() {
@@ -236,5 +234,11 @@ struct PlacesView: View {
         guard !name.isEmpty else { return }
         guide.command("remember this as the \(name)")
         newPlace = ""
+    }
+}
+
+#Preview("Places") {
+    NavigationStack {
+        PlacesView(guide: Guide())
     }
 }
