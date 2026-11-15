@@ -4,8 +4,10 @@ import Foundation
 /// Tracking on the phone (no laptop). Two modes, chosen by what is arriving:
 ///
 /// FUSED (the iPhone's own sensors are running; the normal case)
-///   Heading  The iPhone's gyro, projected on gravity and integrated (never the attitude's
-///            "yaw" angle: that one jumps when the phone stands upright in a pocket).
+///   Heading  From the iPhone's orientation (Apple's gyro + accelerometer fusion): the direction
+///            of its most level axis on the floor plane. Not the "yaw" angle (it jumps when the
+///            phone stands upright) and not the gyro integrated about gravity (it drifts with
+///            every stride in a pocket).
 ///            While the phone is being handled (its tilt changes: taken out of a pocket, put
 ///            away, turned in the hand) its heading is not trusted; the band's heading carries
 ///            the route across that moment, and the phone is lined up again when it settles.
@@ -88,7 +90,7 @@ final class PhoneTracker {
     private var phoneActive: Bool { Date().timeIntervalSince1970 - lastPhoneWall < 1.0 }
 
     init() {
-        sensors.onMotion = { [weak self] t, stamp, rate, g, up in self?.phone(t: t, stamp: stamp, rate: rate, gravity: g, up: up) }
+        sensors.onMotion = { [weak self] t, stamp, turned, rate, g, up in self?.phone(t: t, stamp: stamp, turned: turned, gyroRate: rate, gravity: g, up: up) }
         sensors.onPedometer = { [weak self] n, d in self?.pedometer(steps: n, distance: d) }
         sensors.onAltitude = { [weak self] m in self?.barometer(m) }
     }
@@ -115,7 +117,7 @@ final class PhoneTracker {
         lastSteps = nil; bandSince = 0; accSmooth = nil; accArmed = true; accLast = -1e9
         fused = 0; phoneOffset = nil; fusedWindow = []; history = []; tiltSlow = nil; handling = false; stableSince = nil
         upFast = 0; upSlow = 0; stepArmed = true; lastPeak = -1e9; pending = []; walking = false
-        detected = 0; pedSince = 0; pedAlive = false; altitudeBase = nil; altitude = 0
+        detected = 0; pedSince = 0; pedAlive = CMPedometer.isStepCountingAvailable(); altitudeBase = nil; altitude = 0
         log.open()
         sensors.start()
         sensors.restartPedometer()
@@ -127,15 +129,15 @@ final class PhoneTracker {
 
     // MARK: the iPhone's sensors (50 a second)
 
-    /// rate: turning speed about the vertical, degrees/second, clockwise seen from above.
+    /// turned: degrees turned about the vertical since the last sample (clockwise), from the phone's orientation.
     /// gravity: unit vector pointing down, in the phone's frame. up: vertical acceleration in g, gravity removed.
-    private func phone(t: Double, stamp: Double, rate: Double, gravity gv: [Double], up: Double) {
+    private func phone(t: Double, stamp: Double, turned: Double, gyroRate: Double, gravity gv: [Double], up: Double) {
         lastPhoneWall = t
         let dt = lastPhoneStamp.map { max(0, min(0.2, stamp - $0)) } ?? 0
         lastPhoneStamp = stamp
-        phoneHeading += rate * dt
+        phoneHeading += turned
         guard running else { return }
-        log.add("p,\(f3(t)),\(f2(rate)),\(f3(gv[0])),\(f3(gv[1])),\(f3(gv[2])),\(f3(up))")
+        log.add("p,\(f3(t)),\(f2(turned)),\(f3(gv[0])),\(f3(gv[1])),\(f3(gv[2])),\(f3(up)),\(f2(gyroRate))")
 
         // Is the phone being handled? Its tilt (the direction of gravity in its own frame) moves a
         // lot when it leaves a pocket or is turned over, and hardly at all when the body turns.
@@ -219,7 +221,7 @@ final class PhoneTracker {
         let bandAlive = t - lastBandActivity < 3
         let agreed = (bandAlive && pedAlive) ? min(pedSince, bandSince) : (pedAlive ? pedSince : (bandAlive ? bandSince : 0))
         var target = max(detected, agreed)
-        if pedAlive { target = min(target, max(pedSince, agreed) + 16) }
+        if pedAlive { target = min(target, max(pedSince, bandAlive ? bandSince : 0) + 16) }
         if target > steps { advance(target - steps, t) }
     }
 
@@ -331,13 +333,44 @@ final class PhoneTracker {
 /// The iPhone's motion sensors: gyro + accelerometer fusion (no magnetometer: steel indoors bends
 /// it), Apple's pedometer, and the barometer. Everything is delivered on the main queue.
 final class PhoneSensors {
-    var onMotion: ((_ t: Double, _ stamp: Double, _ rate: Double, _ gravity: [Double], _ up: Double) -> Void)?
+    var onMotion: ((_ t: Double, _ stamp: Double, _ turned: Double, _ gyroRate: Double, _ gravity: [Double], _ up: Double) -> Void)?
     var onPedometer: ((_ steps: Int, _ distance: Double?) -> Void)?
     var onAltitude: ((_ metres: Double) -> Void)?
 
     private let motion = CMMotionManager()
     private let pedometer = CMPedometer()
     private let altimeter = CMAltimeter()
+    private var agreement = 0.0
+    private var axis = -1                    // the phone axis used as the compass needle (0 x, 1 y, 2 z)
+    private var lastAngle: [Double?] = [nil, nil, nil]
+
+    /// Degrees the phone turned about the vertical since the last sample, clockwise seen from above.
+    /// Taken from the phone's ORIENTATION: the direction, on the floor plane, of whichever of its
+    /// axes lies most level (flat in a hand: its long side; upright in a pocket: its screen side).
+    /// Integrating the gyro about gravity instead adds a few degrees with every stride when the
+    /// phone swings with a leg (coning): on a real walk that was 3 to 4 degrees a step, the wrong way.
+    private func turn(_ r: CMRotationMatrix, gravity g: [Double]) -> Double {
+        // The three phone axes in the reference frame (z up). Apple's matrix can be read two ways;
+        // the right one is the one whose vertical parts match gravity.
+        let rows = [[r.m11, r.m12, r.m13], [r.m21, r.m22, r.m23], [r.m31, r.m32, r.m33]]
+        let cols = [[r.m11, r.m21, r.m31], [r.m12, r.m22, r.m32], [r.m13, r.m23, r.m33]]
+        func miss(_ axes: [[Double]]) -> Double { (0..<3).reduce(0) { $0 + abs(axes[$1][2] + g[$1]) } }
+        let axes = miss(rows) <= miss(cols) ? rows : cols
+        // the most level axis, with some stickiness so it does not flip back and forth
+        let best = (0..<3).min { abs(g[$0]) < abs(g[$1]) } ?? 0
+        if axis < 0 || abs(g[axis]) > abs(g[best]) + 0.25 { axis = best }
+        var turned = 0.0
+        for i in 0..<3 {
+            let angle = atan2(axes[i][1], axes[i][0]) * 180 / .pi       // counter-clockwise from the frame's x
+            if i == axis, let last = lastAngle[i], abs(g[i]) < 0.9 {
+                var d = angle - last
+                if d > 180 { d -= 360 } else if d < -180 { d += 360 }
+                turned = -d                                              // clockwise
+            }
+            lastAngle[i] = angle
+        }
+        return turned
+    }
 
     func start() {
         if motion.isDeviceMotionAvailable && !motion.isDeviceMotionActive {
@@ -345,10 +378,14 @@ final class PhoneSensors {
             motion.startDeviceMotionUpdates(using: .xArbitraryZVertical, to: .main) { [weak self] m, _ in
                 guard let self, let m else { return }
                 let g = m.gravity, w = m.rotationRate, a = m.userAcceleration
-                // gravity points down: turning about "down" is clockwise seen from above
-                let rate = (w.x * g.x + w.y * g.y + w.z * g.z) * 180 / .pi
+                let gyroRate = (w.x * g.x + w.y * g.y + w.z * g.z) * 180 / .pi     // logged only, see turn()
                 let up = -(a.x * g.x + a.y * g.y + a.z * g.z)
-                self.onMotion?(Date().timeIntervalSince1970, m.timestamp, rate, [g.x, g.y, g.z], up)
+                var turned = self.turn(m.attitude.rotationMatrix, gravity: [g.x, g.y, g.z])
+                // Safety net for the sign: over a short moment the orientation and the gyro must
+                // turn the same way. If they clearly disagree, the frame is mirrored: flip it.
+                if abs(gyroRate) > 15 { self.agreement = max(-500, min(500, self.agreement + turned * gyroRate * 0.02)) }
+                if self.agreement < -20 { turned = -turned }
+                self.onMotion?(Date().timeIntervalSince1970, m.timestamp, turned, gyroRate, [g.x, g.y, g.z], up)
             }
         }
         if CMAltimeter.isRelativeAltitudeAvailable() {
