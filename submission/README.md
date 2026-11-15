@@ -1,6 +1,6 @@
 # Submission: Wayback Trail × Vexo
 
-- **[wayback-working-demo.mp4](wayback-working-demo.mp4)**: the 60-second working demo. The iPhone screen is on the left, the walker and the app's live updates on the right. It is a simulated screen recording: a synthetic walk run through the real Wayback code, labelled on screen. Details in [demo-video/](../demo-video/README.md).
+- **[wayback-working-demo.mp4](wayback-working-demo.mp4)** (v2 final): the 60-second working demo. The iPhone screen is on the left, the walker and the app's live updates on the right. It is a simulated screen recording: a synthetic walk run through the real Wayback code, labelled on screen. Details in [demo-video/](../demo-video/README.md).
 - **wayback-trail-commercial.mp4**: the 60-second concept commercial (below).
 
 ## The commercial
