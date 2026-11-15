@@ -375,6 +375,115 @@ function walker(c, x, y, s, phase, o = {}) {
   const sx = o.sx == null ? 1 : o.sx;
   return { wrist: [x + hand[0] * s * sx, y + (hand[1] - 9 - bob) * s], pocket: [x - 9.5 * s * sx, y + (-101 - bob) * s], head: [x + 8 * s * sx, y + (-205 - bob) * s], back: [x + backHand[0] * s * sx, y + (backHand[1] - bob) * s] };
 }
+/* The hallway behind the walker. It scrolls with the walker's real position on the simulated
+   route: the distance along entrance -> corner -> elevator, projected from the tracker's x, y.
+   Side view, so +distance is always to the right on screen. */
+const PPM = 112;                       // pixels per metre along the hallway
+let ROUTE = null;
+function routeOf() {
+  if (ROUTE) return ROUTE;
+  const lm = P.events.filter(e => e.kind === "landmark");
+  const ent = lm.find(e => e.label === "entrance") || { x: 0, y: 0 }, ele = lm.find(e => e.label === "elevator") || { x: 5.6, y: 9.1 };
+  const corner = { x: ent.x, y: ele.y };
+  const leg1 = Math.hypot(corner.x - ent.x, corner.y - ent.y), leg2 = Math.hypot(ele.x - corner.x, ele.y - corner.y);
+  ROUTE = { ent, ele, corner, leg1, total: leg1 + leg2 };
+  return ROUTE;
+}
+function hallwayD(x, y) {            // distance along the L from the entrance
+  const R = routeOf();
+  const d1 = clamp(y - R.ent.y, 0, R.leg1), e1 = Math.hypot(x - R.ent.x, y - (R.ent.y + d1));
+  const d2 = clamp(x - R.corner.x, 0, R.total - R.leg1), e2 = Math.hypot(x - (R.corner.x + d2), y - R.corner.y);
+  return e1 <= e2 ? d1 : R.leg1 + d2;
+}
+function drawHallway(c, st, t, X, Y, Wd, Hd, wx) {
+  const R = routeOf(), d = hallwayD(st.samp.x, st.samp.y);
+  const wallB = Y + 318, floorB = Y + Hd;
+  const SX = dp => wx + (dp - d) * PPM;            // screen x of a point dp metres along the hallway
+  // wall
+  let g = c.createLinearGradient(0, Y, 0, wallB); g.addColorStop(0, "#1b1c21"); g.addColorStop(1, "#24252b"); c.fillStyle = g; c.fillRect(X, Y, Wd, wallB - Y);
+  // floor (polished, with tile seams that slide by)
+  g = c.createLinearGradient(0, wallB, 0, floorB); g.addColorStop(0, "#2a2b31"); g.addColorStop(1, "#0d0d10"); c.fillStyle = g; c.fillRect(X, wallB, Wd, floorB - wallB);
+  c.fillStyle = "#0f1013"; c.fillRect(X, wallB - 10, Wd, 10);                          // skirting board
+  c.strokeStyle = "rgba(255,255,255,.05)"; c.lineWidth = 2;
+  for (let k = Math.floor(d - 8); k <= d + 8; k++) { const x0 = SX(k * 1.0); c.beginPath(); c.moveTo(x0, wallB); c.lineTo(x0 - 70, floorB); c.stroke(); }
+  c.beginPath(); c.moveTo(X, wallB + 40); c.lineTo(X + Wd, wallB + 40); c.stroke();
+  // ceiling light strips and their pools of light
+  for (let k = Math.floor((d - 7) / 2); k <= (d + 7) / 2; k++) {
+    const x0 = SX(k * 2 + 1); if (x0 < X - 100 || x0 > X + Wd + 100) continue;
+    c.fillStyle = "rgba(255,255,255,.85)"; rrect(c, x0 - 40, Y + 6, 80, 6, 3); c.fill();
+    c.save(); c.globalCompositeOperation = "lighter"; const lg = c.createRadialGradient(x0, Y + 10, 0, x0, Y + 10, 220);
+    lg.addColorStop(0, "rgba(255,244,225,.10)"); lg.addColorStop(1, "rgba(255,244,225,0)"); c.fillStyle = lg; c.fillRect(x0 - 220, Y, 440, 330); c.restore();
+  }
+  // wall columns every 2.5 m
+  for (let k = Math.floor((d - 7) / 2.5); k <= (d + 7) / 2.5; k++) { const x0 = SX(k * 2.5 + .3); c.fillStyle = "rgba(0,0,0,.18)"; c.fillRect(x0, Y, 18, wallB - Y); c.fillStyle = "rgba(255,255,255,.04)"; c.fillRect(x0, Y, 3, wallB - Y); }
+  const prop = (dp, w, fn) => { const x0 = SX(dp); if (x0 + w < X - 40 || x0 - w > X + Wd + 40) return; c.save(); fn(x0); c.restore(); };
+  // --- filler: room doors, art, a bench, plants
+  const roomDoor = (dp, label) => prop(dp, 120, x0 => {
+    c.fillStyle = "#3a2f28"; rrect(c, x0 - 52, wallB - 230, 104, 230, 4); c.fill();
+    c.strokeStyle = "rgba(0,0,0,.35)"; c.lineWidth = 3; c.strokeRect(x0 - 40, wallB - 214, 80, 90); c.strokeRect(x0 - 40, wallB - 112, 80, 96);
+    c.fillStyle = "#c9c9ce"; rrect(c, x0 + 28, wallB - 122, 16, 6, 3); c.fill();
+    c.fillStyle = "#e5e5ea"; rrect(c, x0 - 30, wallB - 268, 60, 26, 5); c.fill(); T(c, label, x0, wallB - 249, { size: 15, w: 700, align: "center", color: "#1c1c1e" }); });
+  const art = (dp, hue) => prop(dp, 90, x0 => { c.fillStyle = "#0e0e10"; c.fillRect(x0 - 62, Y + 70, 124, 90);
+    const ag = c.createLinearGradient(x0 - 56, Y + 76, x0 + 56, Y + 154); ag.addColorStop(0, "hsl(" + hue + ",60%,45%)"); ag.addColorStop(1, "hsl(" + (hue + 60) + ",60%,30%)"); c.fillStyle = ag; c.fillRect(x0 - 56, Y + 76, 112, 78); });
+  const plant = dp => prop(dp, 60, x0 => { c.fillStyle = "#2c2c30"; rrect(c, x0 - 22, wallB - 2, 44, 52, 6); c.fill();
+    c.fillStyle = "#2f6b3a"; for (let i = 0; i < 7; i++) { c.save(); c.translate(x0, wallB); c.rotate(-1.2 + i * .4); c.beginPath(); c.ellipse(0, -46, 12, 44, 0, 0, 7); c.fill(); c.restore(); } });
+  const bench = dp => prop(dp, 120, x0 => { c.fillStyle = "#6b4f3a"; rrect(c, x0 - 90, wallB + 4, 180, 16, 4); c.fill(); c.fillStyle = "#1c1c1e"; c.fillRect(x0 - 78, wallB + 20, 8, 38); c.fillRect(x0 + 70, wallB + 20, 8, 38); });
+  roomDoor(3.6, "101"); art(5.4, 200); bench(6.4); roomDoor(7.6, "103"); plant(R.leg1 - 1.1);
+  roomDoor(R.leg1 + 1.8, "105"); art(R.leg1 + 3.3, 30); plant(R.total - 1.3); plant(1.7);
+  // --- the entrance: glass doors to daylight, lit sign
+  prop(0, 200, x0 => {
+    c.save(); c.globalCompositeOperation = "lighter"; glowBlob(c, x0, wallB - 120, 260, "#cfe8ff", .45); c.restore();
+    c.fillStyle = "#3a3d44"; rrect(c, x0 - 128, wallB - 262, 256, 262, 6); c.fill();
+    [-1, 1].forEach(sd => { const gx = x0 + (sd < 0 ? -118 : 4);
+      const gg = c.createLinearGradient(gx, wallB - 250, gx + 114, wallB); gg.addColorStop(0, "#bfe3ff"); gg.addColorStop(.55, "#e9f6ff"); gg.addColorStop(1, "#9fc9ec"); c.fillStyle = gg; c.fillRect(gx, wallB - 250, 114, 250);
+      c.fillStyle = "rgba(255,255,255,.45)"; c.beginPath(); c.moveTo(gx + 14, wallB - 250); c.lineTo(gx + 44, wallB - 250); c.lineTo(gx + 4, wallB - 120); c.lineTo(gx, wallB - 160); c.fill();
+      c.fillStyle = "#8e8e93"; c.fillRect(x0 + sd * 14 - 3, wallB - 150, 6, 60); });
+    c.fillStyle = "#3a3d44"; c.fillRect(x0 - 3, wallB - 250, 6, 250);
+    c.fillStyle = "#2f8f4e"; rrect(c, x0 - 92, wallB - 306, 184, 36, 8); c.fill();
+    c.save(); c.shadowColor = "#30D158"; c.shadowBlur = 18; T(c, "ENTRANCE", x0, wallB - 281, { size: 20, w: 800, align: "center", ls: 3 }); c.restore();
+    c.fillStyle = "#3b2f2a"; c.beginPath(); c.moveTo(x0 - 120, wallB + 6); c.lineTo(x0 + 120, wallB + 6); c.lineTo(x0 + 150, wallB + 34); c.lineTo(x0 - 150, wallB + 34); c.closePath(); c.fill();   // mat
+  });
+  // --- the corner where the route turns: a hanging sign pointing on to the elevator
+  prop(R.leg1, 160, x0 => {
+    const cg = c.createLinearGradient(x0 - 60, 0, x0 + 60, 0); cg.addColorStop(0, "rgba(0,0,0,0)"); cg.addColorStop(.5, "rgba(0,0,0,.35)"); cg.addColorStop(1, "rgba(255,255,255,.04)");
+    c.fillStyle = cg; c.fillRect(x0 - 60, Y, 120, wallB - Y);
+    c.strokeStyle = "#8e8e93"; c.lineWidth = 2; c.beginPath(); c.moveTo(x0 - 50, Y); c.lineTo(x0 - 50, Y + 34); c.moveTo(x0 + 50, Y); c.lineTo(x0 + 50, Y + 34); c.stroke();
+    c.fillStyle = "#0a3d8f"; rrect(c, x0 - 92, Y + 32, 184, 40, 8); c.fill(); T(c, "Elevator  →", x0, Y + 59, { size: 19, w: 700, align: "center" });
+  });
+  // --- the elevator: steel doors, call buttons, floor display
+  prop(R.total, 220, x0 => {
+    c.fillStyle = "#4a4d55"; rrect(c, x0 - 128, wallB - 240, 256, 240, 6); c.fill();
+    const open = st.done ? 0 : 0;
+    [-1, 1].forEach(sd => { const gx = x0 + (sd < 0 ? -114 : 2) + sd * open;
+      const mg = c.createLinearGradient(gx, 0, gx + 112, 0); mg.addColorStop(0, "#9ea3ab"); mg.addColorStop(.5, "#d7dbe0"); mg.addColorStop(1, "#8d9299"); c.fillStyle = mg; c.fillRect(gx, wallB - 226, 112, 226);
+      c.fillStyle = "rgba(255,255,255,.18)"; c.fillRect(gx + 20, wallB - 226, 6, 226); });
+    c.fillStyle = "#2b2d31"; c.fillRect(x0 - 2, wallB - 226, 4, 226);
+    c.fillStyle = "#0d0d0f"; rrect(c, x0 - 44, wallB - 272, 88, 26, 6); c.fill();
+    c.save(); c.shadowColor = C.red; c.shadowBlur = 10; T(c, "1 ▲", x0, wallB - 252, { size: 18, w: 800, align: "center", color: "#ff5a4f", f: "ui-monospace, Menlo, monospace" }); c.restore();
+    c.fillStyle = "#3a3c42"; rrect(c, x0 + 146, wallB - 168, 34, 70, 8); c.fill();
+    const lit = Math.floor(t * 2) % 2 === 0 && st.places.length >= 2 && !st.guiding && !st.done;
+    [[-1, wallB - 148], [1, wallB - 118]].forEach(([dir, yy]) => { c.beginPath(); c.arc(x0 + 163, yy, 10, 0, 7); c.fillStyle = dir < 0 && lit ? "#ffd60a" : "#c7c7cc"; c.fill();
+      c.fillStyle = "#1c1c1e"; c.beginPath(); c.moveTo(x0 + 163, yy + dir * 5); c.lineTo(x0 + 158, yy - dir * 3); c.lineTo(x0 + 168, yy - dir * 3); c.fill(); });
+    c.fillStyle = "#e5e5ea"; rrect(c, x0 - 70, wallB - 306, 140, 28, 6); c.fill(); T(c, "ELEVATOR", x0, wallB - 286, { size: 16, w: 800, align: "center", color: "#1c1c1e", ls: 2 });
+  });
+  // --- saved places float a purple pin, like the app's map
+  st.places.forEach(pl => {
+    const dp = pl.label === "entrance" ? 0 : pl.label === "elevator" ? R.total : hallwayD(pl.x, pl.y);
+    const ev = P.events.find(e => e.kind === "landmark" && e.label === pl.label), k = espring(seg(t, ev.vt, ev.vt + .6));
+    prop(dp, 320, x0c => { const x0 = x0c - 168, yy = Y + 96 + Math.sin(t * 2.4) * 4 - (1 - k) * 30; c.globalAlpha = clamp(k);
+      c.save(); c.shadowColor = C.purple; c.shadowBlur = 20; c.beginPath(); c.arc(x0, yy, 20, 0, 7); c.fillStyle = C.landmark; c.fill(); c.restore();
+      c.beginPath(); c.arc(x0, yy, 20, 0, 7); c.strokeStyle = "#fff"; c.lineWidth = 3; c.stroke(); icon(c, "pin", x0, yy, 22, "#fff");
+      pill(c, "Saved: " + cap(pl.label), x0 - 28, yy, { size: 16, align: "right", fill: "rgba(175,82,222,.9)" }); });
+  });
+  // --- while guiding: green chevrons on the floor, sliding toward the entrance
+  if (st.guiding && !st.done) {
+    const a = seg(t, st.navT, st.navT + .6);
+    for (let k = -6; k <= 6; k++) { const ph = ((t * 1.2) % 1); const x0 = X + Wd / 2 + (k - ph) * 120; const yy = wallB + 30;
+      c.save(); c.globalAlpha = a * (.25 + .5 * (1 - Math.abs(k) / 6)); c.strokeStyle = C.green; c.lineWidth = 6; c.lineCap = "round"; c.lineJoin = "round";
+      c.beginPath(); c.moveTo(x0 + 14, yy - 14); c.lineTo(x0 - 6, yy); c.lineTo(x0 + 14, yy + 14); c.stroke(); c.restore(); }
+  }
+  return d;
+}
 function personPanel(c, st, t, X, Y, Wd, Hd) {
   glass(c, X, Y, Wd, Hd, 30, { fill: "rgba(18,18,20,.9)" });
   c.save(); rrect(c, X, Y, Wd, Hd, 30); c.clip();
@@ -385,20 +494,10 @@ function personPanel(c, st, t, X, Y, Wd, Hd) {
   // turned around after "take me back": the synthetic walk turns 180° at about sim 19.4 s
   const turnK = eio(seg(s, 19.38, 20.98)), sx = Math.cos(Math.PI * turnK);
   const fwd = s < 20.2 ? 1 : -1;
-  // floor
-  const hz = Y + 150, vx = X + Wd / 2;
-  const g = c.createLinearGradient(0, Y, 0, Y + Hd); g.addColorStop(0, "#17181c"); g.addColorStop(1, "#08080a"); c.fillStyle = g; c.fillRect(X, Y, Wd, Hd);
-  c.strokeStyle = "rgba(255,255,255,.06)"; c.lineWidth = 2;
-  for (let i = -14; i <= 14; i++) { c.beginPath(); c.moveTo(vx, hz); c.lineTo(vx + i * 200, Y + Hd); c.stroke(); }
-  const dist = st.samp.steps * .45 * 1;
-  const off = (((dist * fwd) % 1) + 1) % 1;
-  for (let j = 0; j < 12; j++) { const z = (j + off) / 12, yy = hz + Math.pow(z, 2.2) * (Y + Hd - hz); c.globalAlpha = z * .9; c.beginPath(); c.moveTo(X, yy); c.lineTo(X + Wd, yy); c.stroke(); }
-  c.globalAlpha = 1;
-  c.save(); c.globalCompositeOperation = "lighter";
-  for (let j = 0; j < 5; j++) { const z = ((((j / 5) + dist * .08 * fwd) % 1) + 1) % 1; glowBlob(c, vx - z * 520 * fwd, hz - 20 - z * z * 120, 30 + z * 90, C.white, .25); }
-  c.restore();
+  const wx = X + Wd * .6;
+  drawHallway(c, st, t, X, Y, Wd, Hd, wx);
   // the walker
-  const wx = X + Wd * .6, wy = Y + Hd - 26;
+  const wy = Y + Hd - 26;
   const tapping = st.listening && P.listen.some(([a]) => t >= a && t < a + .55);
   const wk = walker(c, wx, wy, 1.42, moving ? s * 6.4 : .9, { sx, amp: moving ? 1 : .3, tap: tapping });
   // band light
@@ -429,8 +528,9 @@ function personPanel(c, st, t, X, Y, Wd, Hd) {
     c.restore();
   }
   // labels
-  T(c, "The walker", X + 30, Y + Hd - 64, { size: 15, w: 700, color: C.gray, ls: 2 });
-  T(c, "Vexo band on the wrist · iPhone in the pocket", X + 30, Y + Hd - 36, { size: 20, w: 600, color: "#d1d1d6" });
+  glass(c, X + 18, Y + Hd - 80, 470, 62, 16, { fill: "rgba(10,10,12,.78)" });
+  T(c, "THE WALKER", X + 36, Y + Hd - 56, { size: 13, w: 700, color: C.gray, ls: 2 });
+  T(c, "Vexo band on the wrist · iPhone in the pocket", X + 36, Y + Hd - 32, { size: 18, w: 600, color: "#d1d1d6" });
   const spd = rate > 0 ? (rate > 1.15 ? "▶▶ " + rate.toFixed(1) + "× walk" : "▶ 1× walk") : (st.done ? "■ arrived" : "■ standing");
   pill(c, spd, X + Wd - 24, Y + Hd - 44, { size: 18, align: "right" });
   c.restore();

@@ -25,6 +25,9 @@ said back, the band light, the iPhone buzz and the directions.
 - **Voices (ElevenLabs):** the walker is Chris, Wayback speaks in River (`config.ELEVENLABS_VOICE_ID`),
   and the narrator is Sarah. The key is read only through `keys.py`. Every spoken line is captioned.
 - **Speed:** the outward walk plays at about 1.6× and is labelled on screen; the walk back plays at about 1×.
+- **The hallway:** the walker's panel scrolls past an entrance (glass doors, lit sign), the corner
+  ("Elevator →" sign) and the elevator (doors, call buttons, floor display), placed on the route's
+  real distances. Saved places get a purple pin; the green floor arrows show the way back.
 - **Sound:** a synthesised backing track, plus a low hum for each iPhone buzz in its real pattern.
 
 ## Timeline
