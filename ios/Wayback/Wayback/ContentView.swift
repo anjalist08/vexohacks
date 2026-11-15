@@ -172,7 +172,6 @@ struct ContentView: View {
 
     private var statusLine: String {
         if !guide.voice.isEmpty { return guide.voice }
-        if guide.recording && !guide.calibrated { return "Hold your arm still for a moment…" }
         if guide.recording {
             let floor = guide.level == 0 ? "" : " · floor \(guide.level > 0 ? "+" : "")\(guide.level)"
             return "Recording · \(guide.steps) steps\(floor)\nDouble-tap the band and say \u{201C}remember this as\u{2026}\u{201D}"

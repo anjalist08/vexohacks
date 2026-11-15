@@ -172,7 +172,7 @@ final class PhoneBrain {
             guide?.backTrail = []; guide?.directions = []; guide?.guiding = false; guide?.waypoints = []
             tracker.start(at: t)
             publish()
-            say(tracker.calibrated ? "Route started." : "Route started. Hold still for a moment.", led: "route_started")
+            say("Route started.", led: "route_started")
         case .stopRoute:
             routeActive = false; nav = nil; tracker.stop(); guide?.guiding = false
             publish()

@@ -210,14 +210,16 @@ final class PhoneTracker {
         altitude = metres - (altitudeBase ?? metres)
     }
 
-    /// One step count from three: the phone's footfalls (instant), the band's counter and Apple's
-    /// pedometer (both late to start, both steady). Never behind the steady ones; never more than
-    /// 16 ahead of them while one of them is alive.
+    /// One step count from three. The phone's footfalls are instant. The band's counter and
+    /// Apple's pedometer start late but keep counting even while the app is asleep in a pocket.
+    /// On a real walk the band alone ran 1.5x high and the two phone counts agreed, so the map
+    /// uses the footfalls, never fewer than what BOTH steady counters agree on (the smaller one),
+    /// and never more than 16 ahead of the pedometer.
     private func reconcile(_ t: Double) {
         let bandAlive = t - lastBandActivity < 3
-        let reference = max(bandAlive ? bandSince : 0, pedSince)
-        var target = max(detected, reference)
-        if bandAlive || pedAlive { target = min(target, reference + 16) }
+        let agreed = (bandAlive && pedAlive) ? min(pedSince, bandSince) : (pedAlive ? pedSince : (bandAlive ? bandSince : 0))
+        var target = max(detected, agreed)
+        if pedAlive { target = min(target, max(pedSince, agreed) + 16) }
         if target > steps { advance(target - steps, t) }
     }
 
