@@ -46,7 +46,7 @@ const C = { blue: "#0A84FF", green: "#30D158", orange: "#FF9F0A", purple: "#BF5A
   route: "#147AFA", guide: "#1FC275", landmark: "#9E47F0", iosGray: "#8E8E93", iosBlue: "#007AFF", iosGreen: "#34C759",
   iosOrange: "#FF9500", iosIndigo: "#5856D6", iosPurple: "#AF52DE", iosRed: "#FF3B30", iosCyan: "#32ADE6" };
 const GLOW = [C.orange, C.pink, C.purple, C.indigo, C.blue, C.teal];
-const PAT = { wrong_left: [120, 120, 120], wrong_right: [120, 120, 120, 120, 120], on_track: [600], tick: [50], turn_soon: [80],
+const PAT = { wrong_left: [120, 120, 120], wrong_right: [120, 120, 120, 120, 120], on_track: [600], tick: [70], turn_soon: [80],
   turn_left: [500, 150, 150], turn_right: [500, 150, 150, 150, 150], turn_around: [500, 150, 500], arrived: [700, 200, 700, 200, 700],
   lost: [100, 60, 100, 60, 100, 60, 100, 60, 100] };
 // store/haptics.py names -> the iPhone app's feed labels (ios/Wayback/Wayback/Guide.swift, logBuzz)
@@ -129,7 +129,12 @@ function stateAt(t) {
       push(st.stream, { badge: "TOOL", col: C.teal, text: e.tool + "(" + args + ")", t: e.vt + .5, mono: true });
     } else if (e.kind === "tool") {
       if (e.data && e.data.instructions) { /* navigate */ }
+    } else if (e.kind === "pulse") {   // the iPhone's one buzz rule (clean-app): pulse = on course, silence = turn
+      st.pulse = { on: e.on, t: e.vt };
+      push(st.stream, e.on ? { badge: "BUZZ · iPhone", col: C.green, text: "Steady pulse · facing the way to walk", t: e.vt }
+                           : { badge: "BUZZ · iPhone", col: "#8e8e93", text: "Silence · turn until the pulse comes back", t: e.vt });
     } else if (e.kind === "say") {
+      st.lastSay = e.text;
       push(st.stream, { badge: "WAYBACK · ElevenLabs River", col: C.purple, text: e.text, t: e.vt });
     } else if (e.kind === "led") {
       st.led = { state: e.state, period: e.period, t: e.vt };
@@ -213,11 +218,14 @@ function card(c, x, y, w, h, r) { c.save(); c.shadowColor = "rgba(0,0,0,.10)"; c
 function phoneScreen(c, st, t) {
   // map
   c.fillStyle = "#EEF0F3"; c.fillRect(0, 0, PW, PH);
-  const topIn = st.guiding || st.done ? 248 : 136;
-  const bottomIn = 240 + (st.places.length || st.recording ? 50 : 0) + (st.feed.length ? 108 : 0);
+  // fit the map into the free space: below the banner (which sits under the camera picture)
+  // and above the Live Activity card, chips and dock
+  const camOnMap = st.recording || st.guiding;
+  const topIn = st.guiding || st.done ? 56 + 56 + (camOnMap ? 140 : 0) + 98 + 8 : 136;
+  const dockTop = PH - 26 - 172, bottomIn = PH - (dockTop - (st.places.length || st.recording ? 56 : 0) - (st.feed.length ? 102 : 0)) + 6;
   const kNav = st.navT != null ? eio(seg(t, st.navT, st.navT + .5)) : 0;
   const mapTop = lerp(136, topIn, kNav), mapBot = PH - bottomIn;
-  const bx0 = -3, bx1 = 8.5, by0 = -2, by1 = 10.5;
+  const bx0 = -2, bx1 = 7.6, by0 = -1.6, by1 = 10.4;
   const sc = Math.min((PW - 40) / (bx1 - bx0), (mapBot - mapTop - 20) / (by1 - by0));
   const cx = PW / 2 - ((bx0 + bx1) / 2) * sc, cy = (mapTop + mapBot) / 2 + ((by0 + by1) / 2) * sc;
   const M = (x, y) => [cx + x * sc, cy - y * sc];
@@ -266,9 +274,17 @@ function phoneScreen(c, st, t) {
   if (conn) { T(c, "iPhone + band", 60, tb + 36, { size: 10, w: 500, f: IF, color: C.iosGray });
     rrect(c, 196, tb + 12, 60, 22, 11); c.fillStyle = "rgba(0,0,0,.06)"; c.fill(); T(c, "▮ 82%", 226, tb + 27, { size: 11, w: 600, f: IF, color: C.iosGray, align: "center" }); }
   [[294, "list"], [342, "gear"]].forEach(([x, n]) => { if (n === "list" && !st.feed.length) return; c.save(); c.shadowColor = "rgba(0,0,0,.08)"; c.shadowBlur = 10; c.beginPath(); c.arc(x + 20, tb + 23, 20, 0, 7); c.fillStyle = "rgba(255,255,255,.93)"; c.fill(); c.restore(); icon(c, n, x + 20, tb + 23, 17, "#1c1c1e"); });
+  // the camera picture (clean-app, "Show the camera view"): simulated, what the phone faces in the hallway
+  const camOn = st.recording || st.guiding;
+  if (camOn) {
+    const cx0 = PW - 16 - 96, cy0 = tb + 46 + 12, ka = eout(seg(t, P.events.find(e => e.kind === "led" && e.state === "route_started").vt, P.events.find(e => e.kind === "led" && e.state === "route_started").vt + .5));
+    c.save(); c.globalAlpha = ka; c.shadowColor = "rgba(0,0,0,.15)"; c.shadowBlur = 8; c.shadowOffsetY = 2; rrect(c, cx0, cy0, 96, 128, 14); c.fillStyle = "#222"; c.fill(); c.restore();
+    c.save(); c.globalAlpha = ka; rrect(c, cx0, cy0, 96, 128, 14); c.clip(); cameraView(c, st, t, cx0, cy0, 96, 128); c.restore();
+    c.save(); c.globalAlpha = ka; rrect(c, cx0, cy0, 96, 128, 14); c.strokeStyle = "#fff"; c.lineWidth = 2; c.stroke(); c.restore();
+  }
   // guidance banner
   if (st.banner) {
-    const bk = eout(seg(t, st.navT, st.navT + .45)), by = tb + 56 - (1 - bk) * 30;
+    const bk = eout(seg(t, st.navT, st.navT + .45)), by = tb + 56 + (camOn ? 140 : 0) - (1 - bk) * 30;
     c.save(); c.globalAlpha = bk;
     card(c, 16, by, PW - 32, 98, 24);
     const acc = st.banner.state === "done" ? C.landmark : st.banner.state === "wrong" ? C.iosOrange : C.guide;
@@ -318,8 +334,8 @@ function phoneScreen(c, st, t) {
   card(c, 16, dockY, PW - 32, 172, 30);
   const lis = st.listening;
   const steps = st.recording ? Math.max(0, st.samp.steps - (P.samples[0].steps || 0)) : 0;
-  const calibrating = st.recording && !st.guiding && !st.done && st.s < 2.5 && t < P.segments[1][0] + 2;
-  const status = lis ? "Listening…" : st.done ? "You reached the entrance" : st.guiding ? "Guiding to the entrance · follow the buzzes" : calibrating ? "Hold your arm still for a moment…"
+  const calibrating = false;      // clean-app: no hold-still wait
+  const status = lis ? "Listening… speak now" : st.lastSay ? st.lastSay
     : st.recording ? "Recording · " + steps + " steps — double-tap band to name a spot" : t >= P.connect[0] ? "Tap Start route, or double-tap the band and say “start route”" : "Double-tap Vexo-HACK-80 so its blue light blinks";
   const sw = T(c, status, PW / 2 + 6, dockY + 30, { size: 12.5, w: 500, f: IF, color: lis ? "#000" : C.iosGray, align: "center", max: PW - 80, a: 0 });
   if (lis) icon(c, "wave", PW / 2 - sw / 2 - 8, dockY + 26, 13, C.iosIndigo);
@@ -351,9 +367,44 @@ function drawPhone(c, st, t, x, y, s) {
   // buzz: the phone shakes, rings ripple
   const b = buzzOn(st, t);
   if (b) { for (let r = 0; r < 2; r++) { const k = clamp(b.k * 1.25 - r * .25); if (k > 0 && k < 1) { rrect(c, x - pad - k * 30, y - pad - k * 30, bw + pad * 2 + k * 60, bh + pad * 2 + k * 60, 66 + k * 20);
-    c.strokeStyle = hexA(b.cue === "on_track" ? C.green : b.cue === "arrived" ? C.purple : C.orange, (1 - k) * .55); c.lineWidth = 3; c.stroke(); } } }
+    c.strokeStyle = hexA(b.cue === "on_track" || b.cue === "tick" ? C.green : b.cue === "arrived" ? C.purple : C.orange, (1 - k) * (b.cue === "tick" ? .3 : .55)); c.lineWidth = 3; c.stroke(); } } }
 }
 
+
+/* The phone's camera picture (clean-app "Show the camera view"), simulated: a first-person look
+   down the same hallway the walker panel shows, toward whatever is ahead along the route. */
+function cameraView(c, st, t, x, y, w, h) {
+  const R = routeOf(), d = hallwayD(st.samp.x, st.samp.y), s = st.s;
+  const back = st.guiding || st.done, facingAway = st.guiding && s < 20.2;
+  // what is ahead, and how far
+  let kind, dist;
+  if (!back) { if (d < R.leg1 - .3) { kind = "corner"; dist = R.leg1 - d; } else { kind = "elevator"; dist = R.total - d; } }
+  else if (facingAway) { kind = "elevator"; dist = Math.max(.4, R.total - d); }
+  else if (st.done) { kind = "entrance"; dist = .5; }
+  else if (d > R.leg1 + .3) { kind = "wall"; dist = d - R.leg1; }
+  else { kind = "entrance"; dist = d; }
+  const moving = st.samp.steps > sampleAt(Math.max(0, s - .5)).steps && !st.done;
+  const bob = moving ? Math.sin(s * 12.8) * 1.6 : 0;
+  const vx = x + w / 2, vy = y + h * .46 + bob;
+  const k = 1 / (1 + dist * .32), ew = w * .95 * k + 8, eh = h * .9 * k + 10;   // the far wall
+  const L = vx - ew / 2, Rr = vx + ew / 2, T0 = vy - eh * .55, B = vy + eh * .45;
+  c.fillStyle = "#2b2c31"; c.fillRect(x, y, w, h);
+  c.fillStyle = "#3a3b41"; c.beginPath(); c.moveTo(x, y); c.lineTo(L, T0); c.lineTo(L, B); c.lineTo(x, y + h); c.fill();         // left wall
+  c.fillStyle = "#34353b"; c.beginPath(); c.moveTo(x + w, y); c.lineTo(Rr, T0); c.lineTo(Rr, B); c.lineTo(x + w, y + h); c.fill(); // right wall
+  c.fillStyle = "#1e1f23"; c.beginPath(); c.moveTo(x, y + h); c.lineTo(L, B); c.lineTo(Rr, B); c.lineTo(x + w, y + h); c.fill();  // floor
+  c.fillStyle = "#4a4b52"; c.beginPath(); c.moveTo(x, y); c.lineTo(L, T0); c.lineTo(Rr, T0); c.lineTo(x + w, y); c.fill();        // ceiling
+  c.fillStyle = "rgba(255,255,255,.7)"; c.fillRect(vx - 6 * k - 3, T0 - 6, 12 * k + 6, 2);
+  // the far wall and what is on it
+  c.fillStyle = "#26272c"; c.fillRect(L, T0, ew, eh);
+  if (kind === "entrance") { const g = c.createLinearGradient(L, T0, Rr, B); g.addColorStop(0, "#cfe9ff"); g.addColorStop(1, "#8fbde6"); c.fillStyle = g; c.fillRect(L + ew * .2, T0 + eh * .2, ew * .6, eh * .8);
+    c.fillStyle = "#2f8f4e"; c.fillRect(L + ew * .25, T0 + eh * .06, ew * .5, Math.max(3, eh * .1)); }
+  if (kind === "elevator") { const g = c.createLinearGradient(L, 0, Rr, 0); g.addColorStop(0, "#9ea3ab"); g.addColorStop(.5, "#d7dbe0"); g.addColorStop(1, "#8d9299"); c.fillStyle = g;
+    c.fillRect(L + ew * .18, T0 + eh * .18, ew * .64, eh * .82); c.fillStyle = "#2b2d31"; c.fillRect(vx - .8, T0 + eh * .18, 1.6, eh * .82); }
+  if (kind === "corner") { c.fillStyle = "#0a3d8f"; c.fillRect(L + ew * .2, T0 + eh * .12, ew * .6, Math.max(4, eh * .14)); }
+  // light pools and a slight lens vignette
+  const v = c.createRadialGradient(x + w / 2, y + h / 2, h * .2, x + w / 2, y + h / 2, h * .75); v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(0,0,0,.45)");
+  c.fillStyle = v; c.fillRect(x, y, w, h);
+}
 /* ============================================================ the walker */
 function walker(c, x, y, s, phase, o = {}) {
   c.save(); c.translate(x, y); c.scale(s * (o.sx == null ? 1 : o.sx), s);
@@ -513,7 +564,7 @@ function personPanel(c, st, t, X, Y, Wd, Hd) {
   // buzz in the pocket
   const b = buzzOn(st, t);
   if (b) for (let i = 0; i < 3; i++) { const k = clamp(b.k * 1.3 - i * .18); if (k <= 0 || k >= 1) continue;
-    c.beginPath(); c.arc(wk.pocket[0], wk.pocket[1], 14 + k * 70, 0, 7); c.strokeStyle = hexA(b.cue === "on_track" ? C.green : b.cue === "arrived" ? C.purple : C.orange, (1 - k) * .85); c.lineWidth = 3; c.stroke(); }
+    c.beginPath(); c.arc(wk.pocket[0], wk.pocket[1], 14 + k * 70, 0, 7); c.strokeStyle = hexA(b.cue === "on_track" || b.cue === "tick" ? C.green : b.cue === "arrived" ? C.purple : C.orange, (1 - k) * (b.cue === "tick" ? .6 : .85)); c.lineWidth = 3; c.stroke(); }
   // what the walker says / what the app says
   const clip = clipAt(t);
   if (clip && (clip.voice === "walker" || clip.voice === "app")) {
@@ -543,7 +594,7 @@ function directionsCard(c, st, t, X, Y, Wd, Hd) {
   let big, sub, col = C.white, arrow = null;
   if (st.banner) { const b = st.banner; col = b.state === "done" ? C.purple : b.state === "wrong" ? C.orange : C.green; big = b.big; sub = b.sub; arrow = b.state === "done" ? null : b.arrow;
     const tag = b.state === "done" ? "ARRIVED" : b.state === "wrong" ? "ADJUST HEADING" : "GUIDING"; pill(c, tag, X + Wd - 28, Y + 36, { size: 15, align: "right", color: col, fill: hexA(col, .14), stroke: hexA(col, .35) }); }
-  else if (st.recording) { big = st.s < 2.5 ? "Hold still…" : "Recording your trail"; const steps = Math.max(0, st.samp.steps - P.samples[0].steps);
+  else if (st.recording) { big = "Recording your trail"; const steps = Math.max(0, st.samp.steps - P.samples[0].steps);
     sub = steps + " steps · " + (steps * .7).toFixed(1) + " m · " + st.places.length + " place" + (st.places.length === 1 ? "" : "s") + " saved"; col = C.orange; }
   else { big = t >= P.connect[0] ? "Ready" : "Finding the band…"; sub = t >= P.connect[0] ? "Double-tap the band and speak" : "Bluetooth, inside the app"; }
   const maxW = Wd - (arrow != null ? 190 : 56); let fs = 38; c.save(); while (fs > 24) { c.font = "800 " + fs + "px " + MF; if (c.measureText(big).width <= maxW) break; fs -= 2; } c.restore();
@@ -570,13 +621,17 @@ function lightBuzzCard(c, st, t, X, Y, Wd, Hd) {
   if (nm[1]) T(c, nm[1], X + 100, Y + 122, { size: 16, w: 500, color: C.gray, max: half - 112 });
   c.fillStyle = "rgba(255,255,255,.1)"; c.fillRect(X + half, Y + 24, 1.5, Hd - 48);
   T(c, "IPHONE BUZZ", X + half + 28, Y + 40, { size: 15, w: 700, color: C.gray, ls: 2 });
-  if (st.lastBuzz) {
+  if (st.guiding && st.pulse && !st.pulse.on) {
+    T(c, "silence", X + half + 28, Y + 88, { size: 22, w: 700, color: C.white, f: "ui-monospace, Menlo, monospace" });
+    rrect(c, X + half + 28, Y + 108, 120, 16, 8); c.strokeStyle = "rgba(255,255,255,.25)"; c.setLineDash([4, 6]); c.lineWidth = 2; c.stroke(); c.setLineDash([]);
+    T(c, "turn until the pulse comes back", X + half + 28, Y + 156, { size: 17, w: 500, color: C.gray, max: half - 50 });
+  } else if (st.lastBuzz) {
     const cue = st.lastBuzz.cue, ms = (t - st.lastBuzz.t) * 1000, recent = ms < 2600;
-    T(c, cue, X + half + 28, Y + 88, { size: 22, w: 700, color: recent ? C.white : C.gray, f: "ui-monospace, Menlo, monospace" });
+    T(c, cue === "tick" ? "steady pulse" : cue, X + half + 28, Y + 88, { size: 22, w: 700, color: recent ? C.white : C.gray, f: "ui-monospace, Menlo, monospace" });
     let bx = X + half + 28, acc = 0;
     PAT[cue].forEach((d, i) => { const w = Math.max(8, d / 15); if (i % 2 === 0) { const live = ms >= acc && ms < acc + d; rrect(c, bx, Y + 108, w, 16, 8);
-      c.fillStyle = live ? (cue === "on_track" ? C.green : cue === "arrived" ? C.purple : C.orange) : "rgba(255,255,255,.28)"; c.fill(); } bx += w + 6; acc += d; });
-    T(c, cue === "tick" ? "light keep-alive tick" : (BUZZ_LABEL[cue] || [""])[1], X + half + 28, Y + 156, { size: 17, w: 500, color: C.gray, max: half - 50 });
+      c.fillStyle = live ? (cue === "on_track" || cue === "tick" ? C.green : cue === "arrived" ? C.purple : C.orange) : "rgba(255,255,255,.28)"; c.fill(); } bx += w + 6; acc += d; });
+    T(c, cue === "tick" ? "on course · a tick every 0.6 s" : (BUZZ_LABEL[cue] || [""])[1], X + half + 28, Y + 156, { size: 17, w: 500, color: C.gray, max: half - 50 });
   } else T(c, "No buzz yet", X + half + 28, Y + 92, { size: 22, w: 600, color: C.gray });
 }
 function streamCard(c, st, t, X, Y, Wd, Hd) {

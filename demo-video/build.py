@@ -5,7 +5,8 @@
     python3 demo-video/build.py all
 
 Everything the phone and the panels show comes from simulate.py, which runs the real Wayback
-code (app.py, tracker/wrist.py, store/guidance.py, store/haptics.py) on a synthetic walk.
+code (app.py, tracker/wrist.py, store/) on a synthetic walk, with the iPhone app's newest
+guidance and pulse rules (branch clean-app, PhoneBrain.swift) ported for the walk back.
 Voices are ElevenLabs: the walker (Chris), the app (River, config.ELEVENLABS_VOICE_ID) and a
 narrator (Sarah). The key is read only through keys.py and sent in the xi-api-key header.
 """
@@ -118,8 +119,12 @@ def plan():
                 return v0 + (s - s0) * (v1 - v0) / (s1 - s0)
         return None
 
-    # the replies spoken during the walk back ("Turn left…", "You have reached…")
-    prev_end = end(r4, .2)
+    # the new buzz rule, explained the moment the pulse first starts (after turning around)
+    first_on = next(e for e in ev if e["kind"] == "pulse" and e["on"] and e["t"] > s_nav)
+    n_pulse = clip("narrator", "No buzz means turn. A steady pulse means you're on course.",
+                   min(max(end(r4, .35), vt(first_on["t"]) - 2.6), vt(first_on["t"])), "narrator")   # starts in the silence
+    # the replies spoken during the walk back ("In 5 steps…", "Turn left now…", "You have reached…")
+    prev_end = end(n_pulse, .2)
     for s in says:
         if s["t"] > s_nav:
             c = clip("app", s["text"], max(vt(s["t"]), prev_end), "say", None)
@@ -162,7 +167,7 @@ def plan():
     return out
 
 
-PAT = {"wrong_left": [120, 120, 120], "wrong_right": [120, 120, 120, 120, 120], "on_track": [600], "tick": [50],
+PAT = {"wrong_left": [120, 120, 120], "wrong_right": [120, 120, 120, 120, 120], "on_track": [600], "tick": [70],
        "turn_soon": [80], "turn_left": [500, 150, 150], "turn_right": [500, 150, 150, 150, 150],
        "turn_around": [500, 150, 500], "arrived": [700, 200, 700, 200, 700], "lost": [100, 60] * 4 + [100]}
 
@@ -201,7 +206,7 @@ def mix(p):
                 i0 = int((e["vt"] + acc / 1000) * SR); n = int(ms / 1000 * SR)
                 seg = t[:n]
                 env = np.clip(seg / .01, 0, 1) * np.clip((ms / 1000 - seg) / .02, 0, 1)
-                hum = (np.sin(2 * np.pi * 165 * seg) + .5 * np.sin(2 * np.pi * 330 * seg)) * env * (.10 if e["cue"] == "tick" else .2)
+                hum = (np.sin(2 * np.pi * 165 * seg) + .5 * np.sin(2 * np.pi * 330 * seg)) * env * (.07 if e["cue"] == "tick" else .2)
                 sfx[i0:i0 + n] += hum[: max(0, len(sfx) - i0)]
             acc += ms
     def wav(path, x):
