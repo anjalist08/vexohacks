@@ -51,5 +51,22 @@
    "Hallway graphics: entrance doors, the Elevator sign at the corner, the elevator, Saved pins and green floor arrows on the way back",
    "ElevenLabs voices: the walker (Chris), Wayback (River) and a narrator (Sarah), all captioned"
   ]
+ },
+ {
+  "version": 5,
+  "label": "Demo final v2",
+  "kind": "Working demo",
+  "file": "demo-final-v2.mp4",
+  "date": "2026-11-15",
+  "commit": "5146cfe",
+  "title": "Working demo: the iPhone app's newest behaviour",
+  "changes": [
+   "Matches the iPhone app's newest behaviour (branch clean-app) on main's redesigned screen",
+   "One buzz rule: silence while facing away, a steady pulse while facing the way to walk, three long buzzes on arrival",
+   "Directions spoken one at a time: \"Turn around, walk 8 steps.\", \"In 5 steps, turn left.\", \"Turn left now, then walk 13 steps.\"",
+   "\"Route started.\" with no hold-still wait; arrival two steps early, as the app does",
+   "The phone shows clean-app's camera picture (simulated hallway view); the status line shows what the app last said",
+   "New narrator line: \"No buzz means turn. A steady pulse means you're on course.\""
+  ]
  }
 ]
