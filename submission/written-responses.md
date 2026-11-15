@@ -50,7 +50,7 @@ The heading is smoothed with a rolling median and held on a $90^\circ$ grid, whi
 
 **Web pages.** A trail page shows the live path, a facing cone, the band's connection and battery, and the voice controls. There's also a team map and a phone page that vibrates on Android. No API key ever reaches a page: keys are read only in Python, and only under our own `VEXO_` names.
 
-**Testing.** 115 unit tests. Every real walk is logged to a CSV, and a replay tool runs any log through the tracker, so we tuned the tracker on recorded walks instead of guesses.
+**Testing.** 119 unit tests. Every real walk is logged to a CSV, and a replay tool runs any log through the tracker, so we tuned the tracker on recorded walks instead of guesses.
 
 ## Challenges we ran into
 
