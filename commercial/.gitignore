@@ -1,0 +1,6 @@
+out/frames/
+out/still-*.png
+out/sheet*.png
+out/render.log
+audio/music.wav
+out/crop*.png

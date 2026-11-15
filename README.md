@@ -1,5 +1,15 @@
 # Wayback: wearable spatial memory on the Vexo band
 
+> ## Final submission (VexoHacks, Nov 14 2026)
+> - **Demo video (60 s):** [submission/wayback-demo-FINAL-SUBMISSION.mp4](submission/wayback-demo-FINAL-SUBMISSION.mp4) — the team's working-demo film with a real iPhone screen recording of a walk (iPhone 11 + Vexo band, no laptop) in place of the simulated phone.
+> - **iPhone app:** [`ios/Wayback`](ios/Wayback) — connects straight to the Vexo band over Bluetooth (no laptop). One screen: map of your walk, Start/Stop, Talk, Save place, and saved places you tap to be guided back.
+> - **What it does:** double-tap the band and speak to start a route, name a place ("remember this as the elevator") or ask to go back ("take me back to the elevator"). The phone guides you back with spoken directions (speaker or AirPods) and a **steady haptic pulse while you face the right way** (silence means turn).
+> - **Tracking:** the iPhone's camera + motion sensors (ARKit visual-inertial tracking) lead while the camera can see, at any phone angle. **Camera covered or phone in a pocket? Tracking continues on the Vexo band's motion and step sensors**, fused with the iPhone's IMU, pedometer (stride) and barometer (floor change). While the camera tracks, the band's step counter and the camera's distance learn your stride.
+> - **The Vexo band's role:** every command goes through it (microphone, double-tap, LED light), and its motion + step data carry the tracking whenever vision can't.
+> - **Measured:** a 120 m camera-tracked walk with the phone in hand ended 3.0 m from its start. Pocket-only tracking drifts more (phone handling and arm swing), and is the next thing to improve, e.g. with a proper Kalman filter weighting each sensor by its uncertainty.
+> - **Run it:** open `ios/Wayback/Wayback.xcodeproj` in Xcode, set your Team under Signing, pick your iPhone, press Run. Set your band number in the app (gear icon). Voice keys (Deepgram, Gemini, ElevenLabs) go in the app's settings and are kept in the iOS Keychain.
+
+
 *Vexo remembers what you said. We make it remember **where** you said it.*
 
 Walk around a place that has no map, such as your house, an office or a hospital floor, and say

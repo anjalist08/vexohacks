@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demo Versions</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#000; --card:#1c1c1e; --line:rgba(255,255,255,.12); --fg:#f5f5f7; --muted:#86868b; --blue:#0a84ff; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font-family:"Montserrat", system-ui, sans-serif; }
+  main { max-width:1100px; margin:0 auto; padding:48px 16px 80px; }
+  h1 { font-size:clamp(32px, 6vw, 56px); font-weight:800; letter-spacing:-1.5px; margin:0 0 8px;
+       background:linear-gradient(90deg,#ff9f0a,#ff375f,#bf5af2,#5e5ce6,#0a84ff,#64d2ff); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .sub { color:var(--muted); margin:0 0 36px; }
+  .v { background:var(--card); border:1px solid var(--line); border-radius:24px; padding:20px; margin-bottom:28px; }
+  .head { display:flex; gap:12px; align-items:baseline; flex-wrap:wrap; margin-bottom:14px; }
+  .tag { background:var(--blue); color:#fff; font-weight:700; border-radius:999px; padding:4px 12px; font-size:14px; }
+  .tag.latest { background:#30d158; color:#000; }
+  h2 { margin:0; font-size:22px; font-weight:700; }
+  .meta { color:var(--muted); font-size:13px; }
+  video { width:100%; border-radius:14px; background:#000; display:block; }
+  ul { margin:14px 0 0; padding-left:20px; color:#d1d1d6; line-height:1.55; }
+  a { color:var(--blue); }
+  .err { color:#ff453a; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Wayback Trail demo versions</h1>
+  <p class="sub">Every rendered cut of the 60-second commercial and the working demo, newest first. Serve this folder (for example <code>python3 -m http.server</code>) so the list loads.</p>
+  <div id="list"></div>
+</main>
+<script>
+fetch("versions.json").then(r => r.json()).then(vs => {
+  const list = document.getElementById("list");
+  const latest = Math.max(...vs.map(v => v.version));
+  vs.slice().sort((a, b) => b.version - a.version).forEach(v => {
+    const el = document.createElement("section"); el.className = "v";
+    const head = document.createElement("div"); head.className = "head";
+    const tag = document.createElement("span"); tag.className = "tag" + (v.version === latest ? " latest" : ""); tag.textContent = (v.label || "v" + v.version) + (v.version === latest ? " · latest" : "");
+    const h = document.createElement("h2"); h.textContent = v.title;
+    const meta = document.createElement("span"); meta.className = "meta"; meta.textContent = v.date + " · commit " + v.commit;
+    head.append(tag, h, meta);
+    const vid = document.createElement("video"); vid.controls = true; vid.preload = "metadata"; vid.src = v.file; vid.poster = "thumbs/" + v.file.replace(/\.mp4$/, ".jpg");
+    const ul = document.createElement("ul"); v.changes.forEach(c => { const li = document.createElement("li"); li.textContent = c; ul.append(li); });
+    el.append(head, vid, ul); list.append(el);
+  });
+}).catch(() => {
+  document.getElementById("list").innerHTML = '<p class="err">Could not load versions.json. Serve this folder over http, or open the .mp4 files directly.</p>';
+});
+</script>
+</body>
+</html>
